@@ -67,30 +67,30 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PORT-01 | TBD | Pending |
-| PORT-02 | TBD | Pending |
-| PORT-03 | TBD | Pending |
-| LEGAL-01 | TBD | Pending |
-| LEGAL-02 | TBD | Pending |
-| LEGAL-03 | TBD | Pending |
-| ASC-01 | TBD | Pending |
-| ASC-02 | TBD | Pending |
-| ASC-03 | TBD | Pending |
-| ASC-04 | TBD | Pending |
-| META-01 | TBD | Pending |
-| CRTV-01 | TBD | Pending |
-| CRTV-02 | TBD | Pending |
-| CRTV-03 | TBD | Pending |
-| CRTV-04 | TBD | Pending |
-| READY-01 | TBD | Pending |
-| READY-02 | TBD | Pending |
-| READY-03 | TBD | Pending |
+| PORT-01 | Phase 1 - Portfolio Intake and Wave Control | Pending |
+| PORT-02 | Phase 1 - Portfolio Intake and Wave Control | Pending |
+| PORT-03 | Phase 1 - Portfolio Intake and Wave Control | Pending |
+| LEGAL-01 | Phase 2 - Legal URL Baseline and Cloudflare Publish | Pending |
+| LEGAL-02 | Phase 2 - Legal URL Baseline and Cloudflare Publish | Pending |
+| LEGAL-03 | Phase 4 - Remediation and Metadata Lock | Pending |
+| ASC-01 | Phase 3 - ASC Live Audit and Rejection RCA | Pending |
+| ASC-02 | Phase 3 - ASC Live Audit and Rejection RCA | Pending |
+| ASC-03 | Phase 3 - ASC Live Audit and Rejection RCA | Pending |
+| ASC-04 | Phase 4 - Remediation and Metadata Lock | Pending |
+| META-01 | Phase 4 - Remediation and Metadata Lock | Pending |
+| CRTV-01 | Phase 5 - Creative Production and ASC Asset Refresh | Pending |
+| CRTV-02 | Phase 5 - Creative Production and ASC Asset Refresh | Pending |
+| CRTV-03 | Phase 5 - Creative Production and ASC Asset Refresh | Pending |
+| CRTV-04 | Phase 5 - Creative Production and ASC Asset Refresh | Pending |
+| READY-01 | Phase 6 - Submission-Ready Gate and Reuse Hardening | Pending |
+| READY-02 | Phase 6 - Submission-Ready Gate and Reuse Hardening | Pending |
+| READY-03 | Phase 6 - Submission-Ready Gate and Reuse Hardening | Pending |
 
 **Coverage:**
 - v1 requirements: 18 total
-- Mapped to phases: 0
-- Unmapped: 18 ⚠️
+- Mapped to phases: 18
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-11*
-*Last updated: 2026-03-11 after initial definition*
+*Last updated: 2026-03-11 after roadmap mapping*
