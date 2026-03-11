@@ -1,0 +1,439 @@
+{
+  "generated_at": "2026-03-11",
+  "allowed_states": [
+    "not_started",
+    "in_progress",
+    "blocked",
+    "submission_ready"
+  ],
+  "apps": [
+    {
+      "app_key": "babyvox",
+      "owner": "asc-audit",
+      "state": "blocked",
+      "next_action": "Create the Phase 2 legal URL matrix row, then capture the Phase 3 ASC rejection evidence packet.",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "asc_rejection_details_pending_capture_and_fix",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "evidence": {
+        "legal_url_matrix": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/legal-url-matrix.csv",
+          "note": "Pending BabyVox row."
+        },
+        "cloudflare_publish_log": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/cloudflare-publish-log.md",
+          "note": "No Cloudflare publish evidence yet."
+        },
+        "asc_live_audit": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/asc-live-audit.json",
+          "note": "Requires live ASC pull."
+        },
+        "rejection_rca": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/rejection-rca.md",
+          "note": "Requires reviewer detail and RCA."
+        },
+        "metadata_lock": {
+          "status": "pending",
+          "path": ".planning/phases/04-remediation-and-metadata-lock/metadata-lock.json",
+          "note": "Phase 4 will record final metadata and URL locks."
+        },
+        "creative_bundle": {
+          "status": "pending",
+          "path": ".planning/phases/05-creative-production-and-asc-asset-refresh/creative-bundles/babyvox/",
+          "note": "Phase 5 will populate screenshots previews and upload evidence."
+        },
+        "readiness_packet": {
+          "status": "pending",
+          "path": ".planning/phases/06-submission-ready-gate-and-reuse-hardening/readiness-packets/babyvox.md",
+          "note": "Final gate packet."
+        }
+      }
+    },
+    {
+      "app_key": "oxisnap",
+      "owner": "asc-audit",
+      "state": "blocked",
+      "next_action": "Create the Phase 2 legal URL matrix row, then capture the Phase 3 ASC rejection evidence packet with alias-aware notes.",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "asc_rejection_details_pending_capture_and_fix",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "evidence": {
+        "legal_url_matrix": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/legal-url-matrix.csv",
+          "note": "Pending OxiSnap row."
+        },
+        "cloudflare_publish_log": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/cloudflare-publish-log.md",
+          "note": "No Cloudflare publish evidence yet."
+        },
+        "asc_live_audit": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/asc-live-audit.json",
+          "note": "Requires live ASC pull."
+        },
+        "rejection_rca": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/rejection-rca.md",
+          "note": "Requires reviewer detail and alias-aware RCA."
+        },
+        "metadata_lock": {
+          "status": "pending",
+          "path": ".planning/phases/04-remediation-and-metadata-lock/metadata-lock.json",
+          "note": "Phase 4 will record final metadata and URL locks."
+        },
+        "creative_bundle": {
+          "status": "pending",
+          "path": ".planning/phases/05-creative-production-and-asc-asset-refresh/creative-bundles/oxisnap/",
+          "note": "Phase 5 will populate screenshots previews and upload evidence."
+        },
+        "readiness_packet": {
+          "status": "pending",
+          "path": ".planning/phases/06-submission-ready-gate-and-reuse-hardening/readiness-packets/oxisnap.md",
+          "note": "Final gate packet."
+        }
+      }
+    },
+    {
+      "app_key": "coughwav",
+      "owner": "asc-audit",
+      "state": "blocked",
+      "next_action": "Create the Phase 2 legal URL matrix row, then capture the Phase 3 ASC rejection evidence packet.",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "asc_rejection_details_pending_capture_and_fix",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "evidence": {
+        "legal_url_matrix": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/legal-url-matrix.csv",
+          "note": "Pending CoughWav row."
+        },
+        "cloudflare_publish_log": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/cloudflare-publish-log.md",
+          "note": "No Cloudflare publish evidence yet."
+        },
+        "asc_live_audit": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/asc-live-audit.json",
+          "note": "Requires live ASC pull."
+        },
+        "rejection_rca": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/rejection-rca.md",
+          "note": "Requires reviewer detail and RCA."
+        },
+        "metadata_lock": {
+          "status": "pending",
+          "path": ".planning/phases/04-remediation-and-metadata-lock/metadata-lock.json",
+          "note": "Phase 4 will record final metadata and URL locks."
+        },
+        "creative_bundle": {
+          "status": "pending",
+          "path": ".planning/phases/05-creative-production-and-asc-asset-refresh/creative-bundles/coughwav/",
+          "note": "Phase 5 will populate screenshots previews and upload evidence."
+        },
+        "readiness_packet": {
+          "status": "pending",
+          "path": ".planning/phases/06-submission-ready-gate-and-reuse-hardening/readiness-packets/coughwav.md",
+          "note": "Final gate packet."
+        }
+      }
+    },
+    {
+      "app_key": "thermosnap",
+      "owner": "asc-audit",
+      "state": "blocked",
+      "next_action": "Create the Phase 2 legal URL matrix row, then capture the Phase 3 ASC rejection evidence packet.",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "asc_rejection_details_pending_capture_and_fix",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "evidence": {
+        "legal_url_matrix": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/legal-url-matrix.csv",
+          "note": "Pending ThermoSnap row."
+        },
+        "cloudflare_publish_log": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/cloudflare-publish-log.md",
+          "note": "No Cloudflare publish evidence yet."
+        },
+        "asc_live_audit": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/asc-live-audit.json",
+          "note": "Requires live ASC pull."
+        },
+        "rejection_rca": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/rejection-rca.md",
+          "note": "Requires reviewer detail and RCA."
+        },
+        "metadata_lock": {
+          "status": "pending",
+          "path": ".planning/phases/04-remediation-and-metadata-lock/metadata-lock.json",
+          "note": "Phase 4 will record final metadata and URL locks."
+        },
+        "creative_bundle": {
+          "status": "pending",
+          "path": ".planning/phases/05-creative-production-and-asc-asset-refresh/creative-bundles/thermosnap/",
+          "note": "Phase 5 will populate screenshots previews and upload evidence."
+        },
+        "readiness_packet": {
+          "status": "pending",
+          "path": ".planning/phases/06-submission-ready-gate-and-reuse-hardening/readiness-packets/thermosnap.md",
+          "note": "Final gate packet."
+        }
+      }
+    },
+    {
+      "app_key": "bpsnap",
+      "owner": "asc-audit",
+      "state": "blocked",
+      "next_action": "Create the Phase 2 legal URL matrix row, then capture the Phase 3 ASC rejection evidence packet with slug-aware notes.",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "asc_rejection_details_pending_capture_and_fix",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "evidence": {
+        "legal_url_matrix": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/legal-url-matrix.csv",
+          "note": "Pending BPSnap row."
+        },
+        "cloudflare_publish_log": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/cloudflare-publish-log.md",
+          "note": "No Cloudflare publish evidence yet."
+        },
+        "asc_live_audit": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/asc-live-audit.json",
+          "note": "Requires live ASC pull."
+        },
+        "rejection_rca": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/rejection-rca.md",
+          "note": "Requires reviewer detail and slug-aware RCA."
+        },
+        "metadata_lock": {
+          "status": "pending",
+          "path": ".planning/phases/04-remediation-and-metadata-lock/metadata-lock.json",
+          "note": "Phase 4 will record final metadata and URL locks."
+        },
+        "creative_bundle": {
+          "status": "pending",
+          "path": ".planning/phases/05-creative-production-and-asc-asset-refresh/creative-bundles/bpsnap/",
+          "note": "Phase 5 will populate screenshots previews and upload evidence."
+        },
+        "readiness_packet": {
+          "status": "pending",
+          "path": ".planning/phases/06-submission-ready-gate-and-reuse-hardening/readiness-packets/bpsnap.md",
+          "note": "Final gate packet."
+        }
+      }
+    },
+    {
+      "app_key": "glucosnap",
+      "owner": "legal-publish",
+      "state": "not_started",
+      "next_action": "Add GlucoSnap to the Phase 2 legal URL matrix and queue the Cloudflare publish route.",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "evidence": {
+        "legal_url_matrix": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/legal-url-matrix.csv",
+          "note": "Pending GlucoSnap row."
+        },
+        "cloudflare_publish_log": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/cloudflare-publish-log.md",
+          "note": "No Cloudflare publish evidence yet."
+        },
+        "asc_live_audit": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/asc-live-audit.json",
+          "note": "Requires live ASC pull."
+        },
+        "rejection_rca": {
+          "status": "not_applicable_until_phase_3",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/rejection-rca.md",
+          "note": "Populate only if Phase 3 finds a rejection or equivalent blocker."
+        },
+        "metadata_lock": {
+          "status": "pending",
+          "path": ".planning/phases/04-remediation-and-metadata-lock/metadata-lock.json",
+          "note": "Phase 4 will record final metadata and URL locks."
+        },
+        "creative_bundle": {
+          "status": "pending",
+          "path": ".planning/phases/05-creative-production-and-asc-asset-refresh/creative-bundles/glucosnap/",
+          "note": "Phase 5 will populate screenshots previews and upload evidence."
+        },
+        "readiness_packet": {
+          "status": "pending",
+          "path": ".planning/phases/06-submission-ready-gate-and-reuse-hardening/readiness-packets/glucosnap.md",
+          "note": "Final gate packet."
+        }
+      }
+    },
+    {
+      "app_key": "weightsnap",
+      "owner": "legal-publish",
+      "state": "not_started",
+      "next_action": "Add WeightSnap to the Phase 2 legal URL matrix and queue the Cloudflare publish route.",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "evidence": {
+        "legal_url_matrix": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/legal-url-matrix.csv",
+          "note": "Pending WeightSnap row."
+        },
+        "cloudflare_publish_log": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/cloudflare-publish-log.md",
+          "note": "No Cloudflare publish evidence yet."
+        },
+        "asc_live_audit": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/asc-live-audit.json",
+          "note": "Requires live ASC pull."
+        },
+        "rejection_rca": {
+          "status": "not_applicable_until_phase_3",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/rejection-rca.md",
+          "note": "Populate only if Phase 3 finds a rejection or equivalent blocker."
+        },
+        "metadata_lock": {
+          "status": "pending",
+          "path": ".planning/phases/04-remediation-and-metadata-lock/metadata-lock.json",
+          "note": "Phase 4 will record final metadata and URL locks."
+        },
+        "creative_bundle": {
+          "status": "pending",
+          "path": ".planning/phases/05-creative-production-and-asc-asset-refresh/creative-bundles/weightsnap/",
+          "note": "Phase 5 will populate screenshots previews and upload evidence."
+        },
+        "readiness_packet": {
+          "status": "pending",
+          "path": ".planning/phases/06-submission-ready-gate-and-reuse-hardening/readiness-packets/weightsnap.md",
+          "note": "Final gate packet."
+        }
+      }
+    },
+    {
+      "app_key": "waistvox",
+      "owner": "legal-publish",
+      "state": "not_started",
+      "next_action": "Add WaistVox to the Phase 2 legal URL matrix and queue the Cloudflare publish route.",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "evidence": {
+        "legal_url_matrix": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/legal-url-matrix.csv",
+          "note": "Pending WaistVox row."
+        },
+        "cloudflare_publish_log": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/cloudflare-publish-log.md",
+          "note": "No Cloudflare publish evidence yet."
+        },
+        "asc_live_audit": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/asc-live-audit.json",
+          "note": "Requires live ASC pull."
+        },
+        "rejection_rca": {
+          "status": "not_applicable_until_phase_3",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/rejection-rca.md",
+          "note": "Populate only if Phase 3 finds a rejection or equivalent blocker."
+        },
+        "metadata_lock": {
+          "status": "pending",
+          "path": ".planning/phases/04-remediation-and-metadata-lock/metadata-lock.json",
+          "note": "Phase 4 will record final metadata and URL locks."
+        },
+        "creative_bundle": {
+          "status": "pending",
+          "path": ".planning/phases/05-creative-production-and-asc-asset-refresh/creative-bundles/waistvox/",
+          "note": "Phase 5 will populate screenshots previews and upload evidence."
+        },
+        "readiness_packet": {
+          "status": "pending",
+          "path": ".planning/phases/06-submission-ready-gate-and-reuse-hardening/readiness-packets/waistvox.md",
+          "note": "Final gate packet."
+        }
+      }
+    },
+    {
+      "app_key": "pupweight",
+      "owner": "portfolio-ops",
+      "state": "not_started",
+      "next_action": "Add PupWeight to the Phase 2 legal URL matrix and queue the outlier-specific legal and creative route.",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "evidence": {
+        "legal_url_matrix": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/legal-url-matrix.csv",
+          "note": "Pending PupWeight row."
+        },
+        "cloudflare_publish_log": {
+          "status": "pending",
+          "path": ".planning/phases/02-legal-url-baseline-and-cloudflare-publish/cloudflare-publish-log.md",
+          "note": "No Cloudflare publish evidence yet."
+        },
+        "asc_live_audit": {
+          "status": "pending",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/asc-live-audit.json",
+          "note": "Requires live ASC pull."
+        },
+        "rejection_rca": {
+          "status": "not_applicable_until_phase_3",
+          "path": ".planning/phases/03-asc-live-audit-and-rejection-rca/rejection-rca.md",
+          "note": "Populate only if Phase 3 finds a rejection or equivalent blocker."
+        },
+        "metadata_lock": {
+          "status": "pending",
+          "path": ".planning/phases/04-remediation-and-metadata-lock/metadata-lock.json",
+          "note": "Phase 4 will record final metadata and URL locks."
+        },
+        "creative_bundle": {
+          "status": "pending",
+          "path": ".planning/phases/05-creative-production-and-asc-asset-refresh/creative-bundles/pupweight/",
+          "note": "Phase 5 will populate screenshots previews and upload evidence."
+        },
+        "readiness_packet": {
+          "status": "pending",
+          "path": ".planning/phases/06-submission-ready-gate-and-reuse-hardening/readiness-packets/pupweight.md",
+          "note": "Final gate packet."
+        }
+      }
+    }
+  ]
+}

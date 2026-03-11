@@ -1,0 +1,263 @@
+{
+  "generated_at": "2026-03-11",
+  "portfolio_name": "allnew-app-store-portfolio-recovery",
+  "apps": [
+    {
+      "app_key": "babyvox",
+      "display_name": "BabyVox",
+      "repo_path": "/Users/masa/Development/projects/BabyVox",
+      "landing_slug": "babyvox",
+      "bundle_id": "jp.allnew.babyvox",
+      "asc_app_id": "6759076543",
+      "app_store_url": "https://apps.apple.com/app/id6759076543",
+      "known_review_state": "rejected_per_project_brief_pending_phase_3_live_pull",
+      "current_blocker_state": "blocked",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "asc_rejection_details_pending_capture_and_fix",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "current_surface": "allnew-apps landing slug present; legal docs still reported on legacy GitHub Pages",
+      "source_of_truth": {
+        "repo_path": "local_repo_dir_scan_2026-03-11",
+        "landing_slug": "projects/allnew-apps/data/landing-apps.generated.json",
+        "bundle_id": "projects/allnew-apps/data/landing-apps.generated.json",
+        "asc_app_id": "session_appagent_list_apps_capture_2026-03-11",
+        "known_review_state": "user_project_brief_2026-03-11"
+      },
+      "last_verified_at": "2026-03-11",
+      "notes": [
+        "Wave 1 app because the project brief names it as rejected in ASC.",
+        "Phase 3 must replace the rejection placeholder with live ASC truth and reviewer notes."
+      ]
+    },
+    {
+      "app_key": "oxisnap",
+      "display_name": "OxiSnap",
+      "repo_path": "/Users/masa/Development/projects/OxiVox",
+      "landing_slug": "oxisnap",
+      "bundle_id": "jp.allnew.oxisnap",
+      "asc_app_id": "6759076145",
+      "app_store_url": "https://apps.apple.com/app/id6759076145",
+      "known_review_state": "rejected_per_project_brief_pending_phase_3_live_pull",
+      "current_blocker_state": "blocked",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "asc_rejection_details_pending_capture_and_fix",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "current_surface": "allnew-apps landing slug present; legal docs still reported on legacy GitHub Pages",
+      "source_of_truth": {
+        "repo_path": "local_repo_dir_scan_2026-03-11",
+        "landing_slug": "projects/allnew-apps/data/landing-apps.generated.json",
+        "bundle_id": "projects/allnew-apps/data/landing-apps.generated.json",
+        "asc_app_id": "session_appagent_list_apps_capture_2026-03-11",
+        "known_review_state": "user_project_brief_2026-03-11"
+      },
+      "last_verified_at": "2026-03-11",
+      "notes": [
+        "Canonical key is oxisnap even though the local repo directory is OxiVox.",
+        "Phase 1 identity map captures the repo-to-product name drift explicitly."
+      ]
+    },
+    {
+      "app_key": "coughwav",
+      "display_name": "CoughWav",
+      "repo_path": "/Users/masa/Development/projects/CoughWav",
+      "landing_slug": "coughwav",
+      "bundle_id": "jp.allnew.coughwav",
+      "asc_app_id": "6759076606",
+      "app_store_url": "https://apps.apple.com/app/id6759076606",
+      "known_review_state": "rejected_per_project_brief_pending_phase_3_live_pull",
+      "current_blocker_state": "blocked",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "asc_rejection_details_pending_capture_and_fix",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "current_surface": "allnew-apps landing slug present; legal docs still reported on legacy GitHub Pages",
+      "source_of_truth": {
+        "repo_path": "local_repo_dir_scan_2026-03-11",
+        "landing_slug": "projects/allnew-apps/data/landing-apps.generated.json",
+        "bundle_id": "projects/allnew-apps/data/landing-apps.generated.json",
+        "asc_app_id": "session_appagent_list_apps_capture_2026-03-11",
+        "known_review_state": "user_project_brief_2026-03-11"
+      },
+      "last_verified_at": "2026-03-11",
+      "notes": [
+        "Wave 1 app because the project brief names it as rejected in ASC.",
+        "Later phases must capture the live review detail before any submission action."
+      ]
+    },
+    {
+      "app_key": "thermosnap",
+      "display_name": "ThermoSnap",
+      "repo_path": "/Users/masa/Development/projects/ThermoSnap",
+      "landing_slug": "thermosnap",
+      "bundle_id": "jp.allnew.thermosnap",
+      "asc_app_id": "6759076372",
+      "app_store_url": "https://apps.apple.com/app/id6759076372",
+      "known_review_state": "rejected_per_project_brief_pending_phase_3_live_pull",
+      "current_blocker_state": "blocked",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "asc_rejection_details_pending_capture_and_fix",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "current_surface": "allnew-apps landing slug present; legal docs still reported on legacy GitHub Pages",
+      "source_of_truth": {
+        "repo_path": "local_repo_dir_scan_2026-03-11",
+        "landing_slug": "projects/allnew-apps/data/landing-apps.generated.json",
+        "bundle_id": "projects/allnew-apps/data/landing-apps.generated.json",
+        "asc_app_id": "session_appagent_list_apps_capture_2026-03-11",
+        "known_review_state": "user_project_brief_2026-03-11"
+      },
+      "last_verified_at": "2026-03-11",
+      "notes": [
+        "Wave 1 app because the project brief names it as rejected in ASC.",
+        "Phase 3 must confirm whether metadata, compliance, or product issues drove rejection."
+      ]
+    },
+    {
+      "app_key": "bpsnap",
+      "display_name": "BPSnap",
+      "repo_path": "/Users/masa/Development/projects/BloodPressureSnap",
+      "landing_slug": "bloodpressuresnap",
+      "bundle_id": "jp.allnew.bloodpressuresnap",
+      "asc_app_id": "6759076255",
+      "app_store_url": "https://apps.apple.com/app/id6759076255",
+      "known_review_state": "rejected_per_project_brief_pending_phase_3_live_pull",
+      "current_blocker_state": "blocked",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "asc_rejection_details_pending_capture_and_fix",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "current_surface": "allnew-apps landing slug present; legal docs still reported on legacy GitHub Pages",
+      "source_of_truth": {
+        "repo_path": "local_repo_dir_scan_2026-03-11",
+        "landing_slug": "projects/allnew-apps/data/landing-apps.generated.json",
+        "bundle_id": "projects/allnew-apps/data/landing-apps.generated.json",
+        "asc_app_id": "session_appagent_list_apps_capture_2026-03-11",
+        "known_review_state": "user_project_brief_2026-03-11"
+      },
+      "last_verified_at": "2026-03-11",
+      "notes": [
+        "Canonical key is bpsnap even though the repo and public slug still use bloodpressuresnap.",
+        "Phase 1 identity map documents the brand-to-slug drift explicitly."
+      ]
+    },
+    {
+      "app_key": "glucosnap",
+      "display_name": "GlucoSnap",
+      "repo_path": "/Users/masa/Development/projects/GlucoSnap",
+      "landing_slug": "glucosnap",
+      "bundle_id": "jp.allnew.glucosnap",
+      "asc_app_id": "6759076419",
+      "app_store_url": "https://apps.apple.com/app/id6759076419",
+      "known_review_state": "pending_phase_3_live_pull",
+      "current_blocker_state": "blocked",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "current_surface": "allnew-apps landing slug present; legal docs still reported on legacy GitHub Pages",
+      "source_of_truth": {
+        "repo_path": "local_repo_dir_scan_2026-03-11",
+        "landing_slug": "projects/allnew-apps/data/landing-apps.generated.json",
+        "bundle_id": "projects/allnew-apps/data/landing-apps.generated.json",
+        "asc_app_id": "session_appagent_list_apps_capture_2026-03-11",
+        "known_review_state": "pending_phase_3_live_pull"
+      },
+      "last_verified_at": "2026-03-11",
+      "notes": [
+        "Phase 3 must confirm whether the live ASC state is for sale, ready for sale, or another non-rejected status.",
+        "This app should be able to reuse the health metric pattern established in Wave 1."
+      ]
+    },
+    {
+      "app_key": "weightsnap",
+      "display_name": "WeightSnap",
+      "repo_path": "/Users/masa/Development/projects/WeightSnap",
+      "landing_slug": "weightsnap",
+      "bundle_id": "jp.allnew.weightsnap",
+      "asc_app_id": "6758825019",
+      "app_store_url": "https://apps.apple.com/app/weightsnap/id6758825019",
+      "known_review_state": "pending_phase_3_live_pull",
+      "current_blocker_state": "blocked",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "current_surface": "allnew-apps landing slug present; legal docs still reported on legacy GitHub Pages",
+      "source_of_truth": {
+        "repo_path": "local_repo_dir_scan_2026-03-11",
+        "landing_slug": "projects/allnew-apps/data/landing-apps.generated.json",
+        "bundle_id": "projects/allnew-apps/data/landing-apps.generated.json",
+        "asc_app_id": "projects/allnew-apps/data/landing-apps.generated.json",
+        "known_review_state": "pending_phase_3_live_pull"
+      },
+      "last_verified_at": "2026-03-11",
+      "notes": [
+        "WeightSnap is the only local landing record that already carries an App Store URL and ASC id.",
+        "Use it as a local sanity check when later syncing URLs back into the shared landing catalog."
+      ]
+    },
+    {
+      "app_key": "waistvox",
+      "display_name": "WaistVox",
+      "repo_path": "/Users/masa/Development/projects/WaistVox",
+      "landing_slug": "waistvox",
+      "bundle_id": "jp.allnew.waistvox",
+      "asc_app_id": "6759076494",
+      "app_store_url": "https://apps.apple.com/app/id6759076494",
+      "known_review_state": "pending_phase_3_live_pull",
+      "current_blocker_state": "blocked",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "current_surface": "allnew-apps landing slug present; legal docs still reported on legacy GitHub Pages",
+      "source_of_truth": {
+        "repo_path": "local_repo_dir_scan_2026-03-11",
+        "landing_slug": "projects/allnew-apps/data/landing-apps.generated.json",
+        "bundle_id": "projects/allnew-apps/data/landing-apps.generated.json",
+        "asc_app_id": "session_appagent_list_apps_capture_2026-03-11",
+        "known_review_state": "pending_phase_3_live_pull"
+      },
+      "last_verified_at": "2026-03-11",
+      "notes": [
+        "Phase 3 must confirm the live ASC state because the project brief does not mark it as rejected.",
+        "This app should be able to reuse the same evidence pattern as GlucoSnap and WeightSnap."
+      ]
+    },
+    {
+      "app_key": "pupweight",
+      "display_name": "PupWeight",
+      "repo_path": "/Users/masa/Development/projects/PupWeight",
+      "landing_slug": "pupweight",
+      "bundle_id": "jp.allnew.pupweight",
+      "asc_app_id": "6759076505",
+      "app_store_url": "https://apps.apple.com/app/id6759076505",
+      "known_review_state": "pending_phase_3_live_pull",
+      "current_blocker_state": "blocked",
+      "current_blockers": [
+        "legacy_github_pages_legal_docs",
+        "stale_or_missing_app_store_creatives"
+      ],
+      "current_surface": "allnew-apps landing slug present; legal docs still reported on legacy GitHub Pages",
+      "source_of_truth": {
+        "repo_path": "local_repo_dir_scan_2026-03-11",
+        "landing_slug": "projects/allnew-apps/data/landing-apps.generated.json",
+        "bundle_id": "projects/allnew-apps/data/landing-apps.generated.json",
+        "asc_app_id": "session_appagent_list_apps_capture_2026-03-11",
+        "known_review_state": "pending_phase_3_live_pull"
+      },
+      "last_verified_at": "2026-03-11",
+      "notes": [
+        "PupWeight is a pet app and may need a different creative and legal wording pattern from the health-measurement apps.",
+        "The roadmap treats it as a likely Wave 3 outlier."
+      ]
+    }
+  ]
+}
