@@ -1,0 +1,294 @@
+{
+  "generated_at": "2026-03-11T04:07:48.619Z",
+  "headless": true,
+  "results": [
+    {
+      "app_key": "babyvox",
+      "display_name": "BabyVox",
+      "support_url": "https://apps.allnew.work/babyvox/?lang=ja",
+      "privacy_url": "https://apps.allnew.work/babyvox/?lang=ja#privacy-ja",
+      "started_at": "2026-03-11T04:07:36.967Z",
+      "http_status": 200,
+      "final_url": "https://apps.allnew.work/babyvox/?lang=ja",
+      "redirect_chain": [
+        "https://apps.allnew.work/babyvox/?lang=ja"
+      ],
+      "title": "BabyVox Support",
+      "canonical_href": null,
+      "anchor_presence": {
+        "privacy_ja": 1,
+        "privacy_en": 1,
+        "terms_ja": 1,
+        "terms_en": 1,
+        "commercial_ja": 1,
+        "contact_ja": 1
+      },
+      "body_contains_display_name": true,
+      "home_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/babyvox-home-2026-03-11T04-07-36-378Z.png",
+      "privacy_final_url": "https://apps.allnew.work/babyvox/?lang=ja#privacy-ja",
+      "privacy_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/babyvox-privacy-2026-03-11T04-07-36-378Z.png",
+      "content_check": true,
+      "canonical_check": true,
+      "legacy_leak_detected": false,
+      "safe_for_phase_4": true,
+      "error": null,
+      "completed_at": "2026-03-11T04:07:38.317Z"
+    },
+    {
+      "app_key": "oxisnap",
+      "display_name": "OxiSnap",
+      "support_url": "https://apps.allnew.work/oxisnap/?lang=ja",
+      "privacy_url": "https://apps.allnew.work/oxisnap/?lang=ja#privacy-ja",
+      "started_at": "2026-03-11T04:07:38.354Z",
+      "http_status": 200,
+      "final_url": "https://apps.allnew.work/oxisnap/?lang=ja",
+      "redirect_chain": [
+        "https://apps.allnew.work/oxisnap/?lang=ja"
+      ],
+      "title": "OxiSnap Support",
+      "canonical_href": null,
+      "anchor_presence": {
+        "privacy_ja": 1,
+        "privacy_en": 1,
+        "terms_ja": 1,
+        "terms_en": 1,
+        "commercial_ja": 1,
+        "contact_ja": 1
+      },
+      "body_contains_display_name": true,
+      "home_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/oxisnap-home-2026-03-11T04-07-36-378Z.png",
+      "privacy_final_url": "https://apps.allnew.work/oxisnap/?lang=ja#privacy-ja",
+      "privacy_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/oxisnap-privacy-2026-03-11T04-07-36-378Z.png",
+      "content_check": true,
+      "canonical_check": true,
+      "legacy_leak_detected": false,
+      "safe_for_phase_4": true,
+      "error": null,
+      "completed_at": "2026-03-11T04:07:39.631Z"
+    },
+    {
+      "app_key": "coughwav",
+      "display_name": "CoughWav",
+      "support_url": "https://apps.allnew.work/coughwav/?lang=ja",
+      "privacy_url": "https://apps.allnew.work/coughwav/?lang=ja#privacy-ja",
+      "started_at": "2026-03-11T04:07:39.673Z",
+      "http_status": 200,
+      "final_url": "https://apps.allnew.work/coughwav/?lang=ja",
+      "redirect_chain": [
+        "https://apps.allnew.work/coughwav/?lang=ja"
+      ],
+      "title": "CoughWav Support",
+      "canonical_href": null,
+      "anchor_presence": {
+        "privacy_ja": 1,
+        "privacy_en": 1,
+        "terms_ja": 1,
+        "terms_en": 1,
+        "commercial_ja": 1,
+        "contact_ja": 1
+      },
+      "body_contains_display_name": true,
+      "home_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/coughwav-home-2026-03-11T04-07-36-378Z.png",
+      "privacy_final_url": "https://apps.allnew.work/coughwav/?lang=ja#privacy-ja",
+      "privacy_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/coughwav-privacy-2026-03-11T04-07-36-378Z.png",
+      "content_check": true,
+      "canonical_check": true,
+      "legacy_leak_detected": false,
+      "safe_for_phase_4": true,
+      "error": null,
+      "completed_at": "2026-03-11T04:07:40.890Z"
+    },
+    {
+      "app_key": "thermosnap",
+      "display_name": "ThermoSnap",
+      "support_url": "https://apps.allnew.work/thermosnap/?lang=ja",
+      "privacy_url": "https://apps.allnew.work/thermosnap/?lang=ja#privacy-ja",
+      "started_at": "2026-03-11T04:07:40.931Z",
+      "http_status": 200,
+      "final_url": "https://apps.allnew.work/thermosnap/?lang=ja",
+      "redirect_chain": [
+        "https://apps.allnew.work/thermosnap/?lang=ja"
+      ],
+      "title": "ThermoSnap Support",
+      "canonical_href": null,
+      "anchor_presence": {
+        "privacy_ja": 1,
+        "privacy_en": 1,
+        "terms_ja": 1,
+        "terms_en": 1,
+        "commercial_ja": 1,
+        "contact_ja": 1
+      },
+      "body_contains_display_name": true,
+      "home_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/thermosnap-home-2026-03-11T04-07-36-378Z.png",
+      "privacy_final_url": "https://apps.allnew.work/thermosnap/?lang=ja#privacy-ja",
+      "privacy_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/thermosnap-privacy-2026-03-11T04-07-36-378Z.png",
+      "content_check": true,
+      "canonical_check": true,
+      "legacy_leak_detected": false,
+      "safe_for_phase_4": true,
+      "error": null,
+      "completed_at": "2026-03-11T04:07:42.185Z"
+    },
+    {
+      "app_key": "bpsnap",
+      "display_name": "BPSnap",
+      "support_url": "https://apps.allnew.work/bloodpressuresnap/?lang=ja",
+      "privacy_url": "https://apps.allnew.work/bloodpressuresnap/?lang=ja#privacy-ja",
+      "started_at": "2026-03-11T04:07:42.219Z",
+      "http_status": 200,
+      "final_url": "https://apps.allnew.work/bloodpressuresnap/?lang=ja",
+      "redirect_chain": [
+        "https://apps.allnew.work/bloodpressuresnap/?lang=ja"
+      ],
+      "title": "BPSnap Support",
+      "canonical_href": null,
+      "anchor_presence": {
+        "privacy_ja": 1,
+        "privacy_en": 1,
+        "terms_ja": 1,
+        "terms_en": 1,
+        "commercial_ja": 1,
+        "contact_ja": 1
+      },
+      "body_contains_display_name": true,
+      "home_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/bpsnap-home-2026-03-11T04-07-36-378Z.png",
+      "privacy_final_url": "https://apps.allnew.work/bloodpressuresnap/?lang=ja#privacy-ja",
+      "privacy_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/bpsnap-privacy-2026-03-11T04-07-36-378Z.png",
+      "content_check": true,
+      "canonical_check": true,
+      "legacy_leak_detected": false,
+      "safe_for_phase_4": true,
+      "error": null,
+      "completed_at": "2026-03-11T04:07:43.450Z"
+    },
+    {
+      "app_key": "glucosnap",
+      "display_name": "GlucoSnap",
+      "support_url": "https://apps.allnew.work/glucosnap/?lang=ja",
+      "privacy_url": "https://apps.allnew.work/glucosnap/?lang=ja#privacy-ja",
+      "started_at": "2026-03-11T04:07:43.487Z",
+      "http_status": 200,
+      "final_url": "https://apps.allnew.work/glucosnap/?lang=ja",
+      "redirect_chain": [
+        "https://apps.allnew.work/glucosnap/?lang=ja"
+      ],
+      "title": "GlucoSnap Support",
+      "canonical_href": null,
+      "anchor_presence": {
+        "privacy_ja": 1,
+        "privacy_en": 1,
+        "terms_ja": 1,
+        "terms_en": 1,
+        "commercial_ja": 1,
+        "contact_ja": 1
+      },
+      "body_contains_display_name": true,
+      "home_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/glucosnap-home-2026-03-11T04-07-36-378Z.png",
+      "privacy_final_url": "https://apps.allnew.work/glucosnap/?lang=ja#privacy-ja",
+      "privacy_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/glucosnap-privacy-2026-03-11T04-07-36-378Z.png",
+      "content_check": true,
+      "canonical_check": true,
+      "legacy_leak_detected": false,
+      "safe_for_phase_4": true,
+      "error": null,
+      "completed_at": "2026-03-11T04:07:44.732Z"
+    },
+    {
+      "app_key": "weightsnap",
+      "display_name": "WeightSnap",
+      "support_url": "https://apps.allnew.work/weightsnap/?lang=ja",
+      "privacy_url": "https://apps.allnew.work/weightsnap/?lang=ja#privacy-ja",
+      "started_at": "2026-03-11T04:07:44.764Z",
+      "http_status": 200,
+      "final_url": "https://apps.allnew.work/weightsnap/?lang=ja",
+      "redirect_chain": [
+        "https://apps.allnew.work/weightsnap/?lang=ja"
+      ],
+      "title": "WeightSnap Support",
+      "canonical_href": null,
+      "anchor_presence": {
+        "privacy_ja": 1,
+        "privacy_en": 1,
+        "terms_ja": 1,
+        "terms_en": 1,
+        "commercial_ja": 1,
+        "contact_ja": 1
+      },
+      "body_contains_display_name": true,
+      "home_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/weightsnap-home-2026-03-11T04-07-36-378Z.png",
+      "privacy_final_url": "https://apps.allnew.work/weightsnap/?lang=ja#privacy-ja",
+      "privacy_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/weightsnap-privacy-2026-03-11T04-07-36-378Z.png",
+      "content_check": true,
+      "canonical_check": true,
+      "legacy_leak_detected": false,
+      "safe_for_phase_4": true,
+      "error": null,
+      "completed_at": "2026-03-11T04:07:46.033Z"
+    },
+    {
+      "app_key": "waistvox",
+      "display_name": "WaistVox",
+      "support_url": "https://apps.allnew.work/waistvox/?lang=ja",
+      "privacy_url": "https://apps.allnew.work/waistvox/?lang=ja#privacy-ja",
+      "started_at": "2026-03-11T04:07:46.066Z",
+      "http_status": 200,
+      "final_url": "https://apps.allnew.work/waistvox/?lang=ja",
+      "redirect_chain": [
+        "https://apps.allnew.work/waistvox/?lang=ja"
+      ],
+      "title": "WaistVox Support",
+      "canonical_href": null,
+      "anchor_presence": {
+        "privacy_ja": 1,
+        "privacy_en": 1,
+        "terms_ja": 1,
+        "terms_en": 1,
+        "commercial_ja": 1,
+        "contact_ja": 1
+      },
+      "body_contains_display_name": true,
+      "home_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/waistvox-home-2026-03-11T04-07-36-378Z.png",
+      "privacy_final_url": "https://apps.allnew.work/waistvox/?lang=ja#privacy-ja",
+      "privacy_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/waistvox-privacy-2026-03-11T04-07-36-378Z.png",
+      "content_check": true,
+      "canonical_check": true,
+      "legacy_leak_detected": false,
+      "safe_for_phase_4": true,
+      "error": null,
+      "completed_at": "2026-03-11T04:07:47.314Z"
+    },
+    {
+      "app_key": "pupweight",
+      "display_name": "PupWeight",
+      "support_url": "https://apps.allnew.work/pupweight/?lang=ja",
+      "privacy_url": "https://apps.allnew.work/pupweight/?lang=ja#privacy-ja",
+      "started_at": "2026-03-11T04:07:47.347Z",
+      "http_status": 200,
+      "final_url": "https://apps.allnew.work/pupweight/?lang=ja",
+      "redirect_chain": [
+        "https://apps.allnew.work/pupweight/?lang=ja"
+      ],
+      "title": "PupWeight Support",
+      "canonical_href": null,
+      "anchor_presence": {
+        "privacy_ja": 1,
+        "privacy_en": 1,
+        "terms_ja": 1,
+        "terms_en": 1,
+        "commercial_ja": 1,
+        "contact_ja": 1
+      },
+      "body_contains_display_name": true,
+      "home_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/pupweight-home-2026-03-11T04-07-36-378Z.png",
+      "privacy_final_url": "https://apps.allnew.work/pupweight/?lang=ja#privacy-ja",
+      "privacy_screenshot": "/Users/masa/Development/projects/allnew-apps/debug/screenshots/pupweight-privacy-2026-03-11T04-07-36-378Z.png",
+      "content_check": true,
+      "canonical_check": true,
+      "legacy_leak_detected": false,
+      "safe_for_phase_4": true,
+      "error": null,
+      "completed_at": "2026-03-11T04:07:48.617Z"
+    }
+  ]
+}
