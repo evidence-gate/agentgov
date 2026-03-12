@@ -1,144 +1,256 @@
-# Stack Research
+# Technology Stack: AI Agent Infrastructure Services
 
-**Domain:** Brownfield App Store portfolio remediation and release-readiness operations for existing iOS apps
-**Researched:** 2026-03-11
-**Confidence:** HIGH
+**Project:** AI Agent Infrastructure Market Research
+**Researched:** 2026-03-13
+**Overall Confidence:** MEDIUM-HIGH (rapidly evolving ecosystem; protocols stabilizing but implementations still maturing)
+
+## The Two Protocol Standards
+
+Before diving into the stack, understanding the protocol landscape is essential because it defines the entire infrastructure surface area.
+
+### MCP (Model Context Protocol) -- The Tool Integration Standard
+| Attribute | Detail | Confidence |
+|-----------|--------|------------|
+| Current Spec | [2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) | HIGH |
+| Governance | Linux Foundation (Agentic AI Foundation, donated Dec 2025) | HIGH |
+| Transport | Streamable HTTP (replaces deprecated SSE), stdio for local | HIGH |
+| Auth | OAuth 2.1 + PKCE + RFC 7591 Dynamic Client Registration | HIGH |
+| Message Format | JSON-RPC 2.0 | HIGH |
+| Capabilities | Tools, Resources, Prompts (server); Sampling, Roots, Elicitation (client) | HIGH |
+| Adoption | 97M+ monthly SDK downloads; backed by Anthropic, OpenAI, Google, Microsoft | HIGH |
+
+MCP is the de facto standard for connecting agents to external tools and data. Every major AI vendor has standardized on it. Building MCP-compatible infrastructure is non-negotiable.
+
+### A2A (Agent2Agent Protocol) -- The Agent Interoperability Standard
+| Attribute | Detail | Confidence |
+|-----------|--------|------------|
+| Current Spec | [v1.0 (Release)](https://a2a-protocol.org/latest/specification/) | HIGH |
+| Governance | Linux Foundation (open-sourced from Google Cloud) | HIGH |
+| Transport | HTTP + SSE, JSON-RPC 2.0, gRPC (optional, added in v0.3) | HIGH |
+| Auth | OAuth 2.0 with PKCE, Device Code flow | HIGH |
+| Core Concepts | Agent Cards (JSON metadata), Tasks (lifecycle states), Messages, Parts | HIGH |
+| Adoption | 150+ supporting organizations; v1.0 released with stricter REST/gRPC/JSON-RPC bindings | MEDIUM |
+
+A2A enables agent-to-agent communication for opaque multi-agent systems. Less mature than MCP but growing fast. Infrastructure services should be A2A-aware.
+
+---
 
 ## Recommended Stack
 
-### Core Technologies
+### MCP Server Development (Primary)
 
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| Cloudflare Workers Static Assets + custom domain routing | Workers runtime pinned by `compatibility_date` (`2026-02-12` or newer verified date) | Host legal/support documents on `apps.allnew.work`, preserve stable URLs, and add redirect logic where needed | Cloudflare now supports code + static assets as one deploy unit with global caching. That fits a brownfield legal-doc migration better than keeping a split Pages + custom logic setup. | High |
-| Wrangler CLI | 4.x | Deploy, route, configure, tail logs, and manage secrets for the legal-doc Worker | It is the official control plane for Workers assets/routing and matches the existing Cloudflare ops skill workflow (`secret put`, `deploy`, `tail`). | High |
-| App Store Listing Director + appagent-mcp | Director skill `3.0.0` + current workspace MCP | API-first ASC audit, pull, remediation, push, screenshot upload, preview upload, and pre-submit checks | This is already the local portfolio-ready ASC workflow. It scales across multiple existing apps and keeps browser automation limited to Apple fields the API cannot operate. | High |
-| Figma Desktop + `figma-llm-max-bridge` | Bridge `1.0.0` | Figma-based creative production, batch edits, export automation, and reusable frame composition | The bridge gives real canvas editing and export control through the local plugin/API path. That is materially better than manual per-frame work for a 9-app brownfield portfolio. | High |
-| GitHub Projects | Cloud service (2026 feature set) | Portfolio tracking across apps, workstreams, blockers, owners, target dates, and evidence URLs | Projects supports custom fields, board/table/roadmap views, templates, and insights while staying close to issues/PRs and remediation evidence. That keeps release-readiness visible next to the actual work. | Medium-High |
-| Node.js | `22.22.0` LTS | Shared runtime for Workers tooling, Figma bridge scripts, Playwright compositor, and validation utilities | Using one current LTS runtime across Cloudflare, Figma, and Playwright reduces operational drift and simplifies brownfield maintenance. | High |
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| **TypeScript** | 5.x | Primary language | MCP ecosystem is TS-first; best SDK support; type safety for protocol work | HIGH |
+| **@modelcontextprotocol/sdk** | 1.27.x (v2 expected Q1-Q2 2026) | MCP server/client SDK | Official SDK; 32K+ dependent packages; actively maintained | HIGH |
+| **Zod** | 4.x | Schema validation | MCP SDK peer dependency; 14x faster parsing vs v3; JSON Schema export via `.toJSONSchema()` | HIGH |
+| **FastMCP** (Python) | 3.1.x | Python MCP servers | Powers 70% of MCP servers across all languages; granular auth, versioning, OpenTelemetry built-in | HIGH |
+| **mcp** (Python SDK) | 1.7.x | Python MCP SDK | Official Python SDK; FastMCP 1.0 was incorporated into it | HIGH |
 
-### Supporting Libraries
+**Why TypeScript-first:** The MCP TypeScript SDK is the reference implementation. The spec's authoritative schema is defined in TypeScript (`schema.ts`). Cloudflare Workers (the recommended deployment target) runs TypeScript natively. The entire MCP gateway ecosystem (Traefik, Docker, Microsoft) is TS/JS-oriented.
 
-| Library | Version | Purpose | When to Use | Confidence |
-|---------|---------|---------|-------------|------------|
-| `playwright` | `1.57.0` | Headless browser automation for screenshot compositing, browser-only ASC checks, and evidence capture | Use for all browser automation on macOS. Keep `headless: true`, save screenshots on important steps, and use it as the default browser automation layer. | High |
-| `@playwright/test` | `1.57.0` | Visual regression and deterministic screenshot QA | Use when comparing new App Store creatives against approved baselines before upload or before broad portfolio rollout. | High |
-| `hono` | 4.x | Thin routing layer on Workers for locale routing, old URL redirects, and health/version endpoints | Use only if the Cloudflare legal-doc host needs logic beyond pure static asset serving. Skip it if asset-first routing alone is enough. | Medium |
-| `zod` | 4.x | Schema validation for legal-doc manifests, portfolio status payloads, and creative handoff JSON | Use when importing app matrices, per-app remediation manifests, or Figma/export metadata so drift is caught before deploy or push. | High |
-| `@cloudflare/workers-types` | 4.x-aligned | Type support for Worker code and route handlers | Use if the legal-doc host is implemented in TypeScript. Keep it aligned with the Wrangler major version in the repo. | Medium-High |
+**Why also Python:** FastMCP 3.0 is the most productive way to build MCP servers -- decorator-based, automatic tool definition generation from type hints. For AI/ML-heavy servers, Python is unavoidable.
 
-### Development Tools
+### Web Framework & API Layer
 
-| Tool | Purpose | Notes | Confidence |
-|------|---------|-------|------------|
-| `app-preview-compositor` | Turn HTML/CSS templates into App Store screenshot masters | Local package version is `1.0.0` and already pins `playwright@1.57.0`. Use a 6.7-inch master set and let ASC scale down when possible. | High |
-| `figma-llm-max-bridge` CLI | Query, edit, tag, and export Figma frames in batches | Run the bridge on `http://localhost:3210`, use the `codex-claude-max` channel, and load fonts before text edits. Keep it localhost-only. | High |
-| `wrangler deploy` / `wrangler tail` / `wrangler secret put` | Deploy and verify Cloudflare legal-doc hosting changes | Follow the Cloudflare ops rule: change one variable at a time, deploy, then verify with direct requests and logs. | High |
-| `appstore_video_*` MCP tools | Produce App Store preview videos when a preview materially helps conversion or review readiness | Optional, not baseline. Lock the screenshot narrative first, then add previews only for apps where motion explains value better than static frames. | Medium-High |
-| GitHub Project templates + Insights | Reuse a common portfolio board and generate rollups | Define custom fields such as `App`, `Track`, `ASC Status`, `Legal Host`, `Creative Status`, `Risk`, `Owner`, `Evidence URL`, and `Target Date`. | Medium-High |
-| `appagent-mcp` live checks | Read back ASC state after edits and uploads | Use this instead of trusting upload success alone. Completion should mean the live ASC state is consistent, not just that a command returned success. | High |
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| **Hono** | 4.x | HTTP framework | 12KB, runs on every edge runtime (Workers, Deno, Bun, Node); type-safe RPC mode; 1.8M weekly downloads | HIGH |
+| **Cloudflare Workers** | -- | Edge compute runtime | Fastest MCP deployment path; Durable Objects for state; built-in MCP support via Agents SDK | HIGH |
+| **Cloudflare Agents SDK** | 0.6.x | Agent framework on Workers | Persistent stateful agents; SQLite per instance; WebSocket/SSE streaming; native MCP integration | MEDIUM |
+
+**Why Hono over Express/Fastify:** Hono is built on Web Standards, meaning the same code runs on Cloudflare Workers, Deno, Node, and Bun. For MCP server infrastructure that may need edge deployment, this portability is critical. Express is too heavy and Node-only.
+
+**Why Cloudflare Workers over AWS Lambda / Vercel:** Durable Objects provide per-agent SQLite state with zero-latency access -- essential for MCP session management and agent state. No cold start problem. Workers run in 300+ data centers globally. The Agents SDK integrates MCP natively with RPC transport (no HTTP overhead between Agent and McpAgent in same Worker).
+
+### Database & State
+
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| **Cloudflare D1** | -- | Relational database (SQLite-based) | Native Workers integration; zero config; edge-local reads | MEDIUM |
+| **Drizzle ORM** | 0.30+ | TypeScript ORM | 7.4KB bundle (vs Prisma 2MB); SQL-like API; serverless-native; works on Workers | HIGH |
+| **PostgreSQL** (via Neon/Supabase) | 16+ | Production relational DB | For non-edge workloads; Neon serverless driver works with Drizzle | HIGH |
+| **Cloudflare Durable Objects** | -- | Per-agent stateful storage | Built-in SQLite per instance; ideal for MCP session state and agent memory | HIGH |
+| **Qdrant** | 1.x | Vector database | Open-source, Rust-based, self-hostable; 60-80% cheaper than Pinecone at scale | MEDIUM |
+
+**Why D1 + Durable Objects (not just PostgreSQL):** MCP servers need session state that lives close to compute. Durable Objects give each agent instance its own SQLite database with strong consistency and zero network latency. D1 handles shared relational data. PostgreSQL (via Neon) serves as the canonical data store for billing, user management, and analytics.
+
+**Why Qdrant over Pinecone/Chroma:** For a small team, self-hostable and open-source matters. Qdrant is the performance leader among open-source vector DBs. Chroma is fine for prototyping but not production-scale. Pinecone is managed but expensive and vendor-locked.
+
+### LLM Gateway
+
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| **LiteLLM** | latest | Unified LLM API gateway | OpenAI-compatible API to 100+ providers; virtual keys; budget tracking per key/user; used by Netflix, Rocket Money | HIGH |
+
+**Why LiteLLM:** Any AI agent infrastructure service will need to call LLMs. LiteLLM provides a single OpenAI-compatible interface to every provider, with built-in cost tracking, rate limiting, and virtual API keys. Deploy as a proxy server and all your services go through one gateway. This is the foundational cost-control layer.
+
+### Observability
+
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| **Langfuse** | latest | LLM/agent observability | Open-source (MIT); self-hostable; tracing, cost tracking, prompt versioning, evals | HIGH |
+| **OpenTelemetry** | GenAI semconv v1.37+ | Trace standard | Industry standard; GenAI semantic conventions for agent spans now supported by Datadog, Langfuse | HIGH |
+
+**Why Langfuse over LangSmith/Braintrust:** Langfuse is open-source and self-hostable -- critical for a small team that needs data sovereignty and cost control. LangSmith is great but LangChain-coupled and proprietary. Braintrust is CI/CD-native but closed-source. Langfuse integrates with OpenTelemetry, LiteLLM, and every major framework.
+
+**Why OpenTelemetry:** The GenAI semantic conventions are now stable enough for production. They define standardized attributes for agent tasks, actions, tool calls, and LLM interactions. Instrument once, export to any backend (Langfuse, Datadog, Grafana).
+
+### Authentication & Integration
+
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| **Nango** | latest | OAuth token management | Open-source; 500+ OAuth integrations; handles token refresh/rotation; self-hostable | HIGH |
+| **Composio** | latest | Managed MCP integrations | 500+ pre-built connectors; centralized auth; production-ready tool calling at scale | MEDIUM |
+
+**Why Nango for auth, Composio for integrations:** The project context identifies "external API authentication management" as a key pain point. Nango solves OAuth/token lifecycle as an open-source, self-hostable service -- you own the auth layer. Composio provides the breadth of pre-built MCP tool integrations. Use Nango when you want auth control; use Composio when you want fast integration coverage.
+
+### Billing & Metering
+
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| **Lago** | latest | Usage-based billing | Open-source; event-based metering; no revenue percentage; trusted by Mistral AI; self-hostable | HIGH |
+| **Stripe** (+ Metronome) | latest | Payment processing + AI metering | Stripe acquired Metronome ($1B, Jan 2026); new AI-focused metering for tokens/tasks/workflows | HIGH |
+
+**Why Lago + Stripe (not Stripe alone):** Stripe Billing's legacy architecture has a 100 req/s rate limit on usage ingestion -- insufficient for high-volume agent operations. Lago handles the high-frequency event metering (tokens, tool calls, agent actions) and integrates with Stripe for payment processing. Lago is open-source, self-hostable, and takes no revenue cut. This combination gives you Stripe's payment infrastructure with Lago's metering performance.
+
+**Emerging: Nevermined** for agent-to-agent payments (MCP/A2A native, supports fiat + crypto). Worth monitoring for marketplace use cases but not mature enough for primary billing. **Confidence: LOW**
+
+### Agent Sandbox / Execution
+
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| **E2B** | latest | Code execution sandbox | Open-source; Firecracker microVMs; <200ms cold start; used by ~50% of Fortune 500; Python + TS SDKs | HIGH |
+
+**Why E2B:** When agents need to execute arbitrary code, E2B provides secure, isolated Firecracker microVM sandboxes. Each sandbox gets its own kernel. Modal is the alternative for GPU workloads, but E2B is purpose-built for agent code execution with the best developer experience.
+
+### MCP Gateway (Governance Layer)
+
+| Technology | Type | Purpose | Why | Confidence |
+|------------|------|---------|-----|------------|
+| **Traefik Hub** | Commercial + OSS core | MCP gateway with TBAC | Session-smart routing; audit-ready observability; integrates with existing Traefik deployments | MEDIUM |
+| **Docker MCP Gateway** | Open-source | MCP server orchestration | Centralized proxy; credential management; access control | MEDIUM |
+| **Microsoft MCP Gateway** | Open-source | K8s MCP management | Session-aware routing; authorization; lifecycle management in Kubernetes | MEDIUM |
+
+**Assessment:** The MCP gateway space is nascent and fragmented. For a small team building infrastructure, this is a potential opportunity space rather than a "pick one" decision. The gateway layer (auth, rate limiting, audit, policy enforcement) between MCP clients and servers is where significant value creation opportunity exists.
+
+---
+
+## Alternatives Considered
+
+| Category | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Language | TypeScript | Go, Rust | MCP ecosystem is TS-first; Go/Rust SDKs exist but lag in features and community |
+| Web Framework | Hono | Express, Fastify | Express is Node-only and heavy; Fastify is faster but not edge-compatible |
+| Edge Runtime | Cloudflare Workers | AWS Lambda, Vercel Edge | Lambda has cold starts; Vercel lacks Durable Objects equivalent; Workers has best MCP integration |
+| ORM | Drizzle | Prisma | Prisma's 2MB bundle is prohibitive for edge; Drizzle's SQL-like API is better for DB-literate devs |
+| LLM Gateway | LiteLLM | Portkey, Helicone | LiteLLM is open-source with broadest provider coverage; Portkey/Helicone are more enterprise/commercial |
+| Observability | Langfuse | LangSmith, Braintrust | LangSmith is LangChain-coupled; Braintrust is closed-source; Langfuse is MIT and self-hostable |
+| Vector DB | Qdrant | Pinecone, Chroma | Pinecone is expensive/proprietary; Chroma caps out at prototyping scale |
+| Billing | Lago + Stripe | Chargebee, Orb | Chargebee takes revenue cut; Orb is good but closed-source; Lago is free and self-hostable |
+| Agent Framework | (Framework-agnostic) | LangGraph, CrewAI | Building infrastructure, not agents -- must support all frameworks, not pick one |
+
+---
+
+## What NOT to Use
+
+| Technology | Why Avoid |
+|------------|-----------|
+| **SSE transport for MCP** | Deprecated in 2025-06-18 spec; replaced by Streamable HTTP |
+| **Express.js for edge** | Node-only, cannot run on Workers/Deno/Bun; heavy for MCP servers |
+| **Prisma on edge** | 2MB bundle makes it impractical for Cloudflare Workers or any edge runtime |
+| **Chroma for production** | Not designed for >10M vectors; use for development/prototyping only |
+| **Single LLM provider** | OpenAI Agents SDK locks you to OpenAI; use LiteLLM for provider flexibility |
+| **Custom billing from scratch** | 3-6 months engineering time; 92% of AI companies adjust pricing at least once -- use Lago |
+| **Blockchain-first payments** | Nevermined is interesting but crypto adds unnecessary complexity for initial billing; use Stripe |
+
+---
 
 ## Installation
 
 ```bash
-# Assumes Node.js 22 LTS
+# Core MCP Server (TypeScript)
+npm install @modelcontextprotocol/sdk zod hono
 
-# Cloudflare legal-doc host
-npm install hono zod
-npm install -D wrangler @cloudflare/workers-types typescript
+# Cloudflare
+npm install -D wrangler @cloudflare/workers-types
 
-# Browser automation and creative QA
-npm install playwright @playwright/test
+# Database
+npm install drizzle-orm @neondatabase/serverless
+npm install -D drizzle-kit
 
-# Existing local Figma bridge tool
-cd /Users/masa/Development/tools/Figma連携/figma-llm-max-bridge
-npm install
-npm test
+# LLM Gateway (deploy as proxy)
+pip install litellm[proxy]
 
-# Existing local App Store screenshot compositor
-cd /Users/masa/Development/mcp/app-store-director/scripts/composite
-npm install
-npx playwright install chromium
+# MCP Server (Python)
+pip install fastmcp>=3.0
+
+# Observability
+pip install langfuse opentelemetry-api opentelemetry-sdk
+
+# Billing
+# Lago: self-host via Docker or use Lago Cloud
+# Stripe: npm install stripe
+
+# Agent Sandbox
+pip install e2b
+npm install @e2b/code-interpreter
+
+# OAuth Management (Nango)
+# Self-host via Docker or use Nango Cloud
 ```
 
-## Alternatives Considered
+---
 
-| Recommended | Alternative | When to Use Alternative | Confidence |
-|-------------|-------------|-------------------------|------------|
-| Cloudflare Workers Static Assets | Cloudflare Pages | Only if the site already lives on Pages, has no redirect or Worker logic requirements, and the migration itself would create unnecessary delivery risk in the current cycle. | High |
-| GitHub Projects | Linear | Use Linear only if portfolio planning already lives there organization-wide and code/review evidence is secondary. For repo-coupled brownfield remediation, GitHub Projects stays closer to execution. | Medium |
-| Figma bridge automation | Manual Figma-only production | Use manual-only editing for final visual polish of one or two locked frames, not as the primary production system for a portfolio. | High |
-| App Store Listing Director + appagent-mcp | Raw ASC Web UI / Playwright-first scripts | Use browser-only flow exclusively for Apple fields the API cannot manage or for explicitly human-owned submission steps. | High |
-| Hono on Workers | Pure asset-only Worker | Use pure asset-only hosting when the legal-doc site needs zero request logic. Add Hono only when redirects, health endpoints, or app-aware routing are actually required. | Medium |
+## Protocol Version Matrix
 
-## What NOT to Use
+| Protocol | Latest Stable | Key Date | Breaking Changes to Watch |
+|----------|--------------|----------|--------------------------|
+| MCP | 2025-11-25 | Nov 2025 | Streamable HTTP replaced SSE; OAuth 2.1 is now the auth standard |
+| A2A | v1.0 | ~Q1 2026 | TextPart/FilePart/DataPart replaced with unified Part; stricter REST/gRPC bindings |
 
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| Cloudflare Pages as the new default hosting target for this migration | It keeps the brownfield system split across more surfaces and works against Cloudflare's current direction toward Workers static assets for unified deploys. | Cloudflare Workers Static Assets, optionally with a thin Hono layer |
-| ASC Web automation as the primary remediation path | It is brittle, harder to audit, and violates the local API-first operating model for portfolio work. Browser automation should be the exception, not the stack. | App Store Listing Director + appagent-mcp, with browser-only handling for non-operable Apple fields |
-| Headed browser automation on macOS by default | It steals focus, interrupts other work, and violates the browser automation standard for this workspace. | Playwright with `headless: true` and saved screenshots |
-| Manual Figma editing as the only creative workflow | It does not scale across 9 apps, makes copy/layout parity hard to maintain, and leaves a weak audit trail for revisions. | Structured brief -> Figma bridge batch edits -> Playwright export/QA |
-| Spreadsheet or Notion as the only source of truth for portfolio status | Status drifts away from issues, PRs, screenshots, and legal evidence. Brownfield remediation needs evidence-linked tracking, not just a list of rows. | GitHub Projects backed by repo issues and evidence artifacts |
-| A new React/Next.js SPA or CMS just to host legal pages | It adds rendering/runtime complexity to content that should stay stable, cacheable, and reviewable. That is the wrong tradeoff for release-readiness work. | Versioned static HTML/assets on Workers |
-| KV/D1 as the primary storage for legal page bodies | Legal/support pages are mostly static and should be versioned in git. Database-backed content increases rollback and consistency risk for little benefit. | Markdown/HTML assets in repo, deployed through Workers |
-| Direct HTML-only editing in the deployed legal host | It creates source drift between legal markdown, localized HTML, and ASC URLs. Brownfield compliance work needs a clear editable source of truth. | Markdown source + generated HTML + deployment pipeline |
-| Rebuilding or replatforming the iOS apps as part of this program | This is a brownfield operations project. Rebuild work expands scope and delays the actual goal: make existing apps review-ready again. | Fix existing apps, legal docs, metadata, creatives, and submission settings in place |
-
-## Stack Patterns by Variant
-
-**If legal docs are mostly static but old GitHub Pages URLs must keep working:**
-- Use Cloudflare Workers Static Assets with asset-first routing and a thin Hono redirect layer.
-- Because brownfield migration needs stable URLs, locale handling, and selective redirect logic without turning the docs into a full app.
-
-**If an app is already in `Rejected`, `Metadata Rejected`, or `Developer Rejected`:**
-- Use App Store Listing Director + appagent pull/audit/push flow first, then browser-only steps for Apple fields outside API coverage.
-- Because Apple allows screenshot and preview updates in those states, and API-first remediation is more repeatable than manual UI repair.
-
-**If the workstream is creative refresh only:**
-- Use simulator capture + Figma bridge + `app-preview-compositor` + `@playwright/test` visual baselines.
-- Because the bottleneck is asset throughput and QA consistency, not a full metadata redesign.
-
-**If leadership needs weekly portfolio rollups across all apps:**
-- Use a GitHub Project template with saved board/table/roadmap views and required custom fields.
-- Because you need both summary visibility and drill-down into the exact issue, PR, screenshot set, or legal evidence blocking release-readiness.
-
-## Version Compatibility
-
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `node@22.22.0` | `wrangler@4.x`, `playwright@1.57.0`, `figma-llm-max-bridge@1.0.0` | Keep one Node LTS across Workers, creative tooling, and QA scripts. |
-| Cloudflare Workers `compatibility_date >= 2026-02-12` | `wrangler@4.x` | Pin the compatibility date per deploy to avoid silent runtime drift. |
-| `app-preview-compositor@1.0.0` | `playwright@1.57.0`, `@playwright/test@1.57.0` | This pairing already exists in the local compositor package. |
-| `figma-llm-max-bridge@1.0.0` | Figma Desktop plugin manifest + local bridge on `http://localhost:3210` | Keep the bridge on localhost and treat font loading as mandatory before text mutation. |
-| `App Store Listing Director@3.0.0` | current `appagent-mcp` workspace tooling | Treat it as the orchestration layer over the ASC API and upload tools, not as a promise that every Apple setting is API-operable. |
-| `hono@4.x` | Cloudflare Workers Static Assets + `zod@4.x` | Good fit for redirect/health/manifests, but optional for a pure static docs host. |
+---
 
 ## Sources
 
-- `/Users/masa/gsd-workspace/.planning/PROJECT.md` - Portfolio scope, brownfield constraints, app list, and program objectives. Confidence: High.
-- `/Users/masa/.codex/get-shit-done/templates/research-project/STACK.md` - Required structure for this research artifact. Confidence: High.
-- `/Users/masa/Development/mcp/app-store-director/skills/appstore-listing/SKILL.md` - Current ASC workflow, API/browser boundary, screenshot pipeline, and pre-submit model. Confidence: High.
-- `/Users/masa/.codex/skills/cloudflare-workers-ops-docs/SKILL.md` - Cloudflare Worker deploy, secret, and log-tail operating model. Confidence: High.
-- `/Users/masa/.codex/skills/appstore-promo-director-ja/SKILL.md` - Creative orchestration flow and QA gate expectations. Confidence: High.
-- `/Users/masa/Development/.claude/commands/figma-max-bridge.md` - Figma bridge setup, command catalog, and local security model. Confidence: High.
-- `/Users/masa/Development/tools/Figma連携/figma-llm-max-bridge/package.json` - Local bridge version `1.0.0`. Confidence: High.
-- `/Users/masa/Development/mcp/app-store-director/scripts/composite/package.json` - Local compositor version `1.0.0` and `playwright@1.57.0` dependency. Confidence: High.
-- `/Users/masa/Development/IOS_APP_POLICY.md` - ASC metadata, compliance, legal-doc, and browser automation rules for the current iOS portfolio. Confidence: High.
-- `https://developers.cloudflare.com/workers/static-assets/` - Unified code + assets deploy model, routing, and caching on Workers. Confidence: High.
-- `https://developers.cloudflare.com/workers/static-assets/migration-guides/` - Official migration direction from Pages to Workers. Confidence: High.
-- `https://developers.cloudflare.com/workers/wrangler/configuration/` - Current Wrangler config surface for assets and routing. Confidence: High.
-- `https://developer.apple.com/help/app-store-connect/manage-app-information/upload-app-previews-and-screenshots/` - Editable statuses, upload rules, and high-resolution auto-scaling behavior. Confidence: High.
-- `https://developer.apple.com/help/app-store-connect/reference/screenshot-specifications/` - Apple screenshot specification source. Confidence: High.
-- `https://docs.github.com/en/issues/planning-and-tracking-with-projects/learning-about-projects/about-projects` - Projects fields, views, templates, workflows, and insights. Confidence: High.
-- `https://docs.github.com/enterprise-cloud%40latest/issues/planning-and-tracking-with-projects/customizing-views-in-your-project/changing-the-layout-of-a-view` - Board, table, and roadmap layout options. Confidence: High.
-- `https://nodejs.org/en/about/previous-releases` - Node.js `22.22.0` in the LTS line. Confidence: High.
-- `https://playwright.dev/docs/screenshots` - Screenshot capture capabilities for browser automation and creative export. Confidence: High.
-- `https://playwright.dev/docs/test-snapshots` - Visual comparison model for deterministic creative QA. Confidence: High.
-- `https://www.figma.com/plugin-docs/figma-ui-postmessage/` - Plugin UI to bridge communication model. Confidence: High.
-- `https://www.figma.com/plugin-docs/figma-ui-onmessage/` - Plugin message handling model. Confidence: High.
-- `https://developers.figma.com/docs/rest-api/` - Official Figma API boundary; useful as a complement, not a replacement, for canvas editing via plugin/bridge. Confidence: High.
+### Protocol Specifications
+- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)
+- [A2A Protocol v1.0 Specification](https://a2a-protocol.org/latest/specification/)
+- [A2A What's New in v1.0](https://a2a-protocol.org/latest/whats-new-v1/)
 
----
-*Stack research for: Brownfield App Store portfolio remediation and release-readiness operations for existing iOS apps*
-*Researched: 2026-03-11*
+### SDKs & Frameworks
+- [MCP TypeScript SDK (GitHub)](https://github.com/modelcontextprotocol/typescript-sdk)
+- [@modelcontextprotocol/sdk on npm](https://www.npmjs.com/package/@modelcontextprotocol/sdk) -- v1.27.1
+- [FastMCP 3.0 Release](https://www.jlowin.dev/blog/fastmcp-3) -- v3.1.0
+- [MCP Python SDK on PyPI](https://pypi.org/project/mcp/) -- v1.7.1
+- [Hono Framework](https://hono.dev/) -- ~1.8M weekly npm downloads
+- [Cloudflare Agents SDK](https://developers.cloudflare.com/agents/) -- v0.6.x
+- [Zod v4 Release Notes](https://zod.dev/v4)
+
+### Infrastructure
+- [LiteLLM - Unified LLM Gateway](https://docs.litellm.ai/docs/)
+- [Langfuse - Open Source LLM Observability](https://langfuse.com/)
+- [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
+- [Drizzle ORM](https://orm.drizzle.team/)
+- [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/)
+- [E2B Sandbox](https://github.com/e2b-dev/e2b)
+
+### Billing & Auth
+- [Lago - Open Source Billing](https://getlago.com/)
+- [Stripe Metronome Acquisition](https://stripe.com/blog/metronome-stripe-building-the-future-of-billing)
+- [Nango - OAuth Integration](https://nango.dev/)
+- [Composio - AI Agent Integration](https://composio.dev/)
+- [Nevermined - AI Agent Payments](https://nevermined.ai/)
+
+### Gateway & Governance
+- [Traefik MCP Gateway](https://traefik.io/solutions/mcp-gateway)
+- [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/)
+- [Microsoft MCP Gateway (GitHub)](https://github.com/microsoft/mcp-gateway)
+- [Obot (formerly Acorn Labs) MCP Gateway](https://obot.ai/)
+
+### Market Context
+- [MCP Enterprise Adoption 2025-2026](https://guptadeepak.com/the-complete-guide-to-model-context-protocol-mcp-enterprise-adoption-market-trends-and-implementation-strategies/)
+- [MCP Authorization - Stack Overflow Blog](https://stackoverflow.blog/2026/01/21/is-that-allowed-authentication-and-authorization-in-model-context-protocol/)
+- [AI Agent Billing Patterns 2026](https://nevermined.ai/blog/ai-agent-billing-patterns)
+- [AI Agent Infrastructure Landscape 2025-2026 (Medium)](https://medium.com/@vinniesmandava/the-agentic-ai-infrastructure-landscape-in-2025-2026-a-strategic-analysis-for-tool-builders-b0da8368aee2)
+- [AI Agent Tools Landscape 120+ Tools Mapped](https://www.stackone.com/blog/ai-agent-tools-landscape-2026/)
