@@ -1,6 +1,6 @@
 {
   "mode": "yolo",
-  "granularity": "standard",
+  "granularity": "fine",
   "parallelization": true,
   "commit_docs": true,
   "model_profile": "quality",
