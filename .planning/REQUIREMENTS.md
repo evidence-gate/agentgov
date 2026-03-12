@@ -1,96 +1,102 @@
-# Requirements: AllNew App Store Portfolio Recovery
+# Requirements: AI Agent Infrastructure — Market Research
 
-**Defined:** 2026-03-11
-**Core Value:** 各アプリを、法務・クリエイティブ・審査指摘の3点で止まらない状態にそろえ、App Review に再投入できる提出準備完了状態まで持っていくこと。
+**Defined:** 2026-03-13
+**Core Value:** AIエージェントのインフラ市場において、個人/小規模チームが勝てる空白領域を見極め、Go-to-Market戦略の根拠となるリサーチを届けること。
 
 ## v1 Requirements
 
-### Portfolio Control
+### Technology Trends
 
-- [ ] **PORT-01**: Operator can view a single inventory of all 9 target apps with repo path, public site slug, ASC status, and current blocker state.
-- [ ] **PORT-02**: Operator can assign wave priority with rejected apps first and track each app as `not_started`, `in_progress`, `blocked`, or `submission_ready`.
-- [ ] **PORT-03**: Operator can link each app record to its owner, next action, and evidence artifacts so status is derived from proof instead of chat notes.
+- [ ] **TECH-01**: 2026年3月時点のAIエージェント主要プロトコル（MCP, A2A, AG-UI）の成熟度・採用状況・ロードマップを整理する
+- [ ] **TECH-02**: 主要エージェントフレームワーク（LangGraph, CrewAI, OpenAI Agents SDK, AutoGen, Google ADK等）の比較と市場シェア動向を整理する
+- [ ] **TECH-03**: エージェント向けインフラの技術標準化動向（AAIF, OAuth 2.1 for MCP, OpenTelemetry GenAI等）を整理する
+- [ ] **TECH-04**: マルチエージェントシステムの2026年トレンド（Forrester/Gartner予測含む）を分析する
 
-### Legal Hosting
+### Competitive Landscape
 
-- [ ] **LEGAL-01**: Operator can capture the current legal/support/marketing URL set and the target `apps.allnew.work` URL set for each app in one verified matrix.
-- [ ] **LEGAL-02**: Operator can publish app-specific legal/support documents on Cloudflare under `apps.allnew.work` and verify the final custom-domain URLs return the correct app content.
-- [ ] **LEGAL-03**: Operator can update each app's store-facing references to use only verified Cloudflare legal/support URLs, never legacy GitHub Pages URLs.
+- [ ] **COMP-01**: 14のインフラカテゴリそれぞれの既存プレイヤーを特定し、資金調達・チーム規模・製品成熟度をマッピングする
+- [ ] **COMP-02**: 各カテゴリの競合の強み・弱み・空白領域を分析する
+- [ ] **COMP-03**: Big Tech（Cloudflare, AWS, Google, Microsoft）の動向と吸収リスクを評価する
+- [ ] **COMP-04**: オープンソース vs SaaS のポジショニングを各カテゴリで分析する
 
-### ASC Audit And Rejection Handling
+### Market Opportunity
 
-- [ ] **ASC-01**: Operator can pull live ASC state for each app, including version, build, localization, screenshot/preview presence, and current review status.
-- [ ] **ASC-02**: Operator can record evidence for the browser-only ASC checks required for submission readiness, including privacy labels, tax, age rating, review contact, marketing URL, and license agreement.
-- [ ] **ASC-03**: Operator can create a root-cause packet for each rejected app that captures the rejection reason, affected layers, planned fix, and required retest proof.
-- [ ] **ASC-04**: Operator can confirm that the correct build and submission prerequisites are attached for each app, or explicitly block the app if they are not.
+- [ ] **MRKT-01**: 各インフラカテゴリの市場規模推計（TAM/SAM/SOM）または市場機会の定性評価を行う
+- [ ] **MRKT-02**: 開発者の具体的ペインポイントをカテゴリ別に整理し、痛みの強さをランク付けする
+- [ ] **MRKT-03**: 個人/小規模チームの参入障壁と防御可能性（moat）をカテゴリ別に評価する
+- [ ] **MRKT-04**: EU AI Act（2026年8月施行）等の規制が生む需要機会を分析する
 
-### Metadata And Creative Production
+### Revenue Models
 
-- [ ] **META-01**: Operator can produce updated localized App Store metadata and approved claims that match the actual behavior of each app.
-- [ ] **CRTV-01**: Operator can create a screenshot/preview storyboard for each app from approved claims, runtime evidence, and target locale.
-- [ ] **CRTV-02**: Operator can generate final App Store screenshot sets in the required target size and locale mapping for each app.
-- [ ] **CRTV-03**: Operator can generate approved preview video assets for apps where preview publication is part of the refresh scope.
-- [ ] **CRTV-04**: Operator can upload refreshed screenshot and preview assets to ASC and verify the live read-back matches the intended app, locale, and device set.
+- [ ] **REV-01**: AIインフラサービスの主要な収益モデルパターン（API課金, 使用量ベース, SaaS, OSS+Cloud等）を整理する
+- [ ] **REV-02**: 各収益モデルのユニットエコノミクス構造と小規模チームへの適合性を分析する
+- [ ] **REV-03**: 参考となるOSS→有料化の成功事例（Langfuse, PostHog等）のGTMパターンを整理する
 
-### Readiness Gate And Reuse
+### Strategic Recommendation
 
-- [ ] **READY-01**: Operator can compute a PASS/BLOCK submission-readiness decision per app based on legal URLs, ASC checks, build state, metadata, creative assets, and rejection evidence.
-- [ ] **READY-02**: Operator can assemble a per-app submission packet that includes blockers, verified URLs, asset status, build state, ASC read-back, and the next human approval step.
-- [ ] **READY-03**: Operator can publish reusable templates, checklists, and runbooks from the first remediation wave so later apps do not require process rediscovery.
+- [ ] **STRT-01**: 全領域の分析結果を踏まえた推薦領域（Top 3）を根拠付きで提示する
+- [ ] **STRT-02**: 各推薦領域のGo-to-Market戦略（市場参入順序、初期ターゲット、差別化ポイント）を策定する
+- [ ] **STRT-03**: 日本発・小規模チームの制約を踏まえた実行計画の骨子を提示する
+- [ ] **STRT-04**: リスク評価（タイミング、競合、技術プラットフォーム、規制）と対策を整理する
+
+### Report Deliverables
+
+- [ ] **DLVR-01**: エグゼクティブサマリー（意思決定者が5分で読める要約）を作成する
+- [ ] **DLVR-02**: 競合マップの視覚的な整理（カテゴリ × プレイヤー × ポジショニング）を作成する
+- [ ] **DLVR-03**: 推薦領域の意思決定マトリクス（評価軸 × 候補領域のスコアリング）を作成する
+- [ ] **DLVR-04**: 次のアクション（MVP実装に向けた具体的な次ステップ）を明記する
 
 ## v2 Requirements
 
-### Portfolio Automation
+### Deep Dive (推薦領域が決まった後)
 
-- **AUTO-01**: Operator can run a dry-run batch simulator that estimates which apps can advance to the next stage without modifying live state.
-- **AUTO-02**: Operator can detect cross-app fix patterns automatically and suggest which sibling apps need the same remediation.
-
-### Ongoing Readiness
-
-- **MON-01**: Operator can monitor readiness drift after remediation and alert when legal URLs, ASC assets, or metadata fall out of sync.
-- **MON-02**: Operator can keep a rolling portfolio dashboard of freshness, risk, and next-review cadence after the initial recovery project ends.
-
-### Growth Optimization
-
-- **GROW-01**: Operator can use market-intel-driven creative rotation to improve conversion after the portfolio is already submission-ready.
+- **DEEP-01**: 推薦領域のMVP仕様書
+- **DEEP-02**: 技術アーキテクチャ詳細設計
+- **DEEP-03**: ユーザーインタビュー計画
+- **DEEP-04**: ファイナンシャルモデル（3年P&L）
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Actual App Review submission and release publication | This project stops at submission-ready state; irreversible actions require separate approval |
-| New app development or major new end-user features | The goal is remediation and release-readiness for existing apps, not product expansion |
-| Full portfolio rebrand | Broad branding work would delay blocked apps and is not required for submission readiness |
-| Replatforming the legal host into a full CMS or SPA | Stable, verifiable legal/support pages are sufficient for the current goal |
+| MVP実装 | このPJは調査レポートが成果物。実装は別PJ |
+| ユーザーインタビュー実施 | リサーチ段階では二次情報のみ。一次情報収集は推薦領域決定後 |
+| 投資家向けピッチデック | レポートの読者は自分自身。外部向け資料は別途 |
+| 全カテゴリの技術PoC | 調査段階では実装しない |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PORT-01 | Phase 1 - Portfolio Intake and Wave Control | Pending |
-| PORT-02 | Phase 1 - Portfolio Intake and Wave Control | Pending |
-| PORT-03 | Phase 1 - Portfolio Intake and Wave Control | Pending |
-| LEGAL-01 | Phase 2 - Legal URL Baseline and Cloudflare Publish | Pending |
-| LEGAL-02 | Phase 2 - Legal URL Baseline and Cloudflare Publish | Pending |
-| LEGAL-03 | Phase 4 - Remediation and Metadata Lock | Pending |
-| ASC-01 | Phase 3 - ASC Live Audit and Rejection RCA | Pending |
-| ASC-02 | Phase 3 - ASC Live Audit and Rejection RCA | Pending |
-| ASC-03 | Phase 3 - ASC Live Audit and Rejection RCA | Pending |
-| ASC-04 | Phase 4 - Remediation and Metadata Lock | Pending |
-| META-01 | Phase 4 - Remediation and Metadata Lock | Pending |
-| CRTV-01 | Phase 5 - Creative Production and ASC Asset Refresh | Pending |
-| CRTV-02 | Phase 5 - Creative Production and ASC Asset Refresh | Pending |
-| CRTV-03 | Phase 5 - Creative Production and ASC Asset Refresh | Pending |
-| CRTV-04 | Phase 5 - Creative Production and ASC Asset Refresh | Pending |
-| READY-01 | Phase 6 - Submission-Ready Gate and Reuse Hardening | Pending |
-| READY-02 | Phase 6 - Submission-Ready Gate and Reuse Hardening | Pending |
-| READY-03 | Phase 6 - Submission-Ready Gate and Reuse Hardening | Pending |
+| TECH-01 | TBD | Pending |
+| TECH-02 | TBD | Pending |
+| TECH-03 | TBD | Pending |
+| TECH-04 | TBD | Pending |
+| COMP-01 | TBD | Pending |
+| COMP-02 | TBD | Pending |
+| COMP-03 | TBD | Pending |
+| COMP-04 | TBD | Pending |
+| MRKT-01 | TBD | Pending |
+| MRKT-02 | TBD | Pending |
+| MRKT-03 | TBD | Pending |
+| MRKT-04 | TBD | Pending |
+| REV-01 | TBD | Pending |
+| REV-02 | TBD | Pending |
+| REV-03 | TBD | Pending |
+| STRT-01 | TBD | Pending |
+| STRT-02 | TBD | Pending |
+| STRT-03 | TBD | Pending |
+| STRT-04 | TBD | Pending |
+| DLVR-01 | TBD | Pending |
+| DLVR-02 | TBD | Pending |
+| DLVR-03 | TBD | Pending |
+| DLVR-04 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 18 total
-- Mapped to phases: 18
-- Unmapped: 0
+- v1 requirements: 23 total
+- Mapped to phases: 0
+- Unmapped: 23 ⚠️
 
 ---
-*Requirements defined: 2026-03-11*
-*Last updated: 2026-03-11 after roadmap mapping*
+*Requirements defined: 2026-03-13*
+*Last updated: 2026-03-13 after initial definition*
