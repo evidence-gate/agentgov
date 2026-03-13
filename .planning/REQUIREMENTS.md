@@ -16,8 +16,8 @@
 
 - [x] **COMP-01**: 14のインフラカテゴリそれぞれの既存プレイヤーを特定し、資金調達・チーム規模・製品成熟度をマッピングする
 - [x] **COMP-02**: 各カテゴリの競合の強み・弱み・空白領域を分析する
-- [ ] **COMP-03**: Big Tech（Cloudflare, AWS, Google, Microsoft）の動向と吸収リスクを評価する
-- [ ] **COMP-04**: オープンソース vs SaaS のポジショニングを各カテゴリで分析する
+- [x] **COMP-03**: Big Tech（Cloudflare, AWS, Google, Microsoft）の動向と吸収リスクを評価する
+- [x] **COMP-04**: オープンソース vs SaaS のポジショニングを各カテゴリで分析する
 
 ### Market Opportunity
 
@@ -74,8 +74,8 @@
 | TECH-04 | Phase 2 | Complete |
 | COMP-01 | Phase 3 | Complete |
 | COMP-02 | Phase 3 | Complete |
-| COMP-03 | Phase 4 | Pending |
-| COMP-04 | Phase 4 | Pending |
+| COMP-03 | Phase 4 | Complete |
+| COMP-04 | Phase 4 | Complete |
 | MRKT-01 | Phase 5 | Complete |
 | MRKT-02 | Phase 5 | Complete |
 | MRKT-03 | Phase 6 | Pending |
