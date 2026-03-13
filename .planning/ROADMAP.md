@@ -33,9 +33,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 01-01-proxy-scaffold-PLAN.md — Monorepo scaffold, Hono proxy skeleton, Drizzle schema (budget_ledger + holds + audit_log), append-only DB trigger, Vitest config
-- [ ] 01-02-cost-engine-hold-settle-PLAN.md — Cost calculator (pricing.json, 11 models), Hold/Settle budget gate, audit writer (SHA-256 hash chain), wired into /v1/chat/completions
-- [ ] 01-03-sdk-alert-webhook-PLAN.md — TypeScript SDK (wrap + BudgetExceeded + base URL interceptor), LLM streaming passthrough with post-response settle, budget alert webhook
+- [x] 01-01-proxy-scaffold-PLAN.md — Monorepo scaffold, Hono proxy skeleton, Drizzle schema (budget_ledger + holds + audit_log), append-only DB trigger, Vitest config
+- [x] 01-02-cost-engine-hold-settle-PLAN.md — Cost calculator (pricing.json, 11 models), Hold/Settle budget gate, audit writer (SHA-256 hash chain), wired into /v1/chat/completions
+- [x] 01-03-sdk-alert-webhook-PLAN.md — TypeScript SDK (wrap + BudgetExceeded + base URL interceptor), LLM streaming passthrough with post-response settle, budget alert webhook
 
 ### Phase 2: HITL + Approval Channels
 **Goal**: Agents pause for human approval on risky actions, with decisions routed asynchronously and surviving proxy restarts
@@ -47,11 +47,11 @@ Plans:
   3. An approval request that receives no response within its TTL automatically transitions to DENIED, and the agent receives a denial with a reason — no orphaned approvals exist after a proxy restart
   4. Every approval decision is recorded in the audit log with actor identity, timestamp, action classification, and outcome
 
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01: HITL queue schema (Turso), action classifier (static risk tier table), Cloudflare Workflows waitForEvent integration
-- [ ] 02-02: Approval routing (webhook + Slack Block Kit), TTL expiry to DENIED, callback endpoint for resume
+- [ ] 02-01-PLAN.md — HITL queue schema (Turso), action classifier (static risk tier table), Cloudflare Workflows waitForEvent, notification channels (webhook + Slack), HitlPending SDK error
+- [ ] 02-02-PLAN.md — Slack signature verification, approve/deny/status callback endpoints, HITL classification wired into proxy pipeline, route mounting
 
 ### Phase 3: Error Handling + Production Hardening
 **Goal**: Agents running in production fail deterministically — transient errors retry, permanent errors halt, stuck agents are detected and stopped
