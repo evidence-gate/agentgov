@@ -1,381 +1,518 @@
-# Architecture Research: AI Agent Infrastructure Ecosystem
+# Architecture Research
 
-**Domain:** AI Agent Infrastructure Services (auth, billing, observability, testing)
+**Domain:** Agent Governance Platform (proxy-based, OSS)
 **Researched:** 2026-03-13
-**Confidence:** MEDIUM-HIGH (multiple authoritative sources converge on the same layered model)
+**Confidence:** HIGH (proxy pattern is well-established; agentgov-specific design principles from PROJECT.md are incorporated as-is)
 
-## The 2026 AI Agent Protocol Stack
+## Standard Architecture
 
-The AI agent ecosystem has consolidated around a four-protocol stack. Understanding this stack is essential because **each protocol boundary is a natural insertion point for infrastructure services**.
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     User / Frontend Layer                        │
-│                                                                 │
-│  ┌──────────────┐                                               │
-│  │   AG-UI      │  Agent-to-User Interaction Protocol            │
-│  │  (CopilotKit)│  Event-based streaming from agent to UI       │
-│  └──────┬───────┘                                               │
-├─────────┼───────────────────────────────────────────────────────┤
-│         │          Orchestration / Agent Layer                    │
-│         ▼                                                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │  Agent A     │  │  Agent B     │  │  Agent C     │           │
-│  │ (LangGraph)  │  │  (CrewAI)    │  │ (AutoGen)    │           │
-│  └──┬───────┬───┘  └──┬───────┬──┘  └──┬───────┬───┘           │
-│     │       │          │       │         │       │              │
-│     │  A2A  ◄──────────►  A2A  ◄─────────►  A2A │              │
-│     │(Agent-to-Agent Protocol, Google/Linux Foundation)         │
-│     │  JSON-RPC 2.0 / HTTP(S), Agent Cards for discovery       │
-│     │                                                           │
-├─────┼───────────────────────────────────────────────────────────┤
-│     │              Tool / Capability Layer                       │
-│     ▼                                                           │
-│  ┌──────────────────────────────────────────┐                   │
-│  │            MCP Gateway                    │ <-- KEY INFRA    │
-│  │  (Auth, Rate Limiting, Observability)     │     INSERTION    │
-│  └──┬────────────┬────────────┬─────────┬───┘     POINT        │
-│     │            │            │         │                       │
-│  ┌──▼──┐     ┌──▼──┐     ┌──▼──┐   ┌──▼──┐                    │
-│  │ MCP  │     │ MCP  │     │ MCP │   │ MCP │                    │
-│  │Srv A │     │Srv B │     │Srv C│   │Srv D│                    │
-│  │(DB)  │     │(API) │     │(FS) │   │(SaaS)                   │
-│  └──────┘     └──────┘     └──────┘  └──────┘                  │
-├─────────────────────────────────────────────────────────────────┤
-│                  Foundation Layer                                │
-│                                                                 │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐                │
-│  │  LLM APIs  │  │  Vector DB │  │ Persistence│                │
-│  │(OpenAI,    │  │(Pinecone,  │  │(Postgres,  │                │
-│  │ Anthropic, │  │ Weaviate)  │  │ Redis)     │                │
-│  │ Gemini)    │  │            │  │            │                │
-│  └────────────┘  └────────────┘  └────────────┘                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Protocol Role Summary
-
-| Protocol | Direction | Purpose | Transport | Status (2026-03) |
-|----------|-----------|---------|-----------|-------------------|
-| **MCP** (Anthropic) | Agent -> Tools | Agent accesses external capabilities (DB, API, filesystem) | JSON-RPC 2.0 over stdio or Streamable HTTP | Mature. 97M+ monthly SDK downloads. Adopted by all major AI providers |
-| **A2A** (Google/LF) | Agent <-> Agent | Agents discover and delegate tasks to other agents | JSON-RPC 2.0 over HTTP(S), gRPC (v0.3+) | Growing. v0.3 released. 100+ enterprise supporters |
-| **AG-UI** (CopilotKit) | Agent -> User | Streaming agent events to frontend UI | Event-based streaming | Emerging. Oracle, Google, CopilotKit joint release |
-| **OAuth 2.1** | Cross-cutting | Authentication at every boundary | HTTP headers / token exchange | Standard. MCP spec recommends OAuth for remote servers |
-
-**Confidence:** HIGH -- sourced from official protocol specs and multiple independent analyses.
-
-## Component Responsibilities
-
-### MCP Architecture (Vertical: Agent-to-Tool)
-
-| Component | Responsibility | Implementation |
-|-----------|---------------|----------------|
-| **MCP Host** | AI application that coordinates MCP clients (e.g., Claude Desktop, VS Code, custom agent) | Agent framework runtime |
-| **MCP Client** | 1:1 connection to an MCP server; translates LLM requests to JSON-RPC | SDK-provided (Python/TypeScript MCP SDK) |
-| **MCP Server** | Exposes tools, resources, prompts to the agent | Lightweight program; 500+ public servers exist |
-| **MCP Gateway** | Reverse proxy between agents and MCP servers; adds auth, rate limiting, observability | Emerging category: Bifrost, ContextForge, Traefik Hub, Composio |
-
-MCP servers expose three primitives:
-- **Tools** -- executable functions (side effects allowed: API calls, DB writes)
-- **Resources** -- read-only data sources (file contents, DB records)
-- **Prompts** -- reusable interaction templates (system prompts, few-shot examples)
-
-### A2A Architecture (Horizontal: Agent-to-Agent)
-
-| Component | Responsibility | Implementation |
-|-----------|---------------|----------------|
-| **Agent Card** | JSON metadata describing agent identity, capabilities, endpoint, auth requirements | Published at `/.well-known/agent.json` |
-| **Client Agent** | Discovers remote agents, creates tasks, receives results | Any agent framework with A2A SDK |
-| **Remote Agent** | Receives tasks, executes them, returns artifacts | Any agent framework with A2A SDK |
-| **Task** | Unit of work with lifecycle: submitted -> working -> input-required -> completed/failed | JSON-RPC managed object |
-| **Artifact** | Output generated by agent (documents, images, structured data), composed of Parts | Returned via streaming or polling |
-
-### Agent Framework Layer
-
-| Framework | Architecture Model | Strengths |
-|-----------|-------------------|-----------|
-| **LangGraph** (LangChain) | Graph-based: nodes = tasks, edges = transitions | Production-grade, fine-grained control, state machines |
-| **CrewAI** | Two-layer: Crews (role-based agents) + Flows (deterministic orchestration) | Rapid prototyping, role metaphor, popular |
-| **AutoGen** (Microsoft) | Event-driven messaging: Core (low-level) + AgentChat (high-level) | Multi-agent conversations, async patterns |
-| **Semantic Kernel** (Microsoft) | Enterprise: session management, type safety, filters, telemetry | Enterprise-grade, .NET/Python/Java |
-| **SmolAgents** (HuggingFace) | Code-first: LLM writes Python instead of JSON tool calls | Minimal overhead, open-source models |
-
-**2026 Trend:** Convergence toward graph-based orchestration. Hybrid stacks are common (e.g., LangChain tools wrapped in CrewAI agents).
-
-## Data Flow
-
-### Flow 1: Single Agent Tool Use (most common)
+### System Overview
 
 ```
-User Query
-    |
-    v
-[Agent Framework] -- selects tool based on LLM reasoning
-    |
-    v
-[MCP Client] -- JSON-RPC 2.0 request
-    |
-    v
-[MCP Gateway] -- authenticates, rate limits, logs   <-- INFRA INSERTION
-    |
-    v
-[MCP Server] -- executes tool (API call, DB query, etc.)
-    |
-    v
-[Tool Result] -- returned as content array (text/image/resource)
-    |
-    v
-[Agent Framework] -- feeds result back to LLM as context
-    |
-    v
-[Response to User]
+┌─────────────────────────────────────────────────────────────────────┐
+│                          AGENT PROCESS                              │
+│  ┌──────────────┐    ┌──────────────────────────────────────────┐   │
+│  │  Agent Code  │───▶│  agentgov SDK  (TypeScript / Python)     │   │
+│  │  (user app)  │    │  agentgov.wrap(client)                   │   │
+│  └──────────────┘    │  - Rewrites base_url → Proxy             │   │
+│                      │  - Injects agent-id header               │   │
+│                      │  - Surfaces budget errors as exceptions  │   │
+│                      └──────────────┬───────────────────────────┘   │
+└─────────────────────────────────────│───────────────────────────────┘
+                                      │ HTTPS (OpenAI-compat. format)
+┌─────────────────────────────────────▼───────────────────────────────┐
+│                        PROXY LAYER (control plane)                  │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  Request Ingress  (Hono router, OpenAI-compatible endpoint)  │    │
+│  └────────────────────────┬────────────────────────────────────┘    │
+│                           │                                         │
+│  ┌────────────────────────▼────────────────────────────────────┐    │
+│  │  Auth & Agent Identity  (API key → agent-id mapping)        │    │
+│  └────────────────────────┬────────────────────────────────────┘    │
+│                           │                                         │
+│  ┌────────────────────────▼────────────────────────────────────┐    │
+│  │  Budget Gate  (deterministic, pre-request)                   │    │
+│  │  Hold/Settle pattern: pessimistic reservation               │    │
+│  │  global → provider → model hierarchy                        │    │
+│  │  Graceful degradation: expensive → cheaper model            │    │
+│  └──────────┬─────────────────────────┬───────────────────────┘    │
+│   PASS       │                 BLOCK   │                            │
+│  ┌───────────▼─────────┐  ┌──────────▼──────────────────────┐      │
+│  │  Action Classifier  │  │  Budget Exceeded Response       │      │
+│  │  Reversible /       │  │  (deterministic 429 / graceful  │      │
+│  │  Semi-Reversible /  │  │   fallback to cheaper model)    │      │
+│  │  Irreversible /     │  └─────────────────────────────────┘      │
+│  │  External           │                                            │
+│  └──────────┬──────────┘                                            │
+│  AUTO-PASS  │   HITL-REQUIRED                                       │
+│  ┌──────────▼──────┐  ┌──────────────────────────────────────┐      │
+│  │  LLM Passthrough│  │  HITL Queue  (async suspend/resume)  │      │
+│  │  (forward req)  │  │  pending_approval state persisted    │      │
+│  └──────────┬──────┘  └─────────────┬────────────────────────┘      │
+│             │                       │                               │
+│  ┌──────────▼───────────────────────▼────────────────────────┐      │
+│  │  Error Classifier + Timeout Watchdog                       │      │
+│  │  3-tier: soft-warn → idle-detect → hard-stop              │      │
+│  │  Stuck detection: bounded retry (2 failures → halt)       │      │
+│  └──────────────────────────┬───────────────────────────────┘      │
+│                              │                                      │
+│  ┌───────────────────────────▼──────────────────────────────┐       │
+│  │  Audit Log Writer  (append-only, tamper-evident)          │       │
+│  │  Writes: budget decision, action class, HITL outcome,    │       │
+│  │          error type, timeout events                       │       │
+│  └──────────────────────────────────────────────────────────┘       │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+┌─────────────▼──┐  ┌─────────▼───────┐  ┌───▼───────────────────┐
+│  LLM Provider  │  │  Approval        │  │  Dashboard            │
+│  (OpenAI,      │  │  Channels        │  │  (read-only)          │
+│   Anthropic,   │  │  Slack / Webhook │  │  Cost, budget,        │
+│   etc.)        │  │  ── notify →     │  │  approval queue       │
+│                │  │  ← approve/deny  │  │  Real-time from DB    │
+└────────────────┘  └─────────────────┘  └───────────────────────┘
 ```
 
-### Flow 2: Multi-Agent Delegation (A2A)
+### Component Responsibilities
+
+| Component | Responsibility | Owns |
+|-----------|----------------|------|
+| **SDK (TS/Python)** | Intercept LLM client at construction time; rewrite `base_url`; inject `agent-id`; surface `BudgetExceeded` / `HitlPending` exceptions | Zero persistent state |
+| **Proxy / Request Ingress** | OpenAI-compatible HTTP endpoint; validate inbound format; route to internal pipeline | Request lifetime |
+| **Auth & Agent Identity** | Map API key → agent-id; enforce key validity; capability scope (what budgets/models this agent may use) | Agent credential store |
+| **Budget Gate** | Pre-request hold (pessimistic reservation); post-response settle (actual token cost); hierarchy enforcement (global > provider > model); graceful fallback logic | Budget ledger (Turso/libSQL) |
+| **Action Classifier** | Static, deterministic mapping of requested action → risk tier (Reversible / Semi-Reversible / Irreversible / External); HITL trigger decision is code, not LLM | Static rule table |
+| **HITL Queue** | Async suspend: persist pending request; notify approval channels; expose resume endpoint; timeout the pending approval | Approval state store |
+| **Error Classifier + Timeout Watchdog** | Categorize errors by type; route to typed handler; track retry count per agent/session; enforce 3-tier timeout (soft → idle → hard); detect stuck loops | Per-session error state |
+| **Audit Log Writer** | Append-only writes (never update/delete); timestamp + hash chain for tamper evidence; EU AI Act Article 12/14 traceability | Append-only log table |
+| **Approval Channels** | Slack bot (interactive messages) + generic Webhook; async notify → receive approve/deny callback; correlate back to HITL Queue | External integrations |
+| **Dashboard** | Read-only query of audit log + budget ledger; cost summary, budget remaining, approval queue, error rates | No write path |
+
+## Recommended Project Structure
 
 ```
-Client Agent receives complex task
-    |
-    v
-[Agent Card Discovery] -- GET /.well-known/agent.json
-    |                      from candidate remote agents
-    v
-[Task Creation] -- POST /tasks with instructions + context
-    |
-    v                                                    <-- INFRA INSERTION
-[Remote Agent] -- works on task (may use MCP tools)       (billing, auth,
-    |               status: submitted -> working           observability)
-    v
-[Artifact Stream] -- SSE or polling for results
-    |                  status: working -> completed
-    v
-[Client Agent] -- integrates artifacts into own context
-    |
-    v
-[Final Response]
+agentgov/
+├── packages/
+│   ├── sdk-typescript/          # npm: @agentgov/sdk
+│   │   ├── src/
+│   │   │   ├── wrap.ts          # agentgov.wrap(client) entry point
+│   │   │   ├── interceptor.ts   # base_url rewrite + header injection
+│   │   │   ├── errors.ts        # BudgetExceeded, HitlPending, AgentError
+│   │   │   └── index.ts
+│   │   └── package.json
+│   │
+│   ├── sdk-python/              # PyPI: agentgov
+│   │   ├── agentgov/
+│   │   │   ├── wrap.py          # agentgov.wrap(client)
+│   │   │   ├── interceptor.py   # httpx transport override
+│   │   │   ├── errors.py        # BudgetExceeded, HitlPending
+│   │   │   └── __init__.py
+│   │   └── pyproject.toml
+│   │
+│   └── proxy/                   # Cloudflare Worker (primary) + Docker (self-host)
+│       ├── src/
+│       │   ├── index.ts         # Hono app entry; route /v1/chat/completions
+│       │   ├── auth/
+│       │   │   └── agent-identity.ts   # API key → agent-id resolution
+│       │   ├── budget/
+│       │   │   ├── gate.ts      # hold/settle logic (deterministic)
+│       │   │   ├── ledger.ts    # Turso DB read/write for budget state
+│       │   │   ├── hierarchy.ts # global > provider > model enforcement
+│       │   │   └── fallback.ts  # graceful degradation (cheaper model)
+│       │   ├── hitl/
+│       │   │   ├── classifier.ts  # static risk-tier mapping
+│       │   │   ├── queue.ts       # suspend / persist / resume
+│       │   │   └── channels/
+│       │   │       ├── slack.ts   # Slack interactive message + callback
+│       │   │       └── webhook.ts # generic outbound + inbound callback
+│       │   ├── errors/
+│       │   │   ├── classifier.ts  # error type → handler routing
+│       │   │   ├── timeout.ts     # 3-tier timeout watchdog
+│       │   │   └── stuck.ts       # bounded retry + loop detection
+│       │   ├── audit/
+│       │   │   └── writer.ts      # append-only log writes
+│       │   ├── passthrough/
+│       │   │   └── forward.ts     # proxy approved request to LLM provider
+│       │   └── types.ts           # shared TypeScript types
+│       ├── wrangler.toml          # Cloudflare Workers config
+│       └── docker-compose.yml     # Self-hosted deployment
+│
+├── dashboard/                     # Read-only web UI
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── costs.tsx          # Cost summary + budget remaining
+│   │   │   ├── approvals.tsx      # Pending HITL queue
+│   │   │   └── audit.tsx          # Audit log viewer
+│   │   └── api/                   # Read-only query endpoints
+│   └── package.json
+│
+├── docker/
+│   ├── docker-compose.yml         # Full self-hosted stack
+│   ├── proxy/Dockerfile
+│   └── dashboard/Dockerfile
+│
+└── docs/                          # OSS documentation
 ```
 
-### Flow 3: Agent-to-User Streaming (AG-UI)
+### Structure Rationale
 
-```
-[Agent] -- produces events during execution
-    |
-    v
-[AG-UI Protocol] -- standardized event stream          <-- INFRA INSERTION
-    |                (text delta, tool call start,        (usage metering,
-    v                 state snapshot, etc.)                session tracking)
-[Frontend Client] -- renders events in real-time
-    |                 (React, Angular via CopilotKit)
-    v
-[User sees streaming response + agent actions]
-```
-
-## Natural Insertion Points for Infrastructure Services
-
-The architecture reveals **five natural insertion points** where infrastructure services can intercept, augment, or govern agent behavior. These are ordered by market maturity and opportunity.
-
-### 1. MCP Gateway Layer (HIGHEST OPPORTUNITY)
-
-**What:** Reverse proxy between MCP clients and MCP servers
-**Why it matters:** Every tool call flows through here. This is the "API Gateway" of the agent world.
-
-| Service | How It Inserts | Market State |
-|---------|---------------|--------------|
-| **Authentication** | OAuth token management, credential vault, token refresh/rotation | Active competition: Composio, Bifrost, ContextForge |
-| **Rate Limiting** | Per-agent, per-user, per-tool request caps | Built into gateways but not standalone |
-| **Cost Control** | Budget caps per agent/user, usage tracking, kill switches | Emerging; LiteLLM does this for LLM calls but not MCP |
-| **Observability** | OpenTelemetry traces, Prometheus metrics, audit logs | Converging on OTel standard; Langfuse/LangSmith for LLM layer |
-| **Caching** | Cache repeated tool call results to reduce latency and cost | Basic in gateways; not intelligent yet |
-
-**Architecture pattern:** Hub-and-spoke. Gateway transforms N-agents x M-tools into N-agents x 1-gateway x M-tools.
-
-### 2. A2A Boundary Layer
-
-**What:** Middleware at the agent-to-agent communication boundary
-**Why it matters:** When agents delegate to other agents, billing, auth, and trust become critical.
-
-| Service | How It Inserts | Market State |
-|---------|---------------|--------------|
-| **Agent Identity & Trust** | Verify Agent Cards, sign cards cryptographically (A2A v0.3) | Nascent; A2A spec just added card signing |
-| **Task Billing** | Meter task creation/completion between agents | Not yet addressed by any player |
-| **Cross-agent Observability** | Trace task lifecycle across agent boundaries | OpenTelemetry context propagation applies but not agent-specific |
-| **Access Control** | TBAC (Task-Based Access Control) per A2A spec | Spec-level only; no production implementations found |
-
-### 3. LLM API Gateway Layer
-
-**What:** Proxy between agent and LLM provider APIs
-**Why it matters:** LLM calls are the most expensive single operation in agent systems.
-
-| Service | How It Inserts | Market State |
-|---------|---------------|--------------|
-| **Multi-provider routing** | Route to cheapest/fastest/best model per request | Active: LiteLLM (100+ LLMs), Portkey (1600+ models) |
-| **Spend tracking** | Per-agent, per-user token usage and cost | LiteLLM, Helicone, Portkey all offer this |
-| **Fallback & retry** | Auto-failover between providers | Standard in gateways |
-
-**Note:** This layer is already well-served. Less opportunity for new entrants.
-
-### 4. Agent Framework Middleware
-
-**What:** Hooks/interceptors within the agent framework itself
-**Why it matters:** Framework-level integration captures intent, not just HTTP traffic.
-
-| Service | How It Inserts | Market State |
-|---------|---------------|--------------|
-| **Tracing & Observability** | SDK-level instrumentation (decorators, callbacks) | Langfuse, LangSmith, AgentOps -- active competition |
-| **Evaluation & Testing** | Automated test runs, regression detection | Emerging: Braintrust, RAGAS, custom evals |
-| **Guardrails** | Input/output filtering, PII detection | NeMo Guardrails, Guardrails AI |
-
-### 5. AG-UI Streaming Layer
-
-**What:** Protocol boundary between agent backend and user-facing frontend
-**Why it matters:** User-facing metrics, session management, compliance logging.
-
-| Service | How It Inserts | Market State |
-|---------|---------------|--------------|
-| **Session management** | Track user-agent sessions, state persistence | CopilotKit provides basics; enterprise needs more |
-| **Usage metering** | Per-user interaction tracking for SaaS billing | Not addressed |
-| **Compliance logging** | Audit trail of what agent showed to user | Not addressed |
-
-## Suggested Build Order (Dependencies)
-
-The following order reflects technical dependencies and market opportunity.
-
-```
-Phase 1: MCP Gateway Core
-    |     (Authentication + Rate Limiting + Basic Observability)
-    |     Foundation -- everything else depends on tool access control
-    |
-Phase 2: Cost Control & Billing
-    |     (Budget caps, usage metering, billing APIs)
-    |     Builds on Phase 1 gateway data; most requested by developers
-    |
-Phase 3: Advanced Observability
-    |     (OpenTelemetry traces, cross-agent tracing, dashboards)
-    |     Builds on Phase 1+2 telemetry data
-    |
-Phase 4: A2A Boundary Services
-    |     (Agent identity, task billing, cross-agent trust)
-    |     Market is younger; requires A2A adoption to mature
-    |
-Phase 5: Testing & Evaluation
-          (Agent behavior testing, regression detection)
-          Requires observability data from Phase 3
-```
-
-**Rationale:**
-- MCP gateway is the highest-value insertion point because **every agent, regardless of framework, uses MCP for tool access**. It is framework-agnostic by design.
-- Cost control is the most painful developer problem (runaway agents causing surprise bills).
-- A2A services should wait because the protocol is still maturing (v0.3 just released).
-- Testing/evaluation depends on having observability data first.
+- **packages/sdk-typescript/ and sdk-python/:** Separate npm + PyPI packages. SDK has zero server dependencies — it only rewrites the `base_url` and injects headers. This keeps the SDK trivially small and auditable.
+- **packages/proxy/src/budget/:** Budget logic is isolated from routing logic. The `gate.ts` module is deterministic code with no LLM calls — consistent with the "LLM does judgment, code does deterministic" principle.
+- **packages/proxy/src/hitl/:** HITL queue is separate from the action classifier. Classifier is a pure function (action → risk tier). Queue handles the stateful suspend/resume lifecycle.
+- **packages/proxy/src/audit/:** Writer-only module. Dashboard reads directly from DB. No write path in dashboard prevents accidental mutation.
+- **dashboard/:** Separate deployable. Can be omitted in minimal deployments. Reads only — no write path into budget or audit tables.
 
 ## Architectural Patterns
 
-### Pattern 1: Gateway-as-Middleware (Recommended Starting Point)
+### Pattern 1: Hold/Settle Budget Reservation
 
-**What:** MCP Gateway that sits between any MCP client and any MCP server, adding cross-cutting concerns transparently.
+**What:** Before forwarding a request to the LLM provider, the Budget Gate reserves (holds) the estimated token cost pessimistically. After the response arrives, it settles to the actual token cost and releases the over-estimate.
 
-**When to use:** When you want to provide infrastructure to the broadest possible audience regardless of their agent framework choice.
+**When to use:** All LLM requests. This is the core budget enforcement mechanism. Non-negotiable — without the hold, a budget check at request time is a race condition under concurrent agents.
 
-**Trade-offs:**
-- Pro: Framework-agnostic. Works with LangChain, CrewAI, AutoGen, raw MCP SDK, everything.
-- Pro: Transparent to existing MCP servers -- no changes needed on either side.
-- Con: Limited to information visible at the protocol boundary (HTTP headers, JSON-RPC payloads).
-- Con: Cannot see agent-internal reasoning or intent.
+**Trade-offs:** Slightly over-blocks near budget limits (hold is pessimistic). Tradeoff is correct: under-blocking causes cost overruns, which is the primary user problem to solve.
 
-```
-[Any Agent Framework]
-        |
-        v
-   [MCP Client]
-        |
-        v
-┌───────────────────┐
-│   MCP Gateway     │  <-- Your infrastructure service
-│                   │
-│  - OAuth/token mgmt
-│  - Rate limiting  │
-│  - Cost tracking  │
-│  - OTel tracing   │
-│  - Audit logging  │
-└───────┬───────────┘
-        |
-        v
-   [MCP Server(s)]
-```
+**Example:**
+```typescript
+// budget/gate.ts
+async function budgetGate(ctx: RequestContext): Promise<GateResult> {
+  const estimated = estimateInputTokens(ctx.request); // deterministic, tiktoken
+  const hold = await ledger.hold(ctx.agentId, estimated, ctx.model);
 
-### Pattern 2: SDK-Level Instrumentation
+  if (!hold.approved) {
+    // Budget exceeded — check if graceful fallback applies
+    const fallback = hierarchy.findCheaperModel(ctx.model, hold.remaining);
+    if (fallback) return { action: 'fallback', model: fallback, holdId: null };
+    return { action: 'block', reason: 'budget_exceeded' };
+  }
 
-**What:** Lightweight SDK that wraps agent framework calls, capturing telemetry at the source.
+  return { action: 'pass', holdId: hold.id };
+}
 
-**When to use:** When you need deeper visibility into agent reasoning, tool selection, and multi-step workflows.
-
-**Trade-offs:**
-- Pro: Rich data -- can see LLM prompts, tool selection reasoning, intermediate state.
-- Pro: Better developer experience (decorators, callbacks, auto-instrumentation).
-- Con: Framework-specific. Need adapters for LangChain, CrewAI, AutoGen, etc.
-- Con: Requires developer adoption (install SDK, add instrumentation).
-
-```python
-# Example: SDK-level instrumentation pattern
-from infra_sdk import trace, budget
-
-@trace()                    # Auto-captures LLM calls, tool usage
-@budget(max_usd=1.00)      # Kills execution if budget exceeded
-async def my_agent(query: str):
-    result = await agent.run(query)
-    return result
+async function budgetSettle(holdId: string, actualUsage: TokenUsage): Promise<void> {
+  // Called after LLM response received. Settles to actual cost.
+  await ledger.settle(holdId, actualUsage);
+  // Writes to audit log automatically
+}
 ```
 
-### Pattern 3: Sidecar / Agent Mesh
+### Pattern 2: Static Action Classification (Risk-Graded)
 
-**What:** Each agent gets a co-located sidecar process that handles infrastructure concerns, similar to service mesh (Istio/Envoy) in microservices.
+**What:** A lookup table maps requested tool/action names (or inferred from request content) to a risk tier. The tier determines whether the request auto-passes or enters the HITL queue. No LLM inference involved in this decision.
 
-**When to use:** Multi-agent systems where agents need independent infrastructure management.
+**When to use:** Every request that invokes a tool action. For pure text completion with no tool calls, classification is Reversible and auto-passes.
 
-**Trade-offs:**
-- Pro: Complete isolation; each agent has its own budget, auth context, observability.
-- Pro: Familiar pattern from service mesh; proven at scale.
-- Con: Operational complexity. Overkill for most current deployments.
-- Con: Market is not ready -- most deployments are single-agent.
+**Trade-offs:** Static table requires upfront configuration and periodic review. Avoids the instability of LLM-based HITL triggering (non-deterministic, prompt-injection vulnerable). Correct tradeoff given the security model (agent as untrusted contractor).
 
-## Anti-Patterns
+**Example:**
+```typescript
+// hitl/classifier.ts
+const RISK_TABLE: Record<string, RiskTier> = {
+  'read_file':        RiskTier.Reversible,
+  'write_file':       RiskTier.SemiReversible,
+  'delete_file':      RiskTier.Irreversible,
+  'send_email':       RiskTier.External,
+  'call_payment_api': RiskTier.External,
+  // default for unknown actions:
+  '*':                RiskTier.Irreversible,
+};
 
-### Anti-Pattern 1: Framework Lock-In
+function classifyAction(action: string): RiskTier {
+  return RISK_TABLE[action] ?? RISK_TABLE['*'];
+}
 
-**What people do:** Build infrastructure tightly coupled to one agent framework (e.g., LangChain-only observability).
-**Why it's wrong:** The framework landscape is fragmenting, not consolidating. Developers switch frameworks frequently. LangSmith's tight LangChain coupling is viewed as both strength and weakness.
-**Do this instead:** Build at the protocol level (MCP, A2A) which is framework-agnostic. Provide thin framework adapters as optional convenience layers.
+function requiresHitl(tier: RiskTier, policy: HitlPolicy): boolean {
+  // policy is per-agent config (e.g., "require HITL for Irreversible+")
+  return tier >= policy.minimumTierForHitl;
+}
+```
 
-### Anti-Pattern 2: Trying to Be the Agent Runtime
+### Pattern 3: Async HITL Suspend/Resume
 
-**What people do:** Build an infrastructure service that also tries to host/run agents.
-**Why it's wrong:** Competes with every agent framework simultaneously. Massive surface area. Not what infrastructure customers want.
-**Do this instead:** Be invisible middleware. Enhance existing agent setups without replacing them.
+**What:** When an action requires human approval, the proxy persists the full request context (serialized), responds to the SDK with `HitlPending` (202 status + approval-id), notifies approval channels (Slack/Webhook), and waits. When the approver responds, a callback endpoint resumes the pending request.
 
-### Anti-Pattern 3: LLM Gateway Re-invention
+**When to use:** Whenever `classifyAction()` + `requiresHitl()` returns true. The resume can happen seconds or hours later — the pending state survives proxy restarts because it is stored in the DB.
 
-**What people do:** Build yet another LLM API proxy with routing and cost tracking.
-**Why it's wrong:** LiteLLM, Portkey, Helicone already have strong positions. Saturated market.
-**Do this instead:** Focus on the MCP/A2A layer where the market is earlier and less crowded.
+**Trade-offs:** Increases latency for HITL-gated actions (by design). Adds complexity in the SDK (caller must handle 202 + poll or receive callback). Resume endpoint must be idempotent (Slack retries webhooks).
 
-### Anti-Pattern 4: Ignoring the Credential Problem
+**Example:**
+```typescript
+// hitl/queue.ts
+async function suspendForHitl(ctx: RequestContext): Promise<HitlTicket> {
+  const ticket = await db.insert('hitl_queue', {
+    id: crypto.randomUUID(),
+    agentId: ctx.agentId,
+    requestPayload: JSON.stringify(ctx.request),
+    status: 'pending',
+    expiresAt: Date.now() + HITL_TIMEOUT_MS,
+    createdAt: Date.now(),
+  });
 
-**What people do:** Let each MCP server handle its own authentication, leading to credential sprawl.
-**Why it's wrong:** Agents typically connect to 5-20 MCP servers. Managing OAuth tokens, API keys, and refresh cycles for each one separately is the #1 developer pain point.
-**Do this instead:** Centralized credential vault with automated token lifecycle management (the Composio pattern). This is the "PayPal position" -- handling the auth so developers don't have to.
+  await channels.notify(ticket);  // Slack + Webhook, non-blocking
+  auditLog.write({ event: 'hitl_suspended', ticketId: ticket.id, ...ctx });
+
+  return ticket;
+}
+
+// POST /v1/hitl/:ticketId/approve  (called by Slack callback or webhook)
+async function resumeApproved(ticketId: string, approver: string): Promise<void> {
+  const ticket = await db.get('hitl_queue', ticketId);
+  if (ticket.status !== 'pending') return; // idempotent
+
+  await db.update('hitl_queue', ticketId, { status: 'approved', approver });
+  auditLog.write({ event: 'hitl_approved', ticketId, approver });
+  await forward.resume(ticket); // forward original request to LLM provider
+}
+```
+
+### Pattern 4: Append-Only Audit Log with Hash Chain
+
+**What:** Every budget decision, action classification, HITL event, error, and timeout is written as an immutable row. No UPDATE or DELETE on the audit table. Each row includes a hash of the previous row's hash + current content, creating a tamper-evident chain detectable by sequential verification.
+
+**When to use:** All governance events. Not optional — this is the EU AI Act Article 12/14 compliance backbone and the primary value artifact for enterprise buyers.
+
+**Trade-offs:** Slightly more complex writes (must read previous hash to compute chain). No correction path for erroneous entries — append a correction record instead. Storage grows indefinitely (partition by month for archival).
+
+**Example:**
+```typescript
+// audit/writer.ts
+async function appendAuditEvent(event: AuditEvent): Promise<void> {
+  const prev = await db.queryOne('SELECT hash FROM audit_log ORDER BY seq DESC LIMIT 1');
+  const prevHash = prev?.hash ?? GENESIS_HASH;
+  const payload = JSON.stringify({ ...event, prevHash });
+  const hash = await crypto.subtle.digest('SHA-256', encoder.encode(payload));
+
+  await db.insert('audit_log', {
+    seq: await nextSeq(),
+    event_type: event.type,
+    agent_id: event.agentId,
+    payload,
+    hash: bufferToHex(hash),
+    ts: Date.now(),
+  });
+  // Never UPDATE or DELETE this table
+}
+```
+
+### Pattern 5: 3-Tier Timeout Watchdog
+
+**What:** Three escalating timeout signals per agent session. Soft warning at T1 (log + notify). Idle detection at T2 (if no progress since last check). Hard stop at T3 (terminate session, release all holds, write audit event).
+
+**When to use:** All long-running agent sessions. Prevents runaway agents from holding budget reservations open indefinitely and causing false budget exhaustion.
+
+**Trade-offs:** Requires per-session state tracking. T1/T2/T3 thresholds must be configurable per agent (batch jobs vs. interactive agents have very different profiles).
+
+```
+T1 (soft warning):  30s of no LLM calls → log + optional Slack ping
+T2 (idle detect):   60s of no LLM calls → mark session idle, alert
+T3 (hard stop):    120s of no LLM calls → terminate, settle all holds at $0
+```
+
+## Data Flow
+
+### Request Flow (Auto-Pass Path)
+
+```
+Agent Code
+  │  openai.chat.completions.create(...)
+  ▼
+SDK (wrap)
+  │  rewrites base_url → proxy URL
+  │  injects X-Agent-Id header
+  ▼
+Proxy: Ingress (Hono /v1/chat/completions)
+  │  validates request format
+  ▼
+Auth & Agent Identity
+  │  resolves API key → agent-id + capability scope
+  ▼
+Budget Gate
+  │  holds estimated input tokens
+  │  checks: global budget ≥ hold? provider budget ≥ hold? model budget ≥ hold?
+  │  YES → hold placed, returns hold-id
+  ▼
+Action Classifier
+  │  maps action/tool → RiskTier
+  │  checks policy: requiresHitl? → NO (auto-pass path)
+  ▼
+LLM Passthrough (forward to provider)
+  │  forwards original request headers + body with real API key
+  │  streams response back to SDK
+  ▼
+Budget Settle (post-response)
+  │  extracts actual token usage from response
+  │  settles hold → actual cost
+  ▼
+Audit Log Write
+  │  appends: budget_decision, action_class, response_tokens, latency_ms
+  ▼
+SDK
+  │  returns response to agent code
+  ▼
+Agent Code
+```
+
+### Request Flow (HITL Path)
+
+```
+[... Auth & Agent Identity ... Budget Gate ...] (same as above)
+  ▼
+Action Classifier → RiskTier.Irreversible → requiresHitl? YES
+  ▼
+HITL Queue: suspendForHitl()
+  │  persists full request context to DB (status: pending)
+  │  notifies Slack / Webhook channels (async, non-blocking)
+  │  returns 202 + { approvalId } to SDK
+  ▼
+SDK: raises HitlPending exception to agent code
+  │  agent code can poll GET /v1/hitl/:id/status
+  │  or register a callback URL for push notification
+
+[Human receives Slack message / webhook]
+  │  clicks Approve or Deny
+  ▼
+Slack callback → POST /v1/hitl/:id/approve or /deny
+  ▼
+HITL Queue: resumeApproved() or resumeDenied()
+  │  updates DB status
+  │  audit log write: hitl_approved / hitl_denied
+  │  if approved: forward original request to LLM provider → settle budget
+  │  if denied:   release hold, audit write, return error to SDK
+```
+
+### Request Flow (Budget Blocked Path)
+
+```
+[... Auth & Agent Identity ...]
+  ▼
+Budget Gate: hold fails (budget exhausted)
+  │  checks graceful fallback: cheaper model available within remaining budget?
+  │  YES → rewrite model in request, retry hold → proceed as auto-pass
+  │  NO  → return 429 with BudgetExceeded error body
+  ▼
+Audit Log Write: budget_blocked event
+  ▼
+SDK: raises BudgetExceeded exception
+  ▼
+Agent Code: handles exception (terminate / alert / escalate)
+```
+
+### State Management
+
+```
+Budget Ledger (Turso/libSQL)
+  ├── agent_budgets: global/provider/model limits per agent
+  ├── holds: active pessimistic reservations (holdId, agentId, amount, expiresAt)
+  └── usage_log: settled actual costs (append-friendly, drives dashboard)
+
+HITL State (Turso/libSQL)
+  ├── hitl_queue: pending / approved / denied / expired tickets
+  └── approver_config: who gets notified for which agent / risk tier
+
+Audit Log (Turso/libSQL — append-only table)
+  └── audit_log: seq, event_type, agent_id, payload, hash, ts
+
+Session State (Durable Objects / in-memory for self-host)
+  └── timeout_watchdog: last_activity_ts, retry_counts per session
+```
+
+## Component Boundaries and Build Order
+
+Build order is constrained by dependencies between components. Each layer depends only on what is listed below it.
+
+```
+Layer 0 (foundation, no dependencies):
+  ├── Audit Log Writer (append-only DB writes)
+  ├── Budget Ledger (DB schema + hold/settle)
+  └── Shared Types (TypeScript types package)
+
+Layer 1 (depends on Layer 0):
+  ├── Auth & Agent Identity (reads agent_budgets)
+  ├── Budget Gate (reads/writes holds + ledger)
+  └── Error Classifier + Timeout Watchdog (writes audit log)
+
+Layer 2 (depends on Layer 1):
+  ├── Action Classifier (pure function, no DB dependency)
+  ├── HITL Queue (reads budget state, writes HITL state, writes audit log)
+  └── LLM Passthrough (depends on Budget Gate settle)
+
+Layer 3 (depends on Layer 2):
+  ├── Approval Channels — Slack, Webhook (depends on HITL Queue)
+  ├── Proxy Ingress / Hono Router (orchestrates Layers 0-2)
+  └── SDK TypeScript + Python (depends on Proxy contract only)
+
+Layer 4 (depends on Layer 0, read-only):
+  └── Dashboard (queries audit log + budget ledger)
+```
+
+**Recommended build sequence for phases:**
+1. Budget Gate + Audit Log (core value, prove hold/settle works)
+2. Proxy Ingress + SDK (wire it together, `agentgov.wrap(client)` works end-to-end)
+3. Action Classifier + HITL Queue + Slack channel (HITL path operational)
+4. Error Classifier + Timeout Watchdog (production hardening)
+5. Dashboard (observability layer)
+6. Webhook channel + Python SDK (ecosystem coverage)
+7. Docker Compose self-host packaging (OSS distribution)
+8. Cloudflare Workers deployment (edge/cloud distribution)
 
 ## Scaling Considerations
 
 | Scale | Architecture Adjustments |
 |-------|--------------------------|
-| 0-100 agents | Single gateway instance. SQLite or Postgres for usage tracking. Sufficient for indie/small team. |
-| 100-10K agents | Horizontal gateway scaling. Redis for rate limiting state. Async billing pipeline. Need multi-tenant isolation. |
-| 10K+ agents | Distributed gateway (edge deployment). Kafka/NATS for event streaming. Dedicated billing microservice. This is enterprise territory. |
+| 0-1k agents | Single Cloudflare Worker instance; Turso free tier; no Redis. Durable Objects for session state. |
+| 1k-10k agents | Turso read replicas (embedded replica on each Worker); hold table indexed by (agentId, status). Monitor hold table size — expired holds must be reaped. |
+| 10k-100k agents | Shard budget ledger by agentId prefix. Separate Durable Object per high-throughput agent for session state isolation. Audit log partitioned by month. HITL queue on dedicated table with TTL cleanup job. |
+| 100k+ agents | Budget ledger becomes the bottleneck (high-write, strongly-consistent holds). At this scale: evaluate replacing Turso holds with a Redis-backed counter with Lua scripting for atomic hold/check/deduct. Audit log → object storage (R2) with SQLite index. |
 
 ### Scaling Priorities
 
-1. **First bottleneck:** Gateway latency. Bifrost achieves ~11 microsecond overhead. Gateway must not meaningfully increase tool call latency. In-memory auth caching and connection pooling are essential.
-2. **Second bottleneck:** Observability data volume. At scale, every tool call generates traces. Need sampling strategies and efficient storage (columnar stores, time-series DBs).
+1. **First bottleneck: hold table write contention.** Every LLM request needs an atomic hold. At scale, concurrent holds from the same agent (parallel tool calls) must be serialized. Solution: Durable Object per agent acts as a single-writer lock for that agent's budget state.
+2. **Second bottleneck: audit log table size.** Audit log is append-only and grows without bound. Solution: monthly partitioning + archival to R2/S3, keeping only the last 90 days in hot storage.
+3. **Third bottleneck: HITL queue polling.** If many approvals are pending, the approver dashboard must paginate efficiently. Solution: indexed query on (status='pending', createdAt DESC).
+
+## Anti-Patterns
+
+### Anti-Pattern 1: LLM-Based HITL Triggering
+
+**What people do:** Use an LLM to decide whether an action "seems risky" and should require human approval.
+
+**Why it's wrong:** LLM judgment is non-deterministic, prompt-injectable, and adds latency + cost to every request. An adversarial agent can craft a prompt that convinces the LLM the action is safe. The HITL trigger is a security control — it must not be LLM-mediated.
+
+**Do this instead:** Static action classification table (Pattern 2 above). Risk tier is a property of the action type, not the content. If content-based classification is needed, require it to be explicitly whitelisted and audited by humans, not auto-decided by LLM.
+
+### Anti-Pattern 2: Post-Request Budget Checking
+
+**What people do:** Forward the LLM request first, then check if the cost exceeded the budget after the response arrives.
+
+**Why it's wrong:** The cost has already been incurred. Post-request checking is accounting, not enforcement. An agent can exhaust $1000 in budget with a single parallel burst before any check fires.
+
+**Do this instead:** Pre-request hold (pessimistic reservation) before forwarding. Post-request settle to actual cost. The hold is the enforcement; the settle is the accounting.
+
+### Anti-Pattern 3: Mutable Audit Log
+
+**What people do:** Update or delete audit log rows to correct errors or remove PII.
+
+**Why it's wrong:** Any mutation breaks the hash chain, making tamper-evidence unverifiable. EU AI Act Article 12 requires tamper-resistant logging. Legal defensibility of audit trails depends on immutability.
+
+**Do this instead:** Append a correction record ("This row corrects row #X. Corrected value: Y. Reason: Z."). For PII, pseudonymize at write time (store agent-id, not PII). If GDPR erasure is required, store PII in a separate table that can be deleted, referenced by agent-id in the audit log.
+
+### Anti-Pattern 4: SDK-Embedded Budget Logic
+
+**What people do:** Put budget enforcement in the SDK client library (client-side checks).
+
+**Why it's wrong:** The agent process is "untrusted contractor" — it could be compromised, patched, or simply use a different SDK. Client-side enforcement is trivially bypassed.
+
+**Do this instead:** All enforcement at the proxy layer (server-side). SDK is a convenience layer only — it rewrites URLs and surfaces errors. It cannot and should not be the enforcement boundary.
+
+### Anti-Pattern 5: Synchronous HITL (Blocking Wait)
+
+**What people do:** Block the HTTP request thread while waiting for human approval (synchronous wait with long timeout).
+
+**Why it's wrong:** Human approvals can take minutes or hours. Holding an HTTP connection open wastes resources, hits gateway timeouts (Cloudflare Workers has a 30s CPU limit, 30min wall-clock limit per Durable Object), and provides no recovery path if the connection drops.
+
+**Do this instead:** Async suspend/resume pattern (Pattern 3 above). Return 202 immediately, store pending state in DB, resume on callback. The agent SDK polls status or receives a push notification.
 
 ## Integration Points
 
@@ -383,57 +520,46 @@ async def my_agent(query: str):
 
 | Service | Integration Pattern | Notes |
 |---------|---------------------|-------|
-| LLM Providers (OpenAI, Anthropic, Google) | Not directly -- these sit below the MCP layer | LLM gateways (LiteLLM) handle this layer |
-| MCP Servers (500+ public) | Reverse proxy / registry | Must support both stdio (local) and Streamable HTTP (remote) transports |
-| A2A Agents | Agent Card registry + task routing | JSON-RPC 2.0 over HTTPS; gRPC for v0.3+ |
-| OAuth Providers | Token exchange, refresh, vault | MCP spec recommends OAuth for remote server auth |
-| OpenTelemetry Collectors | OTel SDK export | Industry standard; Jaeger/Zipkin/Datadog compatible |
+| OpenAI | Reverse proxy: forward request, stream response back. Use `X-Request-Id` for correlation. | Extract token usage from `stream_options: {include_usage: true}` in streaming responses. |
+| Anthropic | Same reverse proxy pattern. Different auth header (`x-api-key` vs `Authorization: Bearer`). | Token counting: use Anthropic's token count endpoint for pre-request estimation, or tiktoken approximation. |
+| Slack | Outbound: POST to `chat.postMessage` with interactive button. Inbound: `interactivity_request_url` callback to proxy. | Slack enforces 3-second acknowledgment — return 200 immediately, process async. Verify `X-Slack-Signature` HMAC. |
+| Generic Webhook | Outbound: POST approval request. Inbound: callback endpoint with approve/deny decision. | Caller provides callback URL at agent registration time. Idempotency key on all webhook events. |
+| Turso (libSQL) | libSQL HTTP client from Cloudflare Workers (no native SQLite driver in Workers). Embedded replica for self-hosted Docker. | Use `@libsql/client` npm package. In Cloudflare Workers, use HTTP mode (not embedded). |
+| Cloudflare Durable Objects | Per-agent session state (timeout watchdog, retry counters). One DO per active agent session. | DO enforces single-writer concurrency per agent — eliminates hold table race condition. |
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| Gateway <-> Auth Service | Internal API or embedded module | Start embedded, extract if scaling demands |
-| Gateway <-> Billing Service | Async event pipeline | Do not block tool calls for billing writes |
-| Gateway <-> Observability | OTel SDK (fire-and-forget) | Must not add latency to the hot path |
-| Gateway <-> Rate Limiter | In-memory (Redis for distributed) | Sub-millisecond lookup required |
-| Dashboard <-> Gateway API | REST/GraphQL | Separate read path for usage analytics |
-
-## Key Architectural Insight for This Project
-
-The "PayPal position" in AI agent infrastructure maps most naturally to the **MCP Gateway layer**. Here is why:
-
-1. **Universal touchpoint:** Every AI agent, regardless of framework, uses tools. MCP is the de facto standard for tool access (adopted by OpenAI, Anthropic, Google, Microsoft, Amazon). Building at this layer means your infrastructure applies to the entire market.
-
-2. **Authentication is the wedge:** Managing OAuth tokens, API keys, and credential rotation across 5-20 MCP servers per agent is a recurring pain. Solving this creates immediate value and natural lock-in (like PayPal's credential vault for e-commerce).
-
-3. **Billing follows auth:** Once you manage credentials and see all tool traffic, adding usage metering and cost control is a natural extension -- you already have the data.
-
-4. **Observability follows traffic:** All tool calls flow through your gateway, so you can offer observability as a built-in feature rather than requiring separate instrumentation.
-
-The progression is: **Auth -> Billing -> Observability -> Testing**, each building on data from the previous layer.
+| SDK ↔ Proxy | HTTPS, OpenAI-compatible JSON. Extra headers: `X-Agent-Id`, `X-Agentgov-Version`. Responses: standard OpenAI format + `X-Hold-Id` header for traceability. | SDK must not know proxy internals. Contract is the HTTP interface only. |
+| Proxy ↔ Budget Gate | In-process function call (same Worker). No network hop. | Budget Gate is a module, not a service. Keeps latency under 5ms for the budget decision. |
+| Budget Gate ↔ Turso | HTTP (libSQL HTTP client). Atomic hold operation must be a single SQL transaction: `SELECT remaining; INSERT hold; UPDATE remaining`. | In Cloudflare: use DO to serialize concurrent holds from the same agent. |
+| Proxy ↔ HITL Queue | In-process. HITL Queue writes to Turso and invokes Approval Channels async. | Approval Channels are fire-and-forget from the proxy's perspective — audit log captures the notification event. |
+| HITL Queue ↔ Approval Channels | Outbound HTTP (Slack API, arbitrary webhook URL). Inbound: callback endpoint on proxy (`POST /v1/hitl/:id/approve`). | Callback endpoint must verify caller authenticity (Slack HMAC, webhook secret). |
+| Proxy ↔ Audit Log Writer | In-process function call. Every pipeline step calls `auditLog.write()` before returning. | Writer is synchronous within the request — audit write failure is a fatal error (do not silently drop). |
+| Dashboard ↔ Turso | Read-only HTTP queries. No write path from Dashboard to governance tables. | Dashboard uses a separate DB user/token with SELECT-only permissions on audit_log, usage_log, hitl_queue. |
 
 ## Sources
 
-- [MCP Architecture Overview -- modelcontextprotocol.io](https://modelcontextprotocol.io/docs/learn/architecture)
-- [A2A Protocol Specification -- a2a-protocol.org](https://a2a-protocol.org/latest/specification/)
-- [AG-UI Protocol -- CopilotKit](https://www.copilotkit.ai/ag-ui)
-- [MCP vs A2A Complete Guide -- DEV Community](https://dev.to/pockit_tools/mcp-vs-a2a-the-complete-guide-to-ai-agent-protocols-in-2026-30li)
-- [Architecting Agentic MLOps with A2A and MCP -- InfoQ](https://www.infoq.com/articles/architecting-agentic-mlops-a2a-mcp/)
-- [Enterprise AI Stack 2026 -- DextraLabs](https://dextralabs.com/blog/enterprise-ai-stack-2026-mcp-a2a-domain-models/)
-- [AI Agent Frameworks Compared 2026 -- Arsum](https://arsum.com/blog/posts/ai-agent-frameworks/)
-- [LLM Gateways as Critical Infrastructure -- LangGuard](https://langguard.ai/2026/01/13/invisible-backbone.html)
-- [MCP Gateways Developer Guide -- Composio](https://composio.dev/content/mcp-gateways-guide)
-- [Secure AI Agent Infrastructure Guide -- Composio](https://composio.dev/blog/secure-ai-agent-infrastructure-guide)
-- [AI Agent Observability with Langfuse -- Langfuse Blog](https://langfuse.com/blog/2024-07-ai-agent-observability-with-langfuse)
-- [Best MCP Gateways 2026 -- TrueFoundry](https://www.truefoundry.com/blog/best-mcp-gateways)
-- [ContextForge AI Gateway -- IBM](https://ibm.github.io/mcp-context-forge/)
-- [Building AI Agent Gateway with MCP, OPA -- InfoQ](https://www.infoq.com/articles/building-ai-agent-gateway-mcp/)
-- [A2A Protocol Upgrade -- Google Cloud Blog](https://cloud.google.com/blog/products/ai-machine-learning/agent2agent-protocol-is-getting-an-upgrade)
-- [What Is A2A Protocol -- IBM](https://www.ibm.com/think/topics/agent2agent-protocol)
-- [The AI Agents Stack -- Letta](https://www.letta.com/blog/ai-agents-stack)
-- [MCP Authentication Patterns -- Security Boulevard](https://securityboulevard.com/2026/03/mcp-authentication-and-authorization-patterns/)
+- [LiteLLM Proxy Architecture — Life of a Request](https://docs.litellm.ai/docs/proxy/architecture) — reference for proxy pipeline stage ordering
+- [LiteLLM Budget Routing](https://docs.litellm.ai/docs/proxy/provider_budget_routing) — provider-level budget patterns
+- [Cloudflare Durable Objects — What Are Durable Objects?](https://developers.cloudflare.com/durable-objects/concepts/what-are-durable-objects/) — stateful session management
+- [Cloudflare Workflows GA](https://blog.cloudflare.com/workflows-ga-production-ready-durable-execution/) — durable execution patterns
+- [Cloudflare Human-in-the-Loop (Agents SDK)](https://developers.cloudflare.com/agents/concepts/human-in-the-loop/) — HITL suspend/resume pattern
+- [Microsoft Agent Framework — Human-in-the-Loop Workflows](https://learn.microsoft.com/en-us/agent-framework/workflows/human-in-the-loop) — async approval pattern
+- [Human-in-the-Loop Architecture — Agent Patterns](https://www.agentpatterns.tech/en/architecture/human-in-the-loop-architecture) — async HITL architectural patterns
+- [EU AI Act Article 14 — Human Oversight](https://artificialintelligenceact.eu/article/14/) — compliance requirements for HITL
+- [EU AI Act Article 12 — Logging](https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-14) — tamper-resistant audit log requirements
+- [Turso / libSQL — Change Data Capture](https://turso.tech/blog/introducing-change-data-capture-in-turso-sqlite-rewrite) — append-only audit pattern
+- [Distributed SQLite: libSQL and Turso in 2026](https://dev.to/dataformathub/distributed-sqlite-why-libsql-and-turso-are-the-new-standard-in-2026-58fk) — stack validation
+- [AI Agent Governance Architecture Paper (arxiv 2603.07191)](https://arxiv.org/html/2603.07191) — governance framework academic reference
+- [Hardening Best Practices: Sandboxing, Least Privilege](https://skywork.ai/blog/ai-agent/hardening-best-practices-sandboxing-least-privilege-data-exfiltration/) — capability-based security patterns
+- [SHIELDA: Structured Exception Handling in LLM Agents](https://arxiv.org/html/2508.07935v1) — error taxonomy reference
+- [Partnership on AI — Real-Time Failure Detection in AI Agents](https://partnershiponai.org/wp-content/uploads/2025/09/agents-real-time-failure-detection.pdf) — stuck detection and bounded retry patterns
+- [Building an AI Gateway (LLM Proxies/Routers)](https://medium.com/@adnanmasood/primer-on-ai-gateways-llm-proxies-routers-definition-usage-and-purpose-9b714d544f8c) — AI gateway architecture primer
+- [Langfuse / Braintrust observability patterns](https://www.braintrust.dev/articles/best-ai-observability-tools-2026) — dashboard architecture reference
+- [Token Usage with OpenAI Streams](https://openmeter.io/blog/token-usage-with-openai-streams-and-nextjs) — streaming token counting pattern
 
 ---
-*Architecture research for: AI Agent Infrastructure Services*
+*Architecture research for: Agent Governance Platform (agentgov)*
 *Researched: 2026-03-13*

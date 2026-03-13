@@ -1,256 +1,172 @@
-# Technology Stack: AI Agent Infrastructure Services
+# Stack Research
 
-**Project:** AI Agent Infrastructure Market Research
+**Domain:** Agent Governance Platform (proxy-layer cost enforcement, HITL, audit logging)
 **Researched:** 2026-03-13
-**Overall Confidence:** MEDIUM-HIGH (rapidly evolving ecosystem; protocols stabilizing but implementations still maturing)
-
-## The Two Protocol Standards
-
-Before diving into the stack, understanding the protocol landscape is essential because it defines the entire infrastructure surface area.
-
-### MCP (Model Context Protocol) -- The Tool Integration Standard
-| Attribute | Detail | Confidence |
-|-----------|--------|------------|
-| Current Spec | [2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) | HIGH |
-| Governance | Linux Foundation (Agentic AI Foundation, donated Dec 2025) | HIGH |
-| Transport | Streamable HTTP (replaces deprecated SSE), stdio for local | HIGH |
-| Auth | OAuth 2.1 + PKCE + RFC 7591 Dynamic Client Registration | HIGH |
-| Message Format | JSON-RPC 2.0 | HIGH |
-| Capabilities | Tools, Resources, Prompts (server); Sampling, Roots, Elicitation (client) | HIGH |
-| Adoption | 97M+ monthly SDK downloads; backed by Anthropic, OpenAI, Google, Microsoft | HIGH |
-
-MCP is the de facto standard for connecting agents to external tools and data. Every major AI vendor has standardized on it. Building MCP-compatible infrastructure is non-negotiable.
-
-### A2A (Agent2Agent Protocol) -- The Agent Interoperability Standard
-| Attribute | Detail | Confidence |
-|-----------|--------|------------|
-| Current Spec | [v1.0 (Release)](https://a2a-protocol.org/latest/specification/) | HIGH |
-| Governance | Linux Foundation (open-sourced from Google Cloud) | HIGH |
-| Transport | HTTP + SSE, JSON-RPC 2.0, gRPC (optional, added in v0.3) | HIGH |
-| Auth | OAuth 2.0 with PKCE, Device Code flow | HIGH |
-| Core Concepts | Agent Cards (JSON metadata), Tasks (lifecycle states), Messages, Parts | HIGH |
-| Adoption | 150+ supporting organizations; v1.0 released with stricter REST/gRPC/JSON-RPC bindings | MEDIUM |
-
-A2A enables agent-to-agent communication for opaque multi-agent systems. Less mature than MCP but growing fast. Infrastructure services should be A2A-aware.
+**Confidence:** MEDIUM-HIGH (core stack verified via official docs; version numbers from npm/GitHub releases)
 
 ---
 
 ## Recommended Stack
 
-### MCP Server Development (Primary)
+### Core Technologies
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| **TypeScript** | 5.x | Primary language | MCP ecosystem is TS-first; best SDK support; type safety for protocol work | HIGH |
-| **@modelcontextprotocol/sdk** | 1.27.x (v2 expected Q1-Q2 2026) | MCP server/client SDK | Official SDK; 32K+ dependent packages; actively maintained | HIGH |
-| **Zod** | 4.x | Schema validation | MCP SDK peer dependency; 14x faster parsing vs v3; JSON Schema export via `.toJSONSchema()` | HIGH |
-| **FastMCP** (Python) | 3.1.x | Python MCP servers | Powers 70% of MCP servers across all languages; granular auth, versioning, OpenTelemetry built-in | HIGH |
-| **mcp** (Python SDK) | 1.7.x | Python MCP SDK | Official Python SDK; FastMCP 1.0 was incorporated into it | HIGH |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Hono | 4.12.7 | HTTP framework for Workers + SDK API server | The only serious edge-native TS web framework. Zero-overhead middleware chain maps directly onto the proxy intercept pattern. Runs identically on Workers and Node.js — critical for Docker Compose self-host variant. First-class Cloudflare Workers support, officially documented. |
+| Cloudflare Workers | Runtime (Wrangler 4.x) | Cloud compute + routing | Runs at 300+ PoPs with <1ms cold starts. Durable Objects provide the atomic counter primitive required for crash-safe Hold/Settle budget enforcement. No other serverless platform gives both edge routing and strong consistency in the same runtime. |
+| Cloudflare Durable Objects | — (Workers runtime) | Per-agent budget ledger (atomic state) | A single DO per budget scope guarantees serialized read-modify-write without distributed locking. Atomic transactions via `transaction()` (not `blockConcurrencyWhile()`). The canonical primitive for budget enforcement at edge. |
+| Cloudflare Workflows | — (Workers runtime) | HITL approval state machine with `waitForEvent` | GA'd April 2025. `step.waitForEvent()` allows a Workflow to pause and wait for human approval, then resume. Eliminates the need for a custom state machine for the approval hold. Natively durable — survives Worker restarts. |
+| Cloudflare Queues | — (Workers runtime) | Async delivery of approval requests + audit events | Decouples the hot proxy path from slow Slack/webhook delivery. Consumer Workers write to audit log without blocking the LLM call. |
+| Cloudflare R2 | — (Workers runtime) | Immutable audit log storage | Append-only object writes (one object per audit event, UUID key) provide de-facto immutability without WORM locks. Free egress within Cloudflare network. EU AI Act Article 14 compliance: 18-month retention via lifecycle rules. |
+| Turso (libSQL) | @libsql/client 0.x | Operational database (budgets, agents, policies) | SQLite-compatible, edge-replicated, free tier is sufficient for months 1-6. Pairs with Drizzle ORM natively. Import as `@libsql/client/web` (not `@libsql/client`) in Workers — the web-specific import is mandatory. |
+| Drizzle ORM | 0.45.x + drizzle-kit | Type-safe SQL for Turso / edge SQLite | Lightest ORM with Workers compatibility. Schema-as-code, migrations via `drizzle-kit generate` + `drizzle-kit migrate`. Does not require a connection pool (critical for edge). Zod integration built-in for validation. |
+| TypeScript | 5.x | Language | Workers runtime natively generates types via `wrangler types`. Full type coverage for SDK distribution — the API contract is enforced at compile time, not at runtime. |
+| Zod | 4.3.x | Request/config validation + SDK schema | Zod v4 is 14x faster than v3 for string parsing, ships as `@zod/mini` (1.9 KB) for SDK. Use Zod schemas as the single source of truth for both SDK types and API validation. |
+| Wrangler | 4.x | Deploy, local dev, type generation | Wrangler 4 generates runtime types directly from workerd — do not use `@cloudflare/workers-types` package (stale). `wrangler.jsonc` is now recommended over `wrangler.toml`. |
 
-**Why TypeScript-first:** The MCP TypeScript SDK is the reference implementation. The spec's authoritative schema is defined in TypeScript (`schema.ts`). Cloudflare Workers (the recommended deployment target) runs TypeScript natively. The entire MCP gateway ecosystem (Traefik, Docker, Microsoft) is TS/JS-oriented.
+### Supporting Libraries
 
-**Why also Python:** FastMCP 3.0 is the most productive way to build MCP servers -- decorator-based, automatic tool definition generation from type hints. For AI/ML-heavy servers, Python is unavoidable.
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| tsup | latest (esbuild-powered) | SDK bundle: dual CJS+ESM output | For npm SDK package builds. Produces `.js` (ESM) + `.cjs` (CJS) + `.d.ts` in one command. Zero config for straightforward libs. Use `tsup.config.ts` for custom entrypoints. |
+| @hono/zod-validator | latest | Hono middleware for request validation | Validates incoming SDK registration payloads and dashboard API bodies against Zod schemas. Eliminates manual `safeParse` boilerplate. |
+| openai (npm) | 4.x | TypeScript SDK for OpenAI — used as proxy target model | The TypeScript SDK accepts a custom `fetch` parameter. Pass a governance-intercepting fetch to wrap the client transparently. `agentgov.wrap(client)` works by substituting the fetch transport layer. |
+| @anthropic-ai/sdk | 0.x latest | TypeScript SDK for Anthropic — same proxy mechanism | Same custom fetch pattern as OpenAI SDK. `new Anthropic({ fetch: agentgovFetch })` is the integration point. |
+| @ai-sdk/openai-compatible | latest | Vercel AI SDK compatibility layer | If users use Vercel AI SDK (`generateText`, etc.), this package provides `createOpenAICompatible` which accepts a `baseURL` pointing to the agentgov proxy endpoint — no SDK-level patching required. |
+| react + @vitejs/plugin-react | React 19, Vite 6 | Dashboard SPA | Cloudflare Vite plugin (GA April 2025) runs Worker code inside Vite dev server via workerd. React + Vite + Cloudflare Pages is the supported path. Keep dashboard minimal: cost summary, budget gauges, approval queue. |
+| @cloudflare/vite-plugin | 1.x | Wires React/Vite to Workers runtime in dev | Required for `vite dev` to serve Workers + React SPA from a single process. Do not use without this plugin — local dev otherwise diverges from production. |
+| workers-slack | latest | Cloudflare Workers-native Slack API client | Designed for Workers environment (no Node.js dependencies). Use for Slack HITL approval message delivery from Queue consumer. |
 
-### Web Framework & API Layer
+### Development Tools
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| **Hono** | 4.x | HTTP framework | 12KB, runs on every edge runtime (Workers, Deno, Bun, Node); type-safe RPC mode; 1.8M weekly downloads | HIGH |
-| **Cloudflare Workers** | -- | Edge compute runtime | Fastest MCP deployment path; Durable Objects for state; built-in MCP support via Agents SDK | HIGH |
-| **Cloudflare Agents SDK** | 0.6.x | Agent framework on Workers | Persistent stateful agents; SQLite per instance; WebSocket/SSE streaming; native MCP integration | MEDIUM |
-
-**Why Hono over Express/Fastify:** Hono is built on Web Standards, meaning the same code runs on Cloudflare Workers, Deno, Node, and Bun. For MCP server infrastructure that may need edge deployment, this portability is critical. Express is too heavy and Node-only.
-
-**Why Cloudflare Workers over AWS Lambda / Vercel:** Durable Objects provide per-agent SQLite state with zero-latency access -- essential for MCP session management and agent state. No cold start problem. Workers run in 300+ data centers globally. The Agents SDK integrates MCP natively with RPC transport (no HTTP overhead between Agent and McpAgent in same Worker).
-
-### Database & State
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| **Cloudflare D1** | -- | Relational database (SQLite-based) | Native Workers integration; zero config; edge-local reads | MEDIUM |
-| **Drizzle ORM** | 0.30+ | TypeScript ORM | 7.4KB bundle (vs Prisma 2MB); SQL-like API; serverless-native; works on Workers | HIGH |
-| **PostgreSQL** (via Neon/Supabase) | 16+ | Production relational DB | For non-edge workloads; Neon serverless driver works with Drizzle | HIGH |
-| **Cloudflare Durable Objects** | -- | Per-agent stateful storage | Built-in SQLite per instance; ideal for MCP session state and agent memory | HIGH |
-| **Qdrant** | 1.x | Vector database | Open-source, Rust-based, self-hostable; 60-80% cheaper than Pinecone at scale | MEDIUM |
-
-**Why D1 + Durable Objects (not just PostgreSQL):** MCP servers need session state that lives close to compute. Durable Objects give each agent instance its own SQLite database with strong consistency and zero network latency. D1 handles shared relational data. PostgreSQL (via Neon) serves as the canonical data store for billing, user management, and analytics.
-
-**Why Qdrant over Pinecone/Chroma:** For a small team, self-hostable and open-source matters. Qdrant is the performance leader among open-source vector DBs. Chroma is fine for prototyping but not production-scale. Pinecone is managed but expensive and vendor-locked.
-
-### LLM Gateway
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| **LiteLLM** | latest | Unified LLM API gateway | OpenAI-compatible API to 100+ providers; virtual keys; budget tracking per key/user; used by Netflix, Rocket Money | HIGH |
-
-**Why LiteLLM:** Any AI agent infrastructure service will need to call LLMs. LiteLLM provides a single OpenAI-compatible interface to every provider, with built-in cost tracking, rate limiting, and virtual API keys. Deploy as a proxy server and all your services go through one gateway. This is the foundational cost-control layer.
-
-### Observability
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| **Langfuse** | latest | LLM/agent observability | Open-source (MIT); self-hostable; tracing, cost tracking, prompt versioning, evals | HIGH |
-| **OpenTelemetry** | GenAI semconv v1.37+ | Trace standard | Industry standard; GenAI semantic conventions for agent spans now supported by Datadog, Langfuse | HIGH |
-
-**Why Langfuse over LangSmith/Braintrust:** Langfuse is open-source and self-hostable -- critical for a small team that needs data sovereignty and cost control. LangSmith is great but LangChain-coupled and proprietary. Braintrust is CI/CD-native but closed-source. Langfuse integrates with OpenTelemetry, LiteLLM, and every major framework.
-
-**Why OpenTelemetry:** The GenAI semantic conventions are now stable enough for production. They define standardized attributes for agent tasks, actions, tool calls, and LLM interactions. Instrument once, export to any backend (Langfuse, Datadog, Grafana).
-
-### Authentication & Integration
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| **Nango** | latest | OAuth token management | Open-source; 500+ OAuth integrations; handles token refresh/rotation; self-hostable | HIGH |
-| **Composio** | latest | Managed MCP integrations | 500+ pre-built connectors; centralized auth; production-ready tool calling at scale | MEDIUM |
-
-**Why Nango for auth, Composio for integrations:** The project context identifies "external API authentication management" as a key pain point. Nango solves OAuth/token lifecycle as an open-source, self-hostable service -- you own the auth layer. Composio provides the breadth of pre-built MCP tool integrations. Use Nango when you want auth control; use Composio when you want fast integration coverage.
-
-### Billing & Metering
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| **Lago** | latest | Usage-based billing | Open-source; event-based metering; no revenue percentage; trusted by Mistral AI; self-hostable | HIGH |
-| **Stripe** (+ Metronome) | latest | Payment processing + AI metering | Stripe acquired Metronome ($1B, Jan 2026); new AI-focused metering for tokens/tasks/workflows | HIGH |
-
-**Why Lago + Stripe (not Stripe alone):** Stripe Billing's legacy architecture has a 100 req/s rate limit on usage ingestion -- insufficient for high-volume agent operations. Lago handles the high-frequency event metering (tokens, tool calls, agent actions) and integrates with Stripe for payment processing. Lago is open-source, self-hostable, and takes no revenue cut. This combination gives you Stripe's payment infrastructure with Lago's metering performance.
-
-**Emerging: Nevermined** for agent-to-agent payments (MCP/A2A native, supports fiat + crypto). Worth monitoring for marketplace use cases but not mature enough for primary billing. **Confidence: LOW**
-
-### Agent Sandbox / Execution
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| **E2B** | latest | Code execution sandbox | Open-source; Firecracker microVMs; <200ms cold start; used by ~50% of Fortune 500; Python + TS SDKs | HIGH |
-
-**Why E2B:** When agents need to execute arbitrary code, E2B provides secure, isolated Firecracker microVM sandboxes. Each sandbox gets its own kernel. Modal is the alternative for GPU workloads, but E2B is purpose-built for agent code execution with the best developer experience.
-
-### MCP Gateway (Governance Layer)
-
-| Technology | Type | Purpose | Why | Confidence |
-|------------|------|---------|-----|------------|
-| **Traefik Hub** | Commercial + OSS core | MCP gateway with TBAC | Session-smart routing; audit-ready observability; integrates with existing Traefik deployments | MEDIUM |
-| **Docker MCP Gateway** | Open-source | MCP server orchestration | Centralized proxy; credential management; access control | MEDIUM |
-| **Microsoft MCP Gateway** | Open-source | K8s MCP management | Session-aware routing; authorization; lifecycle management in Kubernetes | MEDIUM |
-
-**Assessment:** The MCP gateway space is nascent and fragmented. For a small team building infrastructure, this is a potential opportunity space rather than a "pick one" decision. The gateway layer (auth, rate limiting, audit, policy enforcement) between MCP clients and servers is where significant value creation opportunity exists.
-
----
-
-## Alternatives Considered
-
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Language | TypeScript | Go, Rust | MCP ecosystem is TS-first; Go/Rust SDKs exist but lag in features and community |
-| Web Framework | Hono | Express, Fastify | Express is Node-only and heavy; Fastify is faster but not edge-compatible |
-| Edge Runtime | Cloudflare Workers | AWS Lambda, Vercel Edge | Lambda has cold starts; Vercel lacks Durable Objects equivalent; Workers has best MCP integration |
-| ORM | Drizzle | Prisma | Prisma's 2MB bundle is prohibitive for edge; Drizzle's SQL-like API is better for DB-literate devs |
-| LLM Gateway | LiteLLM | Portkey, Helicone | LiteLLM is open-source with broadest provider coverage; Portkey/Helicone are more enterprise/commercial |
-| Observability | Langfuse | LangSmith, Braintrust | LangSmith is LangChain-coupled; Braintrust is closed-source; Langfuse is MIT and self-hostable |
-| Vector DB | Qdrant | Pinecone, Chroma | Pinecone is expensive/proprietary; Chroma caps out at prototyping scale |
-| Billing | Lago + Stripe | Chargebee, Orb | Chargebee takes revenue cut; Orb is good but closed-source; Lago is free and self-hostable |
-| Agent Framework | (Framework-agnostic) | LangGraph, CrewAI | Building infrastructure, not agents -- must support all frameworks, not pick one |
-
----
-
-## What NOT to Use
-
-| Technology | Why Avoid |
-|------------|-----------|
-| **SSE transport for MCP** | Deprecated in 2025-06-18 spec; replaced by Streamable HTTP |
-| **Express.js for edge** | Node-only, cannot run on Workers/Deno/Bun; heavy for MCP servers |
-| **Prisma on edge** | 2MB bundle makes it impractical for Cloudflare Workers or any edge runtime |
-| **Chroma for production** | Not designed for >10M vectors; use for development/prototyping only |
-| **Single LLM provider** | OpenAI Agents SDK locks you to OpenAI; use LiteLLM for provider flexibility |
-| **Custom billing from scratch** | 3-6 months engineering time; 92% of AI companies adjust pricing at least once -- use Lago |
-| **Blockchain-first payments** | Nevermined is interesting but crypto adds unnecessary complexity for initial billing; use Stripe |
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| Wrangler 4 | Dev server, deploy, secrets, type gen | `wrangler dev --remote` tests against live DO/Queues. `wrangler types` regenerates `worker-configuration.d.ts` after every `wrangler.jsonc` change. |
+| Vitest 4.x | Unit + integration tests | Cloudflare Workers support via `@cloudflare/vitest-pool-workers`. Run tests inside the actual workerd runtime — critical for catching Workers-incompatible Node.js APIs before deploy. |
+| drizzle-kit | Paired with drizzle-orm version | Schema migrations | `drizzle-kit generate` creates SQL migrations. For Turso: `drizzle-kit migrate` applies via libSQL HTTP API. Check in migration files — do not auto-apply in production boot. |
+| tsup | Latest | SDK package build | Dual CJS+ESM. `--dts` flag emits declarations. Use `--external openai --external @anthropic-ai/sdk` to keep those as peer dependencies. |
+| Docker Compose | 2.x | Self-host orchestration | The `docker-compose.yml` variant runs: (1) Hono proxy server via Node.js adapter, (2) Turso-compatible SQLite via embedded libSQL, (3) optional Redis for queue. Hono's Node.js adapter (`@hono/node-server`) is the migration path from Workers to Docker. |
+| @hono/node-server | latest | Node.js adapter for Hono | Enables the same Hono app to run on Node.js for Docker Compose self-host. No code changes required — the proxy logic is runtime-agnostic. This is the self-host story. |
 
 ---
 
 ## Installation
 
 ```bash
-# Core MCP Server (TypeScript)
-npm install @modelcontextprotocol/sdk zod hono
+# Core Workers app (cloud variant)
+npm create cloudflare@latest agentgov-worker -- --type worker
 
-# Cloudflare
-npm install -D wrangler @cloudflare/workers-types
+# Framework + validation
+npm install hono zod @hono/zod-validator
 
 # Database
-npm install drizzle-orm @neondatabase/serverless
+npm install drizzle-orm @libsql/client
 npm install -D drizzle-kit
 
-# LLM Gateway (deploy as proxy)
-pip install litellm[proxy]
+# Queue + DO are Workers runtime built-ins, no npm install needed
 
-# MCP Server (Python)
-pip install fastmcp>=3.0
+# SDK package (separate workspace)
+npm install openai @anthropic-ai/sdk @ai-sdk/openai-compatible
 
-# Observability
-pip install langfuse opentelemetry-api opentelemetry-sdk
+# Dashboard
+npm install react react-dom
+npm install -D @vitejs/plugin-react @cloudflare/vite-plugin vite
 
-# Billing
-# Lago: self-host via Docker or use Lago Cloud
-# Stripe: npm install stripe
+# Self-host adapter
+npm install @hono/node-server
 
-# Agent Sandbox
-pip install e2b
-npm install @e2b/code-interpreter
-
-# OAuth Management (Nango)
-# Self-host via Docker or use Nango Cloud
+# Dev dependencies
+npm install -D vitest @cloudflare/vitest-pool-workers wrangler tsup typescript
 ```
 
 ---
 
-## Protocol Version Matrix
+## Alternatives Considered
 
-| Protocol | Latest Stable | Key Date | Breaking Changes to Watch |
-|----------|--------------|----------|--------------------------|
-| MCP | 2025-11-25 | Nov 2025 | Streamable HTTP replaced SSE; OAuth 2.1 is now the auth standard |
-| A2A | v1.0 | ~Q1 2026 | TextPart/FilePart/DataPart replaced with unified Part; stricter REST/gRPC bindings |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| Cloudflare Durable Objects | Redis / Valkey | Only for self-host Docker variant where DO is unavailable. Use Redis MULTI/EXEC for atomic hold-settle. |
+| Cloudflare Workflows (waitForEvent) | Custom state machine in Turso | If HITL approval latency > 24h is expected (Workflows has a step timeout). For very long-running approvals, store pending state in Turso and poll. |
+| Cloudflare R2 (append-only objects) | Cloudflare D1 (append-only table) | D1 is fine if volume is low (<1M audit events/month). R2 has no row limits and cheaper at high volume. For MVP, D1 is acceptable. |
+| Turso (libSQL edge-replicated) | Cloudflare D1 | D1 is fine if you commit to Workers-only (no self-host). Turso works in both Workers and Node.js (Docker Compose), making it the better choice for dual-target. |
+| Hono | itty-router | itty-router is lighter but has no middleware ecosystem. Hono's middleware chain is the backbone of the proxy intercept layer. |
+| tsup | tsc / tshy | tsup is faster and single-command. Use tshy if you want a purely tsc-based pipeline without esbuild. |
+| Vitest + @cloudflare/vitest-pool-workers | Jest | Jest does not run in the Workers runtime. Vitest pool workers is the only way to test DO/Queue behavior in-process. |
+
+---
+
+## What NOT to Use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| LiteLLM (as a dependency) | Python-native, 100MB+ dependency tree, not edge-compatible. Competing product in the same space (LLM gateway) — creates positioning confusion. | Custom fetch-intercepting transport in the agentgov SDK |
+| Cloudflare AI Gateway | Owned by Cloudflare — they can break or replicate your feature at will. Overlapping functionality (cost tracking, rate limiting). Creates a dangerous dependency for a governance platform. | Build the proxy layer in Workers directly |
+| Prisma ORM | Prisma requires a Node.js-compatible environment and a connection pool via Prisma Accelerate for edge. Adds significant cold start overhead. | Drizzle ORM — designed for edge, zero binary dependencies |
+| Fastify / Express | Not edge-compatible. For Docker Compose self-host, Hono + `@hono/node-server` runs identically to Workers. Maintaining two frameworks doubles the surface area. | Hono with `@hono/node-server` adapter |
+| @cloudflare/workers-types (npm package) | Stale — types are generated from an older workerd snapshot. Will drift from what your Worker actually supports. | `wrangler types` — generates from your exact compatibility date |
+| Jest | No Workers runtime support. Tests will pass locally but mask edge-incompatible APIs (no `process`, no `fs`, etc.). | Vitest + `@cloudflare/vitest-pool-workers` |
+| Zod v3 | v4 is 14x faster, half the bundle size. No migration friction since you're greenfield. | Zod 4.3.x |
+
+---
+
+## Stack Patterns by Variant
+
+**Cloud variant (Cloudflare Workers):**
+- Hono routes on Workers
+- Budget ledger = Durable Object per agent scope
+- HITL state = Cloudflare Workflow with `waitForEvent`
+- Async delivery = Cloudflare Queues
+- Audit log = R2 (append-only objects)
+- Operational DB = Turso (HTTP endpoint)
+- Dashboard = React + Vite + Cloudflare Pages (Workers Assets)
+
+**Self-host variant (Docker Compose):**
+- Same Hono app, run via `@hono/node-server`
+- Budget ledger = SQLite WAL with row-level locking (via libSQL embedded)
+- HITL state = Turso state table polled by queue worker
+- Async delivery = BullMQ (Redis-backed) or in-process queue
+- Audit log = append-only SQLite table OR local filesystem NDJSON
+- Operational DB = same Turso/libSQL (embedded mode)
+- Dashboard = same React/Vite SPA, served statically
+
+**SDK distribution (npm + PyPI):**
+- TypeScript SDK: intercepts via custom `fetch` param in openai/anthropic clients
+- Python SDK: intercepts via custom `httpx.Client` passed to openai/anthropic clients
+- Both SDKs expose `agentgov.wrap(client)` which returns a governance-wrapped client
+- No network hop for SDK-level enforcement — budget check calls agentgov proxy endpoint
+- Proxy endpoint is the authoritative decision point
+
+---
+
+## Version Compatibility
+
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| hono@4.12.x | Wrangler 4.x | Confirmed. Use `@hono/node-server` for Docker. |
+| drizzle-orm@0.45.x | @libsql/client@0.x | Confirmed. Use `import '@libsql/client/web'` (not `/http`) in Workers. |
+| @cloudflare/vitest-pool-workers | Vitest 4.x | Compatible — check `@cloudflare/vitest-pool-workers` release notes before upgrading Vitest major. |
+| Zod 4.x | Hono's @hono/zod-validator | Verify @hono/zod-validator supports Zod v4 at install time — as of March 2026, check latest release. |
+| Cloudflare Workflows | Wrangler 4.x | Workflows is GA (April 2025). Requires `wrangler.jsonc` workflow binding declaration. |
 
 ---
 
 ## Sources
 
-### Protocol Specifications
-- [MCP Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)
-- [A2A Protocol v1.0 Specification](https://a2a-protocol.org/latest/specification/)
-- [A2A What's New in v1.0](https://a2a-protocol.org/latest/whats-new-v1/)
+- [hono/releases (GitHub)](https://github.com/honojs/hono/releases) — confirmed v4.12.7 (March 10, 2026). HIGH confidence.
+- [Cloudflare Workers docs: Hono](https://developers.cloudflare.com/workers/framework-guides/web-apps/more-web-frameworks/hono/) — official integration guide. HIGH confidence.
+- [Drizzle ORM: Turso Cloud](https://orm.drizzle.team/docs/connect-turso) — confirmed drizzle-orm + @libsql/client integration. HIGH confidence.
+- [Cloudflare Durable Objects: Rules](https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/) — `transaction()` over `blockConcurrencyWhile()`. HIGH confidence.
+- [Cloudflare Workflows GA](https://developers.cloudflare.com/changelog/post/2025-04-07-workflows-ga/) — GA April 2025, `waitForEvent` API. HIGH confidence.
+- [Cloudflare Workflows: Human-in-the-Loop](https://developers.cloudflare.com/workflows/examples/wait-for-event/) — official HITL example. HIGH confidence.
+- [Cloudflare Agents: Human-in-the-Loop](https://developers.cloudflare.com/agents/concepts/human-in-the-loop/) — official patterns. HIGH confidence.
+- [Cloudflare Vite Plugin GA](https://developers.cloudflare.com/changelog/post/2025-04-08-vite-plugin/) — GA April 2025. HIGH confidence.
+- [Zod v4 release](https://zod.dev/v4) — v4.3.x, 14x faster, @zod/mini 1.9 KB. HIGH confidence.
+- [Wrangler npm](https://www.npmjs.com/package/wrangler) — Wrangler 4.x confirmed. MEDIUM confidence (npm 403 on fetch, version from search result).
+- [Anthropic SDK TypeScript](https://github.com/anthropics/anthropic-sdk-typescript) — custom fetch parameter for proxy. HIGH confidence.
+- [AI SDK: OpenAI Custom Providers](https://ai-sdk.dev/providers/openai-compatible-providers/custom-providers) — createOpenAICompatible with baseURL. HIGH confidence.
+- WebSearch: tsup dual CJS+ESM pattern — MEDIUM confidence (multiple consistent sources).
+- WebSearch: @hono/node-server Docker Compose pattern — MEDIUM confidence (official Hono docs referenced).
 
-### SDKs & Frameworks
-- [MCP TypeScript SDK (GitHub)](https://github.com/modelcontextprotocol/typescript-sdk)
-- [@modelcontextprotocol/sdk on npm](https://www.npmjs.com/package/@modelcontextprotocol/sdk) -- v1.27.1
-- [FastMCP 3.0 Release](https://www.jlowin.dev/blog/fastmcp-3) -- v3.1.0
-- [MCP Python SDK on PyPI](https://pypi.org/project/mcp/) -- v1.7.1
-- [Hono Framework](https://hono.dev/) -- ~1.8M weekly npm downloads
-- [Cloudflare Agents SDK](https://developers.cloudflare.com/agents/) -- v0.6.x
-- [Zod v4 Release Notes](https://zod.dev/v4)
-
-### Infrastructure
-- [LiteLLM - Unified LLM Gateway](https://docs.litellm.ai/docs/)
-- [Langfuse - Open Source LLM Observability](https://langfuse.com/)
-- [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
-- [Drizzle ORM](https://orm.drizzle.team/)
-- [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/)
-- [E2B Sandbox](https://github.com/e2b-dev/e2b)
-
-### Billing & Auth
-- [Lago - Open Source Billing](https://getlago.com/)
-- [Stripe Metronome Acquisition](https://stripe.com/blog/metronome-stripe-building-the-future-of-billing)
-- [Nango - OAuth Integration](https://nango.dev/)
-- [Composio - AI Agent Integration](https://composio.dev/)
-- [Nevermined - AI Agent Payments](https://nevermined.ai/)
-
-### Gateway & Governance
-- [Traefik MCP Gateway](https://traefik.io/solutions/mcp-gateway)
-- [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/)
-- [Microsoft MCP Gateway (GitHub)](https://github.com/microsoft/mcp-gateway)
-- [Obot (formerly Acorn Labs) MCP Gateway](https://obot.ai/)
-
-### Market Context
-- [MCP Enterprise Adoption 2025-2026](https://guptadeepak.com/the-complete-guide-to-model-context-protocol-mcp-enterprise-adoption-market-trends-and-implementation-strategies/)
-- [MCP Authorization - Stack Overflow Blog](https://stackoverflow.blog/2026/01/21/is-that-allowed-authentication-and-authorization-in-model-context-protocol/)
-- [AI Agent Billing Patterns 2026](https://nevermined.ai/blog/ai-agent-billing-patterns)
-- [AI Agent Infrastructure Landscape 2025-2026 (Medium)](https://medium.com/@vinniesmandava/the-agentic-ai-infrastructure-landscape-in-2025-2026-a-strategic-analysis-for-tool-builders-b0da8368aee2)
-- [AI Agent Tools Landscape 120+ Tools Mapped](https://www.stackone.com/blog/ai-agent-tools-landscape-2026/)
+---
+*Stack research for: Agent Governance Platform (agentgov)*
+*Researched: 2026-03-13*
