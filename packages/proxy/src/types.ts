@@ -22,7 +22,11 @@ export type AuditEventType =
   | 'budget_settle'
   | 'budget_blocked'
   | 'request_forwarded'
-  | 'alert_fired';
+  | 'alert_fired'
+  | 'hitl_suspended'
+  | 'hitl_approved'
+  | 'hitl_denied'
+  | 'hitl_expired';
 
 export interface AuditEvent {
   eventType: AuditEventType;

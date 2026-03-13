@@ -4,6 +4,16 @@
   "compatibility_date": "2025-01-01",
   "main": "src/index.ts",
 
+  // Cloudflare Workflows binding for HITL (Human-in-the-Loop) approval queue.
+  // HitlWorkflow class must be exported from src/index.ts alongside the Hono app.
+  "workflows": [
+    {
+      "name": "agentgov-hitl",
+      "binding": "HITL_WORKFLOW",
+      "class_name": "HitlWorkflow"
+    }
+  ],
+
   // Vars are non-secret configuration values.
   // For local dev, override with .dev.vars (do NOT commit .dev.vars).
   // TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be set as Wrangler secrets in production.
@@ -17,6 +27,14 @@
     // Alert webhook configuration
     "AGENTGOV_ALERT_WEBHOOK_URL": "",
     // Alert thresholds as comma-separated ratios (default: 80% and 100%)
-    "AGENTGOV_ALERT_THRESHOLDS": "0.80,1.00"
+    "AGENTGOV_ALERT_THRESHOLDS": "0.80,1.00",
+    // HITL TTL — seconds before an unanswered approval auto-denies (default: 72h)
+    "AGENTGOV_HITL_TTL_SECONDS": "259200",
+    // HITL webhook URL — receives approval request notifications
+    "AGENTGOV_HITL_WEBHOOK_URL": "",
+    // Slack integration — set in .dev.vars / wrangler secrets for production
+    "SLACK_BOT_TOKEN": "",
+    "SLACK_CHANNEL_ID": "",
+    "SLACK_SIGNING_SECRET": ""
   }
 }

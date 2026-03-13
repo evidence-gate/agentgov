@@ -44,3 +44,26 @@ export const auditLog = sqliteTable('audit_log', {
   hash: text('hash').notNull(),
   ts: integer('ts').notNull(),
 });
+
+/**
+ * hitl_queue — HITL approval tickets pending human decision.
+ *
+ * Each ticket represents one suspended agent action awaiting approval.
+ * The ticket id doubles as the Cloudflare Workflows instance ID.
+ * request_payload stores the full request body (NOT in Workflow state, per 1MiB limit).
+ * Workflow state is the live execution vehicle; this table is the authoritative record.
+ */
+export const hitlQueue = sqliteTable('hitl_queue', {
+  id: text('id').primaryKey(),                       // UUID, also Workflow instance ID
+  agentId: text('agent_id').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'denied' | 'expired'
+  riskTier: text('risk_tier').notNull(),             // 'reversible' | 'semi-reversible' | 'irreversible' | 'external'
+  actionName: text('action_name').notNull(),         // classifier input e.g. 'tool_call:send_email'
+  requestPayload: text('request_payload'),           // JSON of the full request — stored here, NOT in Workflow state
+  approver: text('approver'),                        // actor who approved/denied; null if pending/expired
+  approverReason: text('approver_reason'),           // optional human note
+  holdId: text('hold_id'),                           // FK to holds.id — budget hold maintained during HITL
+  createdAt: integer('created_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),        // ms; TTL for auto-deny
+  decidedAt: integer('decided_at'),                  // null until decision
+});
