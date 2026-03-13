@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BudgetExceeded } from './errors';
+import { BudgetExceeded, HitlPending, type HitlPendingBody } from './errors';
 import { createAgentgovFetch, buildProxyBaseUrl } from './interceptor';
 import { wrap } from './wrap';
 
@@ -194,6 +194,170 @@ describe('createAgentgovFetch', () => {
       method: 'POST',
     });
     expect(response.status).toBe(429);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HitlPending tests
+// ---------------------------------------------------------------------------
+describe('HitlPending', () => {
+  it('is an instance of Error', () => {
+    const body: HitlPendingBody = {
+      error: {
+        code: 'HITL_PENDING',
+        message: 'Action requires approval',
+        approvalId: 'ticket-abc-123',
+        agentId: 'agent-1',
+        expiresAt: 1700000000000,
+      },
+    };
+    const err = new HitlPending('Action requires approval', body);
+    expect(err).toBeInstanceOf(Error);
+  });
+
+  it('has code HITL_PENDING', () => {
+    const body: HitlPendingBody = {
+      error: {
+        code: 'HITL_PENDING',
+        message: 'Action requires approval',
+        approvalId: 'ticket-abc-123',
+        agentId: 'agent-1',
+        expiresAt: 1700000000000,
+      },
+    };
+    const err = new HitlPending('Action requires approval', body);
+    expect(err.code).toBe('HITL_PENDING');
+  });
+
+  it('has name HitlPending', () => {
+    const body: HitlPendingBody = {
+      error: {
+        code: 'HITL_PENDING',
+        message: 'Action requires approval',
+        approvalId: 'ticket-abc-123',
+        agentId: 'agent-1',
+        expiresAt: 1700000000000,
+      },
+    };
+    const err = new HitlPending('Action requires approval', body);
+    expect(err.name).toBe('HitlPending');
+  });
+
+  it('exposes approvalId, agentId, expiresAt from error body', () => {
+    const body: HitlPendingBody = {
+      error: {
+        code: 'HITL_PENDING',
+        message: 'Action requires approval',
+        approvalId: 'ticket-xyz-999',
+        agentId: 'agent-42',
+        expiresAt: 1700000099999,
+      },
+    };
+    const err = new HitlPending('Action requires approval', body);
+    expect(err.approvalId).toBe('ticket-xyz-999');
+    expect(err.agentId).toBe('agent-42');
+    expect(err.expiresAt).toBe(1700000099999);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HitlPending detection in createAgentgovFetch tests
+// ---------------------------------------------------------------------------
+describe('createAgentgovFetch HitlPending detection', () => {
+  let originalFetch: typeof fetch;
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('throws HitlPending on 202 with HITL_PENDING code', async () => {
+    const hitlPendingBody: HitlPendingBody = {
+      error: {
+        code: 'HITL_PENDING',
+        message: 'Action requires approval',
+        approvalId: 'ticket-abc',
+        agentId: 'agent-1',
+        expiresAt: 1700000000000,
+      },
+    };
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(hitlPendingBody), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    global.fetch = mockFetch;
+
+    const agentFetch = createAgentgovFetch({ proxyUrl: 'http://proxy:8787', agentId: 'agent-1' });
+    await expect(
+      agentFetch('https://api.openai.com/v1/chat/completions', { method: 'POST' }),
+    ).rejects.toThrow(HitlPending);
+  });
+
+  it('thrown HitlPending has correct approvalId, agentId, expiresAt', async () => {
+    const hitlPendingBody: HitlPendingBody = {
+      error: {
+        code: 'HITL_PENDING',
+        message: 'Action requires approval',
+        approvalId: 'ticket-exact-123',
+        agentId: 'agent-exact',
+        expiresAt: 9999999999999,
+      },
+    };
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(hitlPendingBody), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    global.fetch = mockFetch;
+
+    const agentFetch = createAgentgovFetch({ proxyUrl: 'http://proxy:8787', agentId: 'agent-exact' });
+    try {
+      await agentFetch('https://api.openai.com/v1/chat/completions', { method: 'POST' });
+      expect.fail('Should have thrown HitlPending');
+    } catch (err) {
+      expect(err).toBeInstanceOf(HitlPending);
+      const hitlErr = err as HitlPending;
+      expect(hitlErr.approvalId).toBe('ticket-exact-123');
+      expect(hitlErr.agentId).toBe('agent-exact');
+      expect(hitlErr.expiresAt).toBe(9999999999999);
+    }
+  });
+
+  it('returns original 202 response when body does not contain HITL_PENDING code', async () => {
+    const otherBody = { status: 'accepted', id: 'job-123' };
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(otherBody), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    global.fetch = mockFetch;
+
+    const agentFetch = createAgentgovFetch({ proxyUrl: 'http://proxy:8787', agentId: 'agent-1' });
+    const response = await agentFetch('https://api.openai.com/v1/chat/completions', { method: 'POST' });
+    expect(response.status).toBe(202);
+  });
+
+  it('returns original 202 response when body has error with different code', async () => {
+    const otherErrorBody = { error: { code: 'SOME_OTHER_CODE', message: 'Something else' } };
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(otherErrorBody), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    global.fetch = mockFetch;
+
+    const agentFetch = createAgentgovFetch({ proxyUrl: 'http://proxy:8787', agentId: 'agent-1' });
+    const response = await agentFetch('https://api.openai.com/v1/chat/completions', { method: 'POST' });
+    expect(response.status).toBe(202);
   });
 });
 
