@@ -1,4 +1,4 @@
-import { BudgetExceeded, type BudgetExceededBody } from './errors';
+import { BudgetExceeded, type BudgetExceededBody, HitlPending, type HitlPendingBody } from './errors';
 
 export interface AgentgovOptions {
   proxyUrl: string;   // e.g., "http://localhost:8787" or "https://proxy.example.com"
@@ -37,6 +37,21 @@ export function createAgentgovFetch(options: AgentgovOptions): typeof fetch {
       } catch (e) {
         if (e instanceof Error && e.name === 'BudgetExceeded') throw e;
         // Not a BudgetExceeded — return original 429 response
+      }
+    }
+
+    // Detect HitlPending
+    if (response.status === 202) {
+      const clone = response.clone();
+      try {
+        const body = await clone.json() as { error?: { code?: string } };
+        if (body?.error?.code === 'HITL_PENDING') {
+          const fullBody = body as HitlPendingBody;
+          throw new HitlPending(fullBody.error.message, fullBody);
+        }
+      } catch (e) {
+        if (e instanceof Error && e.name === 'HitlPending') throw e;
+        // Not a HitlPending — return original 202 response
       }
     }
 
