@@ -47,7 +47,7 @@ Plans:
   3. An approval request that receives no response within its TTL automatically transitions to DENIED, and the agent receives a denial with a reason — no orphaned approvals exist after a proxy restart
   4. Every approval decision is recorded in the audit log with actor identity, timestamp, action classification, and outcome
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 02-01-PLAN.md — HITL queue schema (Turso), action classifier (static risk tier table), Cloudflare Workflows waitForEvent, notification channels (webhook + Slack), HitlPending SDK error
@@ -93,6 +93,6 @@ Phases 1 → 2 → 3 are a strict dependency chain. Phase 4 can begin in paralle
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Budget Engine + Proxy Foundation | 3/3 | Complete    | 2026-03-13 |
-| 2. HITL + Approval Channels | 0/2 | Not started | - |
+| 2. HITL + Approval Channels | 1/2 | In Progress|  |
 | 3. Error Handling + Production Hardening | 0/2 | Not started | - |
 | 4. Dashboard + Python SDK + Self-Host | 0/3 | Not started | - |

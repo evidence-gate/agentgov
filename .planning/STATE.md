@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Completed 01-03-sdk-alert-webhook-PLAN.md — TypeScript SDK + LLM passthrough + budget alert webhook done
-last_updated: "2026-03-13T09:21:51.735Z"
-last_activity: 2026-03-13 — Plan 01-03 (SDK + alert webhook) completed
+status: in_progress
+stopped_at: Completed 02-01-PLAN.md — HITL queue infrastructure
+last_updated: "2026-03-13T22:03:05Z"
+last_activity: 2026-03-13 — Plan 02-01 (HITL queue infrastructure) completed
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  total_plans: 5
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** AIエージェントのコストを「追跡」ではなく「強制」する — 予算超過時にリクエストを決定論的にブロックし、コスト暴走を構造的に防止する
-**Current focus:** Phase 1 — Budget Engine + Proxy Foundation
+**Current focus:** Phase 2 — HITL + Approval Channels
 
 ## Current Position
 
-Phase: 1 of 4 (Budget Engine + Proxy Foundation) — COMPLETE
-Plan: 3 of 3 in current phase — COMPLETE
-Status: Phase 1 complete, ready for Phase 2
-Last activity: 2026-03-13 — Plan 01-03 (SDK + alert webhook) completed
+Phase: 2 of 4 (HITL + Approval Channels) — IN PROGRESS
+Plan: 1 of 2 in current phase — Plan 02-01 complete, Plan 02-02 ready
+Status: Plan 02-01 executed — HITL queue infrastructure built
+Last activity: 2026-03-13 — Plan 02-01 (HITL queue infrastructure) completed
 
-Progress: [██████████] 100% (Phase 1 complete)
+Progress: [████████░░] 80% (Phase 1 done + Plan 02-01 done)
 
 ## Performance Metrics
 
@@ -44,14 +44,16 @@ Progress: [██████████] 100% (Phase 1 complete)
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-budget-engine-proxy-foundation | 3 | 18m | 6m |
+| 02-hitl-approval-channels | 1 | 6m | 6m |
 
 **Recent Trend:**
-- Last 5 plans: 5m, 7m, 6m
+- Last 5 plans: 5m, 7m, 6m, 6m
 - Trend: stable
 
 *Updated after each plan completion*
 | Phase 01-budget-engine-proxy-foundation P02 | 7 | 2 tasks | 13 files |
 | Phase 01-budget-engine-proxy-foundation P03 | 6 | 2 tasks | 17 files |
+| Phase 02-hitl-approval-channels P01 | 6 | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -74,6 +76,10 @@ Recent decisions affecting current work:
 - [Phase 01-03]: BudgetExceeded uses response.clone() before JSON.parse to preserve original response for non-matching 429s
 - [Phase 01-03]: Anthropic streaming settle uses 0 tokens — SSE usage parsing deferred to later plan
 - [Phase 01-03]: checkAndFireAlerts idempotency via audit_log json_extract(payload, '$.threshold') — no separate alerts_fired table
+- [Phase 02-01]: waitForEvent type='hitl-decision' (hyphens not periods) — Cloudflare Workflows rejects dot notation in event types
+- [Phase 02-01]: DB client created inside each step.do callback — Workflows serialize state between steps, connections don't survive
+- [Phase 02-01]: Unknown actions return required:false (open by default) — prevents over-blocking unclassified tool calls
+- [Phase 02-01]: Default HITL TTL 72h (259200s) — well under 30-day Workflows state retention limit on Paid plan
 
 ### Pending Todos
 
@@ -83,10 +89,10 @@ None yet.
 
 - [Phase 1]: Verify @hono/zod-validator Zod v4 compatibility at install time — do NOT proceed without confirming
 - [Phase 1]: Pricing sync source for `agentgov pricing sync` CLI not yet decided (pricepertoken.com API vs tokencost library vs community JSON)
-- [Phase 2]: Cloudflare Workflows step timeout limit vs long-running HITL approvals — verify before Phase 2 planning
+- [Phase 2]: Cloudflare Workflows step timeout — RESOLVED: waitForEvent supports 1s~365d timeout, waiting instances excluded from 10k concurrent limit
 
 ## Session Continuity
 
-Last session: 2026-03-13T09:14:27Z
-Stopped at: Completed 01-03-sdk-alert-webhook-PLAN.md — TypeScript SDK + LLM passthrough + budget alert webhook done
+Last session: 2026-03-13
+Stopped at: Completed 02-01-PLAN.md — HITL queue infrastructure
 Resume file: None
