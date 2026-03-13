@@ -1,8 +1,8 @@
-# Roadmap: AI Agent Infrastructure -- Market Research
+# Roadmap: Agent Governance Platform (agentgov)
 
 ## Overview
 
-This roadmap delivers a comprehensive market research report on AI agent infrastructure opportunities for a solo/small-team entrant. The research flows from foundational technology understanding through competitive and market analysis, to revenue model evaluation, strategic synthesis, and final report assembly. Each phase produces research artifacts that feed downstream phases, culminating in an actionable Go-to-Market recommendation with supporting evidence.
+agentgov is built in four phases that follow the architecture's dependency chain: durable budget state must exist before HITL queue can write to it, which must exist before error handler escalation paths can use it. Phase 1 proves the core thesis (deterministic cost enforcement) and produces the only artifact users will install on Day 1. Phases 2-3 layer governance depth. Phase 4 broadens distribution. The research-suggested Phase 6 (Cloudflare Workers cloud deployment) is deferred to v2 — validate self-host adoption first.
 
 ## Phases
 
@@ -12,164 +12,87 @@ This roadmap delivers a comprehensive market research report on AI agent infrast
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 1: Protocol & Framework Landscape** - Map the current state of AI agent protocols (MCP, A2A, AG-UI) and major frameworks
-- [ ] **Phase 2: Infrastructure Standards & Trends** - Analyze standardization efforts and multi-agent system trends shaping the infrastructure layer
-- [x] **Phase 3: Competitive Player Mapping** - Identify and catalog existing players across all 14 infrastructure categories
-- [ ] **Phase 4: Competitive Analysis & Gaps** - Analyze competitive dynamics, Big Tech absorption risk, and OSS vs SaaS positioning
-- [x] **Phase 5: Developer Pain Points & Market Sizing** - Quantify market opportunity and rank developer pain points by severity
-- [ ] **Phase 6: Regulatory & Structural Opportunities** - Analyze regulation-driven demand (EU AI Act) and entry barriers for small teams
-- [x] **Phase 7: Revenue Model Analysis** - Evaluate pricing models, unit economics, and OSS-to-paid conversion patterns
-- [x] **Phase 8: Strategic Synthesis & Recommendations** - Synthesize all research into ranked domain recommendations with GTM strategies
-- [x] **Phase 9: Report Assembly & Deliverables** - Package all findings into the final research report with executive summary and decision tools (completed 2026-03-13)
+- [ ] **Phase 1: Budget Engine + Proxy Foundation** - OpenAI-compatible proxy with Hold/Settle cost enforcement and append-only audit log
+- [ ] **Phase 2: HITL + Approval Channels** - Risk-graded human approval with async pause/resume and webhook/Slack routing
+- [ ] **Phase 3: Error Handling + Production Hardening** - Error classification, finite retry, stuck/loop detection, timeout watchdog
+- [ ] **Phase 4: Dashboard + Python SDK + Self-Host** - Read-only cost dashboard, Python SDK, and Docker Compose self-host packaging
 
 ## Phase Details
 
-### Phase 1: Protocol & Framework Landscape
-**Goal**: Reader understands the current protocol and framework ecosystem that defines where infrastructure can be inserted
+### Phase 1: Budget Engine + Proxy Foundation
+**Goal**: Developers can enforce cost budgets on AI agents with a single line of code, with hard blocking and a crash-safe audit trail
 **Depends on**: Nothing (first phase)
-**Requirements**: TECH-01, TECH-02
+**Requirements**: COST-01, COST-02, COST-03, COST-04, COST-05, SDK-01, SDK-03
 **Success Criteria** (what must be TRUE):
-  1. Report section clearly explains MCP, A2A, and AG-UI protocols with their maturity levels, adoption metrics, and roadmaps as of March 2026
-  2. Report section compares major agent frameworks (LangGraph, CrewAI, OpenAI Agents SDK, AutoGen, Google ADK) with market share indicators and architectural differences
-  3. Reader can identify which protocol boundaries are natural insertion points for infrastructure services
-**Plans**: 2 plans
+  1. Developer adds `agentgov.wrap(client)` (or sets base URL to the proxy) and subsequent LLM requests are intercepted and cost-tracked without changing any other application code
+  2. A request that would exceed the configured budget is blocked before it reaches the LLM — the agent receives a `BudgetExceeded` error, not a successful response
+  3. Concurrent requests from the same agent never double-spend: a Hold is written before the request is forwarded and Settled to actual cost after the response, with no gap where a second request can slip through
+  4. Every budget enforcement decision (allow, block, hold, settle) appears in an append-only audit log with actor, timestamp, cost delta, and running balance
+  5. An unknown model name fails closed (request blocked with a warning) rather than passing through with zero cost
+
+**Plans**: TBD
 
 Plans:
-- [x] 01-01-PLAN.md -- Research and write protocol landscape section (MCP, A2A, AG-UI)
-- [x] 01-02-PLAN.md -- Research and write framework comparison section (LangGraph, CrewAI, OpenAI Agents SDK, AutoGen, Google ADK)
+- [ ] 01-01: Proxy scaffold, Hono routing, Turso schema (budget ledger + audit log), Drizzle migrations
+- [ ] 01-02: Cost calculator (pricing table, COST-01/02/03), Hold/Settle Durable Object (COST-04)
+- [ ] 01-03: TypeScript SDK (`agentgov.wrap`, base URL redirect, BudgetExceeded exception), budget alert webhook (COST-05)
 
-### Phase 2: Infrastructure Standards & Trends
-**Goal**: Reader understands the standardization trajectory and multi-agent trends that will shape infrastructure demand over the next 12-24 months
+### Phase 2: HITL + Approval Channels
+**Goal**: Agents pause for human approval on risky actions, with decisions routed asynchronously and surviving proxy restarts
 **Depends on**: Phase 1
-**Requirements**: TECH-03, TECH-04
+**Requirements**: HITL-01, HITL-02, HITL-03, HITL-04, HITL-05
 **Success Criteria** (what must be TRUE):
-  1. Report section catalogs active standardization efforts (AAIF, OAuth 2.1 for MCP, OpenTelemetry GenAI conventions) with their timelines and expected impact
-  2. Report section presents multi-agent system trends with analyst predictions (Forrester/Gartner) and implications for infrastructure needs
-  3. Reader can assess which standards are mature enough to build on now vs. which require a wait-and-see approach
-**Plans**: 2 plans
+  1. An agent action classified as requiring approval causes the agent to pause and await a decision — the agent context resumes with the approval decision attached, not a generic timeout error
+  2. Approval requests are routed to a configured webhook endpoint (or Slack channel) and the approval or denial is fed back into the paused agent's execution without the agent holding a thread open
+  3. An approval request that receives no response within its TTL automatically transitions to DENIED, and the agent receives a denial with a reason — no orphaned approvals exist after a proxy restart
+  4. Every approval decision is recorded in the audit log with actor identity, timestamp, action classification, and outcome
 
-Plans:
-- [x] 02-01-PLAN.md -- Research and write standardization efforts section (AAIF, OAuth 2.1, OTel GenAI, EU AI Act)
-- [x] 02-02-PLAN.md -- Research and write multi-agent system trends section (Gartner/Deloitte/Salesforce predictions, 6 key trends)
-
-### Phase 3: Competitive Player Mapping
-**Goal**: Reader has a comprehensive map of who is building what across every infrastructure category
-**Depends on**: Phase 1
-**Requirements**: COMP-01, COMP-02
-**Success Criteria** (what must be TRUE):
-  1. All 14 infrastructure categories have identified players with funding, team size, and product maturity data
-  2. Each category has a strengths/weaknesses/gaps analysis that reveals where incumbents are weak or absent
-  3. Reader can visually scan the competitive landscape to identify crowded vs. underserved categories
 **Plans**: TBD
 
 Plans:
-- [x] 03-01-PLAN.md -- Research and write competitive player mapping for categories 1-7 (LLM gateways, observability, auth/identity, tool management, cost control, error handling, sandboxes)
-- [x] 03-02-PLAN.md -- Research and write competitive player mapping for categories 8-14 (memory, guardrails, secrets, HITL, evaluation, payments, deployment) plus cross-category summary
+- [ ] 02-01: HITL queue schema (Turso), action classifier (static risk tier table), Cloudflare Workflows waitForEvent integration
+- [ ] 02-02: Approval routing (webhook + Slack Block Kit), TTL expiry to DENIED, callback endpoint for resume
 
-### Phase 4: Competitive Analysis & Gaps
-**Goal**: Reader understands the strategic dynamics -- who will absorb what, and where open source creates defensible positions
-**Depends on**: Phase 3
-**Requirements**: COMP-03, COMP-04
+### Phase 3: Error Handling + Production Hardening
+**Goal**: Agents running in production fail deterministically — transient errors retry, permanent errors halt, stuck agents are detected and stopped
+**Depends on**: Phase 2
+**Requirements**: ERR-01, ERR-02, ERR-03, ERR-04
 **Success Criteria** (what must be TRUE):
-  1. Big Tech (Cloudflare, AWS, Google, Microsoft) agent infrastructure moves are cataloged with absorption risk ratings per category
-  2. OSS vs. SaaS positioning analysis shows which categories favor open-source-first strategies and which require proprietary approaches
-  3. Reader can identify categories where small-team entrants have structural advantages over well-funded competitors
+  1. A rate-limit or 5xx error from the LLM triggers automatic retry with exponential backoff and jitter, up to a configurable maximum — the agent does not need to handle retries itself
+  2. An authentication or 4xx error immediately halts the agent request without retrying — no wasted budget on permanent failures
+  3. An agent that calls the same action with the same inputs twice without making progress is detected and stopped with a structured error that includes the repeated action, timestamps, and suggested remediation
+  4. Every error event (classification, retry attempt, halt decision) appears in the audit log with type, timestamp, agent context, and suggested remediation
+
 **Plans**: TBD
 
 Plans:
-- [x] 04-01-PLAN.md -- Research and write Big Tech absorption risk analysis (Cloudflare, AWS, Google, Microsoft) with per-category ratings
-- [x] 04-02-PLAN.md -- Research and write OSS vs SaaS positioning analysis plus composite opportunity ranking
+- [ ] 03-01: Error classifier (transient vs permanent), finite retry engine (ERR-01/02), structured error reporting (ERR-04)
+- [ ] 03-02: Stuck/loop detector (2-failure-stop rule, per-session state via Durable Object) (ERR-03)
 
-### Phase 5: Developer Pain Points & Market Sizing
-**Goal**: Reader knows which developer problems are most painful and how large the addressable market is for each infrastructure category
-**Depends on**: Phase 3
-**Requirements**: MRKT-01, MRKT-02
+### Phase 4: Dashboard + Python SDK + Self-Host
+**Goal**: Non-TypeScript teams can adopt agentgov, and all users can observe their governance state through a dashboard — with a self-host path for enterprise environments
+**Depends on**: Phase 1 (can begin after Phase 1; does not require Phase 2 or 3)
+**Requirements**: SDK-02, SDK-04, SDK-05
 **Success Criteria** (what must be TRUE):
-  1. Each infrastructure category has a market size estimate (TAM/SAM/SOM) or qualitative opportunity assessment with supporting rationale
-  2. Developer pain points are organized by category and ranked by severity, frequency, and willingness-to-pay indicators
-  3. Reader can cross-reference pain severity with market size to identify high-impact, high-opportunity intersections
+  1. A Python developer can call `agentgov.wrap(client)` on an Anthropic or OpenAI Python client and have requests intercepted by the proxy with the same governance behavior as the TypeScript SDK
+  2. A developer running `docker compose up` has a fully working agentgov stack (proxy + database + dashboard) within 5 minutes, with no external service dependencies
+  3. The dashboard shows current budget balance, session cost breakdown, enforcement events, and the approval queue — all updated from live audit log queries without requiring a page reload workflow
+
 **Plans**: TBD
 
 Plans:
-- [x] 05-01-PLAN.md -- Research and write market size estimates (TAM/SAM/SOM) for all 14 infrastructure categories
-- [x] 05-02-PLAN.md -- Research and write developer pain point ranking by severity/frequency/willingness-to-pay
-
-### Phase 6: Regulatory & Structural Opportunities
-**Goal**: Reader understands which market opportunities are structurally favorable for small teams and which are unlocked by upcoming regulation
-**Depends on**: Phase 4, Phase 5
-**Requirements**: MRKT-03, MRKT-04
-**Success Criteria** (what must be TRUE):
-  1. Entry barriers and moat potential are evaluated per category with explicit assessment of what small teams can and cannot defend
-  2. EU AI Act (August 2026) and other regulatory drivers are analyzed for the specific infrastructure demand they create
-  3. Reader can filter categories by "small-team feasibility" to focus on realistically winnable domains
-**Plans**: 2 plans
-
-Plans:
-- [x] 06-01-PLAN.md -- Research and write entry barrier and moat analysis for small-team entrants (14 categories + top 3 deep dive)
-- [x] 06-02-PLAN.md -- Research and write regulatory demand analysis (EU AI Act + global regulatory landscape)
-
-### Phase 7: Revenue Model Analysis
-**Goal**: Reader understands which business models work for AI infrastructure and has proven GTM patterns to follow
-**Depends on**: Phase 5, Phase 6
-**Requirements**: REV-01, REV-02, REV-03
-**Success Criteria** (what must be TRUE):
-  1. Major revenue model patterns (API usage, SaaS subscription, OSS+Cloud, marketplace) are documented with pros/cons and real-world examples
-  2. Unit economics structures are analyzed with explicit assessment of small-team viability (can one person run this profitably?)
-  3. At least 3 OSS-to-paid success stories (e.g., Langfuse, PostHog) are dissected for their GTM sequence, timeline, and community-building approach
-  4. Reader can match revenue models to specific infrastructure categories based on the analysis
-**Plans**: TBD
-
-Plans:
-- [x] 07-01-PLAN.md -- Research and write revenue model patterns and unit economics analysis
-- [x] 07-02-PLAN.md -- Research and write OSS-to-paid success stories and GTM playbook
-
-### Phase 8: Strategic Synthesis & Recommendations
-**Goal**: Reader has a clear, evidence-backed recommendation of which domains to pursue and how to enter the market
-**Depends on**: Phase 2, Phase 4, Phase 6, Phase 7
-**Requirements**: STRT-01, STRT-02, STRT-03, STRT-04
-**Success Criteria** (what must be TRUE):
-  1. Top 3 recommended domains are presented with scoring rationale that traces back to competitive, market, and revenue analyses
-  2. Each recommended domain has a Go-to-Market strategy specifying entry sequence, initial target users, and differentiation points
-  3. An execution plan skeleton addresses the Japan-based/small-team constraints with concrete first steps
-  4. Risk assessment covers timing, competitive, platform, and regulatory risks with specific mitigation strategies
-  5. Reader can make an informed go/no-go decision on which domain to pursue for MVP development
-**Plans**: TBD
-
-Plans:
-- [x] 08-01-PLAN.md -- Strategic synthesis Part 1: Domain recommendations with 6-axis scoring and GTM strategies
-- [x] 08-02-PLAN.md -- Strategic synthesis Part 2: Execution plan skeleton and comprehensive risk assessment
-
-### Phase 9: Report Assembly & Deliverables
-**Goal**: All research is packaged into a polished, navigable report that supports rapid decision-making
-**Depends on**: Phase 8
-**Requirements**: DLVR-01, DLVR-02, DLVR-03, DLVR-04
-**Success Criteria** (what must be TRUE):
-  1. Executive summary exists that a decision-maker can read in 5 minutes and understand the key recommendation
-  2. Competitive map visualization shows categories, players, and positioning in a scannable format
-  3. Decision matrix scores candidate domains across evaluation axes with transparent methodology
-  4. Next actions section lists concrete MVP implementation steps with clear priorities
-  5. Report is internally consistent -- executive summary claims match detailed section evidence
-**Plans**: TBD
-
-Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
+- [ ] 04-01: Python SDK (httpx transport override, agentgov.wrap, BudgetExceeded/HitlPending exceptions, PyPI packaging) (SDK-02)
+- [ ] 04-02: Docker Compose self-host stack (proxy via @hono/node-server, embedded libSQL, static dashboard bundle) (SDK-04)
+- [ ] 04-03: Dashboard SPA (React 19 + Vite 6, budget gauges, enforcement events, approval queue) (SDK-05)
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
-
-Note: Phases 1 and 3 can execute in parallel (no dependency). Phases 4 and 5 can execute in parallel (both depend on Phase 3, not each other).
+Phases 1 → 2 → 3 are a strict dependency chain. Phase 4 can begin in parallel after Phase 1 completes. Recommended: start Phase 4 in parallel with Phase 2.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol & Framework Landscape | 2/2 | Complete | 2026-03-13 |
-| 2. Infrastructure Standards & Trends | 2/2 | Complete | 2026-03-13 |
-| 3. Competitive Player Mapping | 2/2 | Complete | 2026-03-13 |
-| 4. Competitive Analysis & Gaps | 2/2 | Complete | 2026-03-13 |
-| 5. Developer Pain Points & Market Sizing | 2/2 | Complete | 2026-03-13 |
-| 6. Regulatory & Structural Opportunities | 2/2 | Complete | 2026-03-13 |
-| 7. Revenue Model Analysis | 2/2 | Complete | 2026-03-13 |
-| 8. Strategic Synthesis & Recommendations | 2/2 | Complete | 2026-03-13 |
-| 9. Report Assembly & Deliverables | 2/2 | Complete   | 2026-03-13 |
+| 1. Budget Engine + Proxy Foundation | 0/3 | Not started | - |
+| 2. HITL + Approval Channels | 0/2 | Not started | - |
+| 3. Error Handling + Production Hardening | 0/2 | Not started | - |
+| 4. Dashboard + Python SDK + Self-Host | 0/3 | Not started | - |

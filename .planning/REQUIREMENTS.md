@@ -80,31 +80,31 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| COST-01 | — | Pending |
-| COST-02 | — | Pending |
-| COST-03 | — | Pending |
-| COST-04 | — | Pending |
-| COST-05 | — | Pending |
-| HITL-01 | — | Pending |
-| HITL-02 | — | Pending |
-| HITL-03 | — | Pending |
-| HITL-04 | — | Pending |
-| HITL-05 | — | Pending |
-| ERR-01 | — | Pending |
-| ERR-02 | — | Pending |
-| ERR-03 | — | Pending |
-| ERR-04 | — | Pending |
-| SDK-01 | — | Pending |
-| SDK-02 | — | Pending |
-| SDK-03 | — | Pending |
-| SDK-04 | — | Pending |
-| SDK-05 | — | Pending |
+| COST-01 | Phase 1 | Pending |
+| COST-02 | Phase 1 | Pending |
+| COST-03 | Phase 1 | Pending |
+| COST-04 | Phase 1 | Pending |
+| COST-05 | Phase 1 | Pending |
+| SDK-01 | Phase 1 | Pending |
+| SDK-03 | Phase 1 | Pending |
+| HITL-01 | Phase 2 | Pending |
+| HITL-02 | Phase 2 | Pending |
+| HITL-03 | Phase 2 | Pending |
+| HITL-04 | Phase 2 | Pending |
+| HITL-05 | Phase 2 | Pending |
+| ERR-01 | Phase 3 | Pending |
+| ERR-02 | Phase 3 | Pending |
+| ERR-03 | Phase 3 | Pending |
+| ERR-04 | Phase 3 | Pending |
+| SDK-02 | Phase 4 | Pending |
+| SDK-04 | Phase 4 | Pending |
+| SDK-05 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after initial definition*
+*Last updated: 2026-03-13 after roadmap creation — traceability complete*
