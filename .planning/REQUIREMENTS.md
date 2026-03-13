@@ -34,10 +34,10 @@
 
 ### Strategic Recommendation
 
-- [ ] **STRT-01**: 全領域の分析結果を踏まえた推薦領域（Top 3）を根拠付きで提示する
-- [ ] **STRT-02**: 各推薦領域のGo-to-Market戦略（市場参入順序、初期ターゲット、差別化ポイント）を策定する
-- [ ] **STRT-03**: 日本発・小規模チームの制約を踏まえた実行計画の骨子を提示する
-- [ ] **STRT-04**: リスク評価（タイミング、競合、技術プラットフォーム、規制）と対策を整理する
+- [x] **STRT-01**: 全領域の分析結果を踏まえた推薦領域（Top 3）を根拠付きで提示する
+- [x] **STRT-02**: 各推薦領域のGo-to-Market戦略（市場参入順序、初期ターゲット、差別化ポイント）を策定する
+- [x] **STRT-03**: 日本発・小規模チームの制約を踏まえた実行計画の骨子を提示する
+- [x] **STRT-04**: リスク評価（タイミング、競合、技術プラットフォーム、規制）と対策を整理する
 
 ### Report Deliverables
 
@@ -83,10 +83,10 @@
 | REV-01 | Phase 7 | Complete |
 | REV-02 | Phase 7 | Complete |
 | REV-03 | Phase 7 | Complete |
-| STRT-01 | Phase 8 | Pending |
-| STRT-02 | Phase 8 | Pending |
-| STRT-03 | Phase 8 | Pending |
-| STRT-04 | Phase 8 | Pending |
+| STRT-01 | Phase 8 | Complete |
+| STRT-02 | Phase 8 | Complete |
+| STRT-03 | Phase 8 | Complete |
+| STRT-04 | Phase 8 | Complete |
 | DLVR-01 | Phase 9 | Pending |
 | DLVR-02 | Phase 9 | Pending |
 | DLVR-03 | Phase 9 | Pending |
