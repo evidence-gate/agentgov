@@ -1,0 +1,14 @@
+// Use wrangler types to regenerate worker-configuration.d.ts after editing
+{
+  "name": "agentgov-proxy",
+  "compatibility_date": "2025-01-01",
+  "main": "src/index.ts",
+
+  // Vars are non-secret configuration values.
+  // For local dev, override with .dev.vars (do NOT commit .dev.vars).
+  // TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be set as Wrangler secrets in production.
+  "vars": {
+    "TURSO_DATABASE_URL": "",
+    "TURSO_AUTH_TOKEN": ""
+  }
+}

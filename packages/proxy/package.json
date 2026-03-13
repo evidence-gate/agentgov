@@ -1,0 +1,28 @@
+{
+  "name": "@agentgov/proxy",
+  "version": "0.0.1",
+  "private": true,
+  "description": "agentgov Hono proxy — OpenAI-compatible endpoint with budget enforcement",
+  "module": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "types": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "latest",
+    "drizzle-kit": "latest",
+    "typescript": "^5",
+    "vitest": "^2",
+    "wrangler": "^4"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14",
+    "drizzle-orm": "^0.45",
+    "hono": "^4.12.7"
+  }
+}

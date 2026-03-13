@@ -1,0 +1,18 @@
+{
+  "name": "agentgov",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Agent Governance Platform — cost enforcement and HITL for LLM agents",
+  "scripts": {
+    "dev": "pnpm --filter @agentgov/proxy dev",
+    "test": "pnpm --filter @agentgov/proxy test",
+    "build": "pnpm --filter @agentgov/proxy build"
+  },
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "sharp", "workerd"]
+  }
+}
