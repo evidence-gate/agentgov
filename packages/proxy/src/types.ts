@@ -1,9 +1,24 @@
 export type AgentId = string;
 export type HoldId = string;
 
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+export interface ChatCompletionMessage {
+  role: string;
+  content: string | null;
+  tool_calls?: ToolCall[];
+}
+
 export interface ChatCompletionRequest {
   model: string;
-  messages: Array<{ role: string; content: string }>;
+  messages: ChatCompletionMessage[];
   stream?: boolean;
   max_tokens?: number;
 }

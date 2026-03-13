@@ -13,6 +13,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Mock cloudflare:workers module — not available in Node.js (only in Cloudflare Workers runtime)
+// This allows importing index.ts (which re-exports HitlWorkflow) in Node.js test env.
+vi.mock('cloudflare:workers', () => ({
+  WorkflowEntrypoint: class WorkflowEntrypoint {},
+}));
+
 // ---------------------------------------------------------------------------
 // extractToolCalls and classifyToolCalls helper tests
 // (tested via the pipeline behavior through app.request)
@@ -21,6 +27,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 describe('HITL pipeline integration (via index.ts app with mocked DB)', () => {
   beforeEach(() => {
     vi.resetModules();
+    // Re-apply the cloudflare:workers mock after resetModules
+    vi.mock('cloudflare:workers', () => ({
+      WorkflowEntrypoint: class WorkflowEntrypoint {},
+    }));
   });
 
   it('returns 202 with HITL_PENDING when request has risky tool_calls (send_email)', async () => {

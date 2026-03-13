@@ -41,7 +41,7 @@ hitlRoutes.post('/v1/hitl/:id/approve', async (c) => {
   }
 
   try {
-    const instance = c.env.HITL_WORKFLOW.get(ticketId);
+    const instance = await c.env.HITL_WORKFLOW.get(ticketId);
     await instance.sendEvent({
       type: 'hitl-decision',
       payload: { decision: 'approved', actor, reason },
@@ -73,7 +73,7 @@ hitlRoutes.post('/v1/hitl/:id/deny', async (c) => {
   }
 
   try {
-    const instance = c.env.HITL_WORKFLOW.get(ticketId);
+    const instance = await c.env.HITL_WORKFLOW.get(ticketId);
     await instance.sendEvent({
       type: 'hitl-decision',
       payload: { decision: 'denied', actor, reason },
@@ -161,7 +161,7 @@ hitlRoutes.post('/v1/slack/callback', async (c) => {
   // The workflow resumption runs in the background (per research Pitfall 5)
   const workPromise = (async () => {
     try {
-      const instance = c.env.HITL_WORKFLOW.get(ticketId);
+      const instance = await c.env.HITL_WORKFLOW.get(ticketId);
       await instance.sendEvent({
         type: 'hitl-decision',
         payload: {

@@ -3,6 +3,8 @@ import { createDbClient } from './db/client';
 import { budgetGate } from './budget/gate';
 import { forwardToLlm } from './passthrough/forward';
 import { checkAndFireAlerts } from './budget/alerts';
+import { classifyAction } from './hitl/classifier';
+import { hitlRoutes } from './hitl/routes';
 import type { ChatCompletionRequest, BudgetExceededErrorBody } from './types';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -11,6 +13,10 @@ const app = new Hono<{ Bindings: Env }>();
 app.get('/health', (c) => {
   return c.json({ status: 'ok' });
 });
+
+// Mount HITL sub-routes (approve, deny, status, slack callback)
+// Mounted before /v1/chat/completions to ensure HITL paths take priority
+app.route('/', hitlRoutes);
 
 // OpenAI-compatible chat completions endpoint with budget enforcement
 app.post('/v1/chat/completions', async (c) => {
@@ -75,9 +81,57 @@ app.post('/v1/chat/completions', async (c) => {
     return c.json(errorBody, 429);
   }
 
-  // Step 5: Gate passed — forward to real LLM provider
+  // Gate passed — budget hold is created
   const holdId = gateResult.holdId!;
 
+  // Step 4.5: HITL action classification
+  // Check if any tool_calls in the request require human approval.
+  // IMPORTANT: Budget hold is created BEFORE this check (per locked decision).
+  const toolCalls = extractToolCalls(body);
+  if (toolCalls.length > 0) {
+    const hitlResult = classifyToolCalls(toolCalls);
+    if (hitlResult.required) {
+      // Trigger HITL workflow — agent must pause until human approves/denies
+      const ticketId = crypto.randomUUID();
+      const ttlSeconds = parseInt(c.env?.AGENTGOV_HITL_TTL_SECONDS ?? '259200', 10);
+      const expiresAt = Date.now() + ttlSeconds * 1000;
+      const callbackBaseUrl = new URL(c.req.url).origin;
+
+      // Create Workflow instance (uses ticketId as instance ID per research Pitfall 1)
+      await c.env.HITL_WORKFLOW.create({
+        id: ticketId,
+        params: {
+          ticketId,
+          agentId,
+          actionName: hitlResult.actionName,
+          riskTier: hitlResult.tier,
+          requestPayload: JSON.stringify(body),
+          ttlSeconds,
+          holdId,
+          callbackBaseUrl,
+          webhookUrl: c.env?.AGENTGOV_HITL_WEBHOOK_URL || undefined,
+          slackBotToken: c.env?.SLACK_BOT_TOKEN || undefined,
+          slackChannelId: c.env?.SLACK_CHANNEL_ID || undefined,
+        },
+      });
+
+      // Return 202 Accepted — agent should pause and poll for approval
+      return c.json(
+        {
+          error: {
+            code: 'HITL_PENDING',
+            message: `Action '${hitlResult.actionName}' requires human approval. Use approvalId to poll status.`,
+            approvalId: ticketId,
+            agentId,
+            expiresAt,
+          },
+        },
+        202
+      );
+    }
+  }
+
+  // Step 5: No HITL required — forward to real LLM provider
   // Parse alert thresholds from env (default: 80% and 100%)
   const thresholdsRaw = c.env?.AGENTGOV_ALERT_THRESHOLDS ?? '0.80,1.00';
   const thresholds = thresholdsRaw
@@ -99,13 +153,52 @@ app.post('/v1/chat/completions', async (c) => {
     (err) => console.error('checkAndFireAlerts error:', err),
   );
 
-  if (c.executionCtx && typeof c.executionCtx.waitUntil === 'function') {
-    c.executionCtx.waitUntil(alertPromise);
+  try {
+    if (c.executionCtx && typeof c.executionCtx.waitUntil === 'function') {
+      c.executionCtx.waitUntil(alertPromise);
+    }
+  } catch {
+    // executionCtx not available (Node.js test env) — alertPromise runs in background
   }
   // (If no executionCtx, the promise runs in background — fine for non-Workers environments)
 
   return llmResponse;
 });
+
+/**
+ * Extract action names from tool_calls in all messages.
+ * Returns array of 'tool_call:<function_name>' strings for classifier lookup.
+ */
+function extractToolCalls(body: ChatCompletionRequest): string[] {
+  const names: string[] = [];
+  for (const message of body.messages) {
+    if (message.tool_calls && Array.isArray(message.tool_calls)) {
+      for (const tc of message.tool_calls) {
+        if (tc.function?.name) {
+          names.push(`tool_call:${tc.function.name}`);
+        }
+      }
+    }
+  }
+  return names;
+}
+
+/**
+ * Classify extracted tool call names against the HITL risk table.
+ * Returns the FIRST risky action found (priority: external > irreversible > semi-reversible).
+ * Returns { required: false } if all actions are safe or unknown.
+ */
+function classifyToolCalls(
+  toolCallNames: string[],
+): { required: false } | { required: true; tier: string; actionName: string } {
+  for (const name of toolCallNames) {
+    const result = classifyAction(name);
+    if (result.required) {
+      return { required: true, tier: result.tier, actionName: name };
+    }
+  }
+  return { required: false };
+}
 
 /**
  * Creates a stub OpenAI-compatible response.
@@ -134,6 +227,9 @@ function makeStubResponse(model: string) {
     },
   };
 }
+
+// Export HitlWorkflow alongside default app (required for Cloudflare to wire the Workflow binding)
+export { HitlWorkflow } from './hitl/workflow';
 
 // Export app as default (Cloudflare Workers entry point convention)
 export default app;

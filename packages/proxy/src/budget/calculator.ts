@@ -32,7 +32,7 @@ function getPricing() {
  * Rounds up to the nearest integer.
  */
 export function estimateInputTokens(request: ChatCompletionRequest): number {
-  const totalChars = request.messages.reduce((sum, msg) => sum + msg.content.length, 0);
+  const totalChars = request.messages.reduce((sum, msg) => sum + (msg.content?.length ?? 0), 0);
   return Math.ceil(totalChars / 4);
 }
 

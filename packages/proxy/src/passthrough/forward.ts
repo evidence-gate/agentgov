@@ -264,9 +264,9 @@ function convertToAnthropicFormat(requestBody: ChatCompletionRequest): {
 
   for (const msg of messages) {
     if (msg.role === 'system') {
-      system = msg.content;
+      system = msg.content ?? undefined;
     } else {
-      nonSystemMessages.push({ role: msg.role as 'user' | 'assistant', content: msg.content });
+      nonSystemMessages.push({ role: msg.role as 'user' | 'assistant', content: msg.content ?? '' });
     }
   }
 
