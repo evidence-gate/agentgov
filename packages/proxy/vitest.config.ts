@@ -14,6 +14,7 @@ export default defineWorkersConfig({
       'src/audit/writer.test.ts',
       'src/budget/gate.test.ts',
       'src/budget/alerts.test.ts',
+      'src/hitl/hitl.test.ts',
     ],
   },
 });
