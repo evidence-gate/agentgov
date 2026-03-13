@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Every budget enforcement decision (allow, block, hold, settle) appears in an append-only audit log with actor, timestamp, cost delta, and running balance
   5. An unknown model name fails closed (request blocked with a warning) rather than passing through with zero cost
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 - [ ] 01-01-proxy-scaffold-PLAN.md — Monorepo scaffold, Hono proxy skeleton, Drizzle schema (budget_ledger + holds + audit_log), append-only DB trigger, Vitest config
@@ -92,7 +92,7 @@ Phases 1 → 2 → 3 are a strict dependency chain. Phase 4 can begin in paralle
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Budget Engine + Proxy Foundation | 0/3 | Not started | - |
+| 1. Budget Engine + Proxy Foundation | 1/3 | In Progress|  |
 | 2. HITL + Approval Channels | 0/2 | Not started | - |
 | 3. Error Handling + Production Hardening | 0/2 | Not started | - |
 | 4. Dashboard + Python SDK + Self-Host | 0/3 | Not started | - |
