@@ -1,102 +1,110 @@
-# Requirements: AI Agent Infrastructure -- Market Research
+# Requirements: Agent Governance Platform (agentgov)
 
 **Defined:** 2026-03-13
-**Core Value:** AIエージェントのインフラ市場において、個人/小規模チームが勝てる空白領域を見極め、Go-to-Market戦略の根拠となるリサーチを届けること。
+**Core Value:** AIエージェントのコストを「追跡」ではなく「強制」する -- 予算超過時にリクエストを決定論的にブロックし、コスト暴走を構造的に防止すること。
 
 ## v1 Requirements
 
-### Technology Trends
+### Cost Control
 
-- [x] **TECH-01**: 2026年3月時点のAIエージェント主要プロトコル（MCP, A2A, AG-UI）の成熟度・採用状況・ロードマップを整理する
-- [x] **TECH-02**: 主要エージェントフレームワーク（LangGraph, CrewAI, OpenAI Agents SDK, AutoGen, Google ADK等）の比較と市場シェア動向を整理する
-- [x] **TECH-03**: エージェント向けインフラの技術標準化動向（AAIF, OAuth 2.1 for MCP, OpenTelemetry GenAI等）を整理する
-- [x] **TECH-04**: マルチエージェントシステムの2026年トレンド（Forrester/Gartner予測含む）を分析する
+- [ ] **COST-01**: Per-request cost calculation with maintainable pricing table (OpenAI, Anthropic, Google models)
+- [ ] **COST-02**: Multi-level spend aggregation (model, provider, team, agent)
+- [ ] **COST-03**: Budget definition at multiple scopes (global, per-provider, per-model)
+- [ ] **COST-04**: Hard enforcement — block requests when budget is exceeded
+- [ ] **COST-05**: Budget alert notifications (webhook) at configurable thresholds (e.g., 80%, 100%)
 
-### Competitive Landscape
+### HITL / Approval
 
-- [x] **COMP-01**: 14のインフラカテゴリそれぞれの既存プレイヤーを特定し、資金調達・チーム規模・製品成熟度をマッピングする
-- [x] **COMP-02**: 各カテゴリの競合の強み・弱み・空白領域を分析する
-- [x] **COMP-03**: Big Tech（Cloudflare, AWS, Google, Microsoft）の動向と吸収リスクを評価する
-- [x] **COMP-04**: オープンソース vs SaaS のポジショニングを各カテゴリで分析する
+- [ ] **HITL-01**: Approval request routing to external channel (webhook)
+- [ ] **HITL-02**: Approve/deny response path that feeds decision back to agent context
+- [ ] **HITL-03**: Async approval — agent pauses and resumes without blocking (non-blocking wait)
+- [ ] **HITL-04**: Timeout and escalation handling for unanswered approval requests
+- [ ] **HITL-05**: Approval history / audit trail with actor, timestamp, and action taken
 
-### Market Opportunity
+### Error Handling
 
-- [x] **MRKT-01**: 各インフラカテゴリの市場規模推計（TAM/SAM/SOM）または市場機会の定性評価を行う
-- [x] **MRKT-02**: 開発者の具体的ペインポイントをカテゴリ別に整理し、痛みの強さをランク付けする
-- [x] **MRKT-03**: 個人/小規模チームの参入障壁と防御可能性（moat）をカテゴリ別に評価する
-- [x] **MRKT-04**: EU AI Act（2026年8月施行）等の規制が生む需要機会を分析する
+- [ ] **ERR-01**: Error classification — transient (retriable: rate limit, 5xx) vs permanent (non-retriable: auth, 4xx)
+- [ ] **ERR-02**: Finite retry with exponential backoff and jitter, configurable max retries
+- [ ] **ERR-03**: Stuck/loop detection — detect agents repeating the same action without progress
+- [ ] **ERR-04**: Structured error reporting with type, timestamp, agent context, and suggested remediation
 
-### Revenue Models
+### SDK & Integration
 
-- [x] **REV-01**: AIインフラサービスの主要な収益モデルパターン（API課金, 使用量ベース, SaaS, OSS+Cloud等）を整理する
-- [x] **REV-02**: 各収益モデルのユニットエコノミクス構造と小規模チームへの適合性を分析する
-- [x] **REV-03**: 参考となるOSS→有料化の成功事例（Langfuse, PostHog等）のGTMパターンを整理する
-
-### Strategic Recommendation
-
-- [x] **STRT-01**: 全領域の分析結果を踏まえた推薦領域（Top 3）を根拠付きで提示する
-- [x] **STRT-02**: 各推薦領域のGo-to-Market戦略（市場参入順序、初期ターゲット、差別化ポイント）を策定する
-- [x] **STRT-03**: 日本発・小規模チームの制約を踏まえた実行計画の骨子を提示する
-- [x] **STRT-04**: リスク評価（タイミング、競合、技術プラットフォーム、規制）と対策を整理する
-
-### Report Deliverables
-
-- [x] **DLVR-01**: エグゼクティブサマリー（意思決定者が5分で読める要約）を作成する
-- [x] **DLVR-02**: 競合マップの視覚的な整理（カテゴリ × プレイヤー × ポジショニング）を作成する
-- [x] **DLVR-03**: 推薦領域の意思決定マトリクス（評価軸 × 候補領域のスコアリング）を作成する
-- [x] **DLVR-04**: 次のアクション（MVP実装に向けた具体的な次ステップ）を明記する
+- [ ] **SDK-01**: TypeScript SDK with `agentgov.wrap(client)` 1-line integration
+- [ ] **SDK-02**: Python SDK with equivalent `agentgov.wrap(client)` API
+- [ ] **SDK-03**: OpenAI-compatible API surface (proxy accepts standard chat/completions format)
+- [ ] **SDK-04**: Docker Compose self-host deployment (5-minute setup)
+- [ ] **SDK-05**: Basic dashboard — budget status, session cost, enforcement events, approval queue
 
 ## v2 Requirements
 
-### Deep Dive (推薦領域が決まった後)
+### Cost Control — Differentiators
 
-- **DEEP-01**: 推薦領域のMVP仕様書
-- **DEEP-02**: 技術アーキテクチャ詳細設計
-- **DEEP-03**: ユーザーインタビュー計画
-- **DEEP-04**: ファイナンシャルモデル（3年P&L）
+- **COST-06**: Hold/Settle pessimistic budget reservation (banto pattern) — crash-safe budget state
+- **COST-07**: Graceful degradation — auto-downgrade to cheaper model when budget threshold reached
+- **COST-08**: Per-session budget isolation — independent budget per agent execution session
+
+### HITL — Differentiators
+
+- **HITL-06**: Risk-Graded static action classification (Reversible/Semi-Reversible/Irreversible/External)
+- **HITL-07**: EU AI Act Article 14 compliance mode — evidence export with oversight documentation
+- **HITL-08**: Cryptographic audit log integrity (SHA-256 hash chain for tamper detection)
+- **HITL-09**: Slack Block Kit native approval integration
+
+### Error Handling — Differentiators
+
+- **ERR-05**: 3-tier timeout (soft warning → idle detection → hard stop)
+- **ERR-06**: Error-type to handler static mapping (declarative config, not runtime LLM judgment)
+- **ERR-07**: Partial result return on hard stop (preserve completed work)
+
+### Infrastructure — Differentiators
+
+- **INFRA-01**: Cloudflare Workers edge deployment (cloud version)
+- **INFRA-02**: Capability-based security model (agent as untrusted contractor)
+- **INFRA-03**: Multi-channel approval (Slack, email, SMS)
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| MVP実装 | このPJは調査レポートが成果物。実装は別PJ |
-| ユーザーインタビュー実施 | リサーチ段階では二次情報のみ。一次情報収集は推薦領域決定後 |
-| 投資家向けピッチデック | レポートの読者は自分自身。外部向け資料は別途 |
-| 全カテゴリの技術PoC | 調査段階では実装しない |
+| LLM routing / load balancing | Commoditized (LiteLLM, Portkey). No differentiation possible. Let users choose their router |
+| Guardrails / content filtering | Separate domain with different buyers. Highly competitive (Guardrails.ai, Lakera) |
+| Agent framework features | Becomes competing framework, destroys "wrap any client" positioning |
+| ML-based anomaly detection | High false positive rate. Deterministic thresholds are more trustworthy and auditable |
+| Real-time WebSocket for all events | Significant infrastructure complexity. Polling + webhook sufficient for MVP |
+| Fine-grained RBAC | Deep surface area. Small teams don't need it. Add only after PMF |
+| Mobile approval app | Slack's mobile app handles this. No native app needed |
+| Billing / invoicing | Financial-grade compliance required. Track costs for users, don't process payments |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TECH-01 | Phase 1 | Complete |
-| TECH-02 | Phase 1 | Complete |
-| TECH-03 | Phase 2 | Complete |
-| TECH-04 | Phase 2 | Complete |
-| COMP-01 | Phase 3 | Complete |
-| COMP-02 | Phase 3 | Complete |
-| COMP-03 | Phase 4 | Complete |
-| COMP-04 | Phase 4 | Complete |
-| MRKT-01 | Phase 5 | Complete |
-| MRKT-02 | Phase 5 | Complete |
-| MRKT-03 | Phase 6 | Complete |
-| MRKT-04 | Phase 6 | Complete |
-| REV-01 | Phase 7 | Complete |
-| REV-02 | Phase 7 | Complete |
-| REV-03 | Phase 7 | Complete |
-| STRT-01 | Phase 8 | Complete |
-| STRT-02 | Phase 8 | Complete |
-| STRT-03 | Phase 8 | Complete |
-| STRT-04 | Phase 8 | Complete |
-| DLVR-01 | Phase 9 | Complete |
-| DLVR-02 | Phase 9 | Complete |
-| DLVR-03 | Phase 9 | Complete |
-| DLVR-04 | Phase 9 | Complete |
+| COST-01 | — | Pending |
+| COST-02 | — | Pending |
+| COST-03 | — | Pending |
+| COST-04 | — | Pending |
+| COST-05 | — | Pending |
+| HITL-01 | — | Pending |
+| HITL-02 | — | Pending |
+| HITL-03 | — | Pending |
+| HITL-04 | — | Pending |
+| HITL-05 | — | Pending |
+| ERR-01 | — | Pending |
+| ERR-02 | — | Pending |
+| ERR-03 | — | Pending |
+| ERR-04 | — | Pending |
+| SDK-01 | — | Pending |
+| SDK-02 | — | Pending |
+| SDK-03 | — | Pending |
+| SDK-04 | — | Pending |
+| SDK-05 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total
-- Mapped to phases: 23
-- Unmapped: 0
+- v1 requirements: 19 total
+- Mapped to phases: 0
+- Unmapped: 19
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after roadmap creation*
+*Last updated: 2026-03-13 after initial definition*
