@@ -92,7 +92,7 @@ Phases 1 → 2 → 3 are a strict dependency chain. Phase 4 can begin in paralle
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Budget Engine + Proxy Foundation | 3/3 | Complete   | 2026-03-13 |
+| 1. Budget Engine + Proxy Foundation | 3/3 | Complete    | 2026-03-13 |
 | 2. HITL + Approval Channels | 0/2 | Not started | - |
 | 3. Error Handling + Production Hardening | 0/2 | Not started | - |
 | 4. Dashboard + Python SDK + Self-Host | 0/3 | Not started | - |
