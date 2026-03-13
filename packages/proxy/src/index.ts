@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { createDbClient } from './db/client';
 import { budgetGate } from './budget/gate';
+import { forwardToLlm } from './passthrough/forward';
+import { checkAndFireAlerts } from './budget/alerts';
 import type { ChatCompletionRequest, BudgetExceededErrorBody } from './types';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -61,8 +63,6 @@ app.post('/v1/chat/completions', async (c) => {
     }
 
     // 429 Too Many Requests — budget exceeded
-    // Fetch current budget state for the error body
-    // (We don't have the exact values here, so we use what we know)
     const errorBody: BudgetExceededErrorBody = {
       error: {
         code: 'BUDGET_EXCEEDED',
@@ -75,15 +75,41 @@ app.post('/v1/chat/completions', async (c) => {
     return c.json(errorBody, 429);
   }
 
-  // Step 5: Gate passed — return stub response
-  // NOTE: budgetSettle is NOT called here — it will be called after the real LLM response
-  // arrives in plan 01-03 (LLM forwarding).
-  return c.json(makeStubResponse(body.model), 200);
+  // Step 5: Gate passed — forward to real LLM provider
+  const holdId = gateResult.holdId!;
+
+  // Parse alert thresholds from env (default: 80% and 100%)
+  const thresholdsRaw = c.env?.AGENTGOV_ALERT_THRESHOLDS ?? '0.80,1.00';
+  const thresholds = thresholdsRaw
+    .split(',')
+    .map((t: string) => parseFloat(t.trim()))
+    .filter((t: number) => !isNaN(t));
+
+  const webhookUrl = c.env?.AGENTGOV_ALERT_WEBHOOK_URL || undefined;
+
+  // Forward to LLM (streaming or non-streaming)
+  const llmResponse = await forwardToLlm(body, holdId, agentId, db, {
+    OPENAI_API_KEY: c.env?.OPENAI_API_KEY,
+    ANTHROPIC_API_KEY: c.env?.ANTHROPIC_API_KEY,
+  });
+
+  // Fire budget alerts fire-and-forget (not on the hot path)
+  // Use executionCtx.waitUntil if available (Cloudflare Workers), else background promise
+  const alertPromise = checkAndFireAlerts(db, agentId, webhookUrl, thresholds).catch(
+    (err) => console.error('checkAndFireAlerts error:', err),
+  );
+
+  if (c.executionCtx && typeof c.executionCtx.waitUntil === 'function') {
+    c.executionCtx.waitUntil(alertPromise);
+  }
+  // (If no executionCtx, the promise runs in background — fine for non-Workers environments)
+
+  return llmResponse;
 });
 
 /**
  * Creates a stub OpenAI-compatible response.
- * Used while LLM forwarding is not yet implemented (completed in 01-03).
+ * Used only in local dev mode when DB credentials are not configured.
  */
 function makeStubResponse(model: string) {
   return {
