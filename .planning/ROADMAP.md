@@ -32,11 +32,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. Report section clearly explains MCP, A2A, and AG-UI protocols with their maturity levels, adoption metrics, and roadmaps as of March 2026
   2. Report section compares major agent frameworks (LangGraph, CrewAI, OpenAI Agents SDK, AutoGen, Google ADK) with market share indicators and architectural differences
   3. Reader can identify which protocol boundaries are natural insertion points for infrastructure services
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md -- Research and write protocol landscape section (MCP, A2A, AG-UI)
+- [ ] 01-02-PLAN.md -- Research and write framework comparison section (LangGraph, CrewAI, OpenAI Agents SDK, AutoGen, Google ADK)
 
 ### Phase 2: Infrastructure Standards & Trends
 **Goal**: Reader understands the standardization trajectory and multi-agent trends that will shape infrastructure demand over the next 12-24 months
@@ -164,7 +164,7 @@ Note: Phases 1 and 3 can execute in parallel (no dependency). Phases 4 and 5 can
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol & Framework Landscape | 0/2 | Not started | - |
+| 1. Protocol & Framework Landscape | 0/2 | Planning complete | - |
 | 2. Infrastructure Standards & Trends | 0/2 | Not started | - |
 | 3. Competitive Player Mapping | 0/2 | Not started | - |
 | 4. Competitive Analysis & Gaps | 0/2 | Not started | - |
