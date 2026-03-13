@@ -102,11 +102,11 @@ Plans:
   1. Entry barriers and moat potential are evaluated per category with explicit assessment of what small teams can and cannot defend
   2. EU AI Act (August 2026) and other regulatory drivers are analyzed for the specific infrastructure demand they create
   3. Reader can filter categories by "small-team feasibility" to focus on realistically winnable domains
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [x] 06-01-PLAN.md -- Research and write entry barrier and moat analysis for small-team entrants (14 categories + top 3 deep dive)
+- [x] 06-02-PLAN.md -- Research and write regulatory demand analysis (EU AI Act + global regulatory landscape)
 
 ### Phase 7: Revenue Model Analysis
 **Goal**: Reader understands which business models work for AI infrastructure and has proven GTM patterns to follow
@@ -169,7 +169,7 @@ Note: Phases 1 and 3 can execute in parallel (no dependency). Phases 4 and 5 can
 | 3. Competitive Player Mapping | 2/2 | Complete | 2026-03-13 |
 | 4. Competitive Analysis & Gaps | 2/2 | Complete | 2026-03-13 |
 | 5. Developer Pain Points & Market Sizing | 2/2 | Complete | 2026-03-13 |
-| 6. Regulatory & Structural Opportunities | 0/2 | Not started | - |
+| 6. Regulatory & Structural Opportunities | 2/2 | Complete | 2026-03-13 |
 | 7. Revenue Model Analysis | 0/2 | Not started | - |
 | 8. Strategic Synthesis & Recommendations | 0/2 | Not started | - |
 | 9. Report Assembly & Deliverables | 0/2 | Not started | - |

@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: completed
 stopped_at: Completed 05-02-PLAN.md (Phase 5 complete)
-last_updated: "2026-03-13T03:18:52.484Z"
+last_updated: "2026-03-13T03:32:44.848Z"
 last_activity: 2026-03-13 -- Completed 05-02-PLAN.md (developer pain points and market sizing complete)
 progress:
   total_phases: 9
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
+  completed_phases: 6
+  total_plans: 12
+  completed_plans: 12
   percent: 100
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** AIエージェントのインフラ市場において、個人/小規模チームが勝てる空白領域を見極め、Go-to-Market戦略の根拠となるリサーチを届けること。
-**Current focus:** Phase 5: Developer Pain Points & Market Sizing (COMPLETE)
+**Current focus:** Phase 6: Regulatory & Structural Opportunities (COMPLETE)
 
 ## Current Position
 
-Phase: 5 of 9 (Developer Pain Points & Market Sizing)
-Plan: 2 of 2 in current phase (Phase 5 COMPLETE)
-Status: Phase complete -- ready for Phase 6
-Last activity: 2026-03-13 -- Completed 05-02-PLAN.md (developer pain points and market sizing complete)
+Phase: 6 of 9 (Regulatory & Structural Opportunities)
+Plan: 2 of 2 in current phase (Phase 6 COMPLETE)
+Status: Phase complete -- ready for Phase 7
+Last activity: 2026-03-13 -- Completed 06-02-PLAN.md (regulatory and structural opportunities complete)
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 12
 - Average duration: 9min
-- Total execution time: 1.35 hours
+- Total execution time: 1.75 hours
 
 **By Phase:**
 
@@ -48,10 +48,11 @@ Progress: [██████████] 100%
 | 03-competitive-player-mapping | 2/2 | 24min | 12min |
 | 04-competitive-analysis-and-gaps | 2/2 | 9min | 5min |
 | 05-developer-pain-points-and-market-sizing | 2/2 | 30min | 15min |
+| 06-regulatory-and-structural-opportunities | 2/2 | 24min | 12min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (8min), 03-01 (12min), 03-02 (12min), 05-01 (15min), 05-02 (15min)
-- Trend: Increasing (more research per plan)
+- Last 5 plans: 03-02 (12min), 05-01 (15min), 05-02 (15min), 06-01 (12min), 06-02 (12min)
+- Trend: Stable (~12-15min per plan)
 
 *Updated after each plan completion*
 
@@ -101,6 +102,19 @@ Recent decisions affecting current work:
 - [05-02]: HITL "approval fatigue" scored 100/125 -- second highest pain, unsolved by any product
 - [05-02]: Error handling should be bundled with cost control (high pain but low standalone WTP signal)
 - [05-02]: 3-axis analysis confirms Cost Control as "most painful, largest market, most vacant" -- unique among all 14 categories
+- [06-01]: 3 of 14 categories rated Feasible for small-team entry: Cost Control, HITL, Error Handling (bundled)
+- [06-01]: 7 categories rated Infeasible (auth, sandbox, guardrails, secrets, payments, deployment, LLM gateway)
+- [06-01]: Cost Control has strongest moat (18/25): data network effects + switching costs + community + OSS
+- [06-01]: HITL has strongest regulatory moat (17/25): Article 14 expertise + audit trail lock-in
+- [06-01]: SOC 2 not needed Day 1 for OSS-first -- defer to month 12-18 ($20-60K, 6-9 months)
+- [06-01]: Japan-based team should adopt Global-first strategy: English-first, OSS community, PLG, async-first
+- [06-02]: HITL rated Must-have (10/10 regulatory demand) -- EU AI Act Article 14 creates legal obligation
+- [06-02]: Cost Control rated Should-have (6/10) -- risk management best practice but not direct legal mandate
+- [06-02]: 36,000-80,000 EU organizations estimated to have high-risk AI requiring compliance
+- [06-02]: EU AI Act penalties up to 7% of turnover (1.75x GDPR) -- strong compliance motivation
+- [06-02]: HITL demand is universal across jurisdictions (EU mandate, US sector regulation, Japan guidelines)
+- [06-02]: Optimal MVP launch: Q2-Q3 2026 (before August 2 deadline)
+- [06-02]: Gartner validates: AI governance platform market $492M in 2026 → $1B+ by 2030
 
 ### Pending Todos
 
@@ -114,6 +128,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T12:30:00.000Z
-Stopped at: Completed 05-02-PLAN.md (Phase 5 complete)
+Last session: 2026-03-13T13:00:00.000Z
+Stopped at: Completed 06-02-PLAN.md (Phase 6 complete)
 Resume file: None

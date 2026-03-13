@@ -23,8 +23,8 @@
 
 - [x] **MRKT-01**: 各インフラカテゴリの市場規模推計（TAM/SAM/SOM）または市場機会の定性評価を行う
 - [x] **MRKT-02**: 開発者の具体的ペインポイントをカテゴリ別に整理し、痛みの強さをランク付けする
-- [ ] **MRKT-03**: 個人/小規模チームの参入障壁と防御可能性（moat）をカテゴリ別に評価する
-- [ ] **MRKT-04**: EU AI Act（2026年8月施行）等の規制が生む需要機会を分析する
+- [x] **MRKT-03**: 個人/小規模チームの参入障壁と防御可能性（moat）をカテゴリ別に評価する
+- [x] **MRKT-04**: EU AI Act（2026年8月施行）等の規制が生む需要機会を分析する
 
 ### Revenue Models
 
@@ -78,8 +78,8 @@
 | COMP-04 | Phase 4 | Complete |
 | MRKT-01 | Phase 5 | Complete |
 | MRKT-02 | Phase 5 | Complete |
-| MRKT-03 | Phase 6 | Pending |
-| MRKT-04 | Phase 6 | Pending |
+| MRKT-03 | Phase 6 | Complete |
+| MRKT-04 | Phase 6 | Complete |
 | REV-01 | Phase 7 | Pending |
 | REV-02 | Phase 7 | Pending |
 | REV-03 | Phase 7 | Pending |
