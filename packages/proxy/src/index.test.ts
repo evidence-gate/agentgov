@@ -11,10 +11,28 @@ describe('GET /health', () => {
 });
 
 describe('POST /v1/chat/completions', () => {
-  it('returns 200 with OpenAI-compatible stub response for valid JSON body', async () => {
+  it('returns 400 when X-Agent-Id header is missing', async () => {
     const res = await app.request('/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: 'Hello' }],
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body['error']).toBe('X-Agent-Id header required');
+  });
+
+  it('returns 200 with stub response for valid request (no DB bindings = dev passthrough)', async () => {
+    // Without TURSO bindings (no env in test), budget enforcement is skipped (dev mode passthrough)
+    const res = await app.request('/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Agent-Id': 'test-agent-01',
+      },
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: 'Hello' }],
@@ -31,10 +49,13 @@ describe('POST /v1/chat/completions', () => {
     expect(choices[0].message.content).toBe('stub');
   });
 
-  it('returns 400 for non-JSON body', async () => {
+  it('returns 400 for non-JSON body (with X-Agent-Id header)', async () => {
     const res = await app.request('/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Agent-Id': 'test-agent-01',
+      },
       body: 'this is not json',
     });
     expect(res.status).toBe(400);
