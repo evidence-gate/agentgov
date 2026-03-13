@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 2: Infrastructure Standards & Trends** - Analyze standardization efforts and multi-agent system trends shaping the infrastructure layer
 - [x] **Phase 3: Competitive Player Mapping** - Identify and catalog existing players across all 14 infrastructure categories
 - [ ] **Phase 4: Competitive Analysis & Gaps** - Analyze competitive dynamics, Big Tech absorption risk, and OSS vs SaaS positioning
-- [ ] **Phase 5: Developer Pain Points & Market Sizing** - Quantify market opportunity and rank developer pain points by severity
+- [x] **Phase 5: Developer Pain Points & Market Sizing** - Quantify market opportunity and rank developer pain points by severity
 - [ ] **Phase 6: Regulatory & Structural Opportunities** - Analyze regulation-driven demand (EU AI Act) and entry barriers for small teams
 - [ ] **Phase 7: Revenue Model Analysis** - Evaluate pricing models, unit economics, and OSS-to-paid conversion patterns
 - [ ] **Phase 8: Strategic Synthesis & Recommendations** - Synthesize all research into ranked domain recommendations with GTM strategies
@@ -77,8 +77,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [x] 04-01-PLAN.md -- Research and write Big Tech absorption risk analysis (Cloudflare, AWS, Google, Microsoft) with per-category ratings
+- [x] 04-02-PLAN.md -- Research and write OSS vs SaaS positioning analysis plus composite opportunity ranking
 
 ### Phase 5: Developer Pain Points & Market Sizing
 **Goal**: Reader knows which developer problems are most painful and how large the addressable market is for each infrastructure category
@@ -91,8 +91,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [x] 05-01-PLAN.md -- Research and write market size estimates (TAM/SAM/SOM) for all 14 infrastructure categories
+- [x] 05-02-PLAN.md -- Research and write developer pain point ranking by severity/frequency/willingness-to-pay
 
 ### Phase 6: Regulatory & Structural Opportunities
 **Goal**: Reader understands which market opportunities are structurally favorable for small teams and which are unlocked by upcoming regulation
@@ -167,8 +167,8 @@ Note: Phases 1 and 3 can execute in parallel (no dependency). Phases 4 and 5 can
 | 1. Protocol & Framework Landscape | 2/2 | Complete | 2026-03-13 |
 | 2. Infrastructure Standards & Trends | 2/2 | Complete | 2026-03-13 |
 | 3. Competitive Player Mapping | 2/2 | Complete | 2026-03-13 |
-| 4. Competitive Analysis & Gaps | 0/2 | Not started | - |
-| 5. Developer Pain Points & Market Sizing | 0/2 | Not started | - |
+| 4. Competitive Analysis & Gaps | 2/2 | Complete | 2026-03-13 |
+| 5. Developer Pain Points & Market Sizing | 2/2 | Complete | 2026-03-13 |
 | 6. Regulatory & Structural Opportunities | 0/2 | Not started | - |
 | 7. Revenue Model Analysis | 0/2 | Not started | - |
 | 8. Strategic Synthesis & Recommendations | 0/2 | Not started | - |
