@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "vitest run",
+    "test": "vitest run && vitest run --config vitest.config.node.ts",
+    "test:workers": "vitest run",
+    "test:node": "vitest run --config vitest.config.node.ts",
     "test:watch": "vitest",
     "types": "wrangler types",
     "db:generate": "drizzle-kit generate",
@@ -15,14 +17,14 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "latest",
-    "drizzle-kit": "latest",
+    "drizzle-kit": "^0.31.9",
     "typescript": "^5",
     "vitest": "^2",
     "wrangler": "^4"
   },
   "dependencies": {
-    "@libsql/client": "^0.14",
-    "drizzle-orm": "^0.45",
+    "@libsql/client": "^0.14.0",
+    "drizzle-orm": "^0.45.1",
     "hono": "^4.12.7"
   }
 }
