@@ -50,8 +50,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 02-01-PLAN.md — HITL queue schema (Turso), action classifier (static risk tier table), Cloudflare Workflows waitForEvent, notification channels (webhook + Slack), HitlPending SDK error
-- [ ] 02-02-PLAN.md — Slack signature verification, approve/deny/status callback endpoints, HITL classification wired into proxy pipeline, route mounting
+- [x] 02-01-PLAN.md — HITL queue schema (Turso), action classifier (static risk tier table), Cloudflare Workflows waitForEvent, notification channels (webhook + Slack), HitlPending SDK error
+- [x] 02-02-PLAN.md — Slack signature verification, approve/deny/status callback endpoints, HITL classification wired into proxy pipeline, route mounting
 
 ### Phase 3: Error Handling + Production Hardening
 **Goal**: Agents running in production fail deterministically — transient errors retry, permanent errors halt, stuck agents are detected and stopped
@@ -63,11 +63,11 @@ Plans:
   3. An agent that calls the same action with the same inputs twice without making progress is detected and stopped with a structured error that includes the repeated action, timestamps, and suggested remediation
   4. Every error event (classification, retry attempt, halt decision) appears in the audit log with type, timestamp, agent context, and suggested remediation
 
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 03-01: Error classifier (transient vs permanent), finite retry engine (ERR-01/02), structured error reporting (ERR-04)
-- [ ] 03-02: Stuck/loop detector (2-failure-stop rule, per-session state via Durable Object) (ERR-03)
+- [ ] 03-01-PLAN.md — Error classifier (transient vs permanent), finite retry engine with exponential backoff + jitter, structured error reporter, AgentError SDK class (ERR-01, ERR-02, ERR-04)
+- [ ] 03-02-PLAN.md — Stuck/loop detector (2-failure-stop rule, per-request in-memory state), pipeline integration (ERR-03)
 
 ### Phase 4: Dashboard + Python SDK + Self-Host
 **Goal**: Non-TypeScript teams can adopt agentgov, and all users can observe their governance state through a dashboard — with a self-host path for enterprise environments
