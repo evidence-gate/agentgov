@@ -1,4 +1,4 @@
-# Requirements: AI Agent Infrastructure — Market Research
+# Requirements: AI Agent Infrastructure -- Market Research
 
 **Defined:** 2026-03-13
 **Core Value:** AIエージェントのインフラ市場において、個人/小規模チームが勝てる空白領域を見極め、Go-to-Market戦略の根拠となるリサーチを届けること。
@@ -68,35 +68,35 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TECH-01 | TBD | Pending |
-| TECH-02 | TBD | Pending |
-| TECH-03 | TBD | Pending |
-| TECH-04 | TBD | Pending |
-| COMP-01 | TBD | Pending |
-| COMP-02 | TBD | Pending |
-| COMP-03 | TBD | Pending |
-| COMP-04 | TBD | Pending |
-| MRKT-01 | TBD | Pending |
-| MRKT-02 | TBD | Pending |
-| MRKT-03 | TBD | Pending |
-| MRKT-04 | TBD | Pending |
-| REV-01 | TBD | Pending |
-| REV-02 | TBD | Pending |
-| REV-03 | TBD | Pending |
-| STRT-01 | TBD | Pending |
-| STRT-02 | TBD | Pending |
-| STRT-03 | TBD | Pending |
-| STRT-04 | TBD | Pending |
-| DLVR-01 | TBD | Pending |
-| DLVR-02 | TBD | Pending |
-| DLVR-03 | TBD | Pending |
-| DLVR-04 | TBD | Pending |
+| TECH-01 | Phase 1 | Pending |
+| TECH-02 | Phase 1 | Pending |
+| TECH-03 | Phase 2 | Pending |
+| TECH-04 | Phase 2 | Pending |
+| COMP-01 | Phase 3 | Pending |
+| COMP-02 | Phase 3 | Pending |
+| COMP-03 | Phase 4 | Pending |
+| COMP-04 | Phase 4 | Pending |
+| MRKT-01 | Phase 5 | Pending |
+| MRKT-02 | Phase 5 | Pending |
+| MRKT-03 | Phase 6 | Pending |
+| MRKT-04 | Phase 6 | Pending |
+| REV-01 | Phase 7 | Pending |
+| REV-02 | Phase 7 | Pending |
+| REV-03 | Phase 7 | Pending |
+| STRT-01 | Phase 8 | Pending |
+| STRT-02 | Phase 8 | Pending |
+| STRT-03 | Phase 8 | Pending |
+| STRT-04 | Phase 8 | Pending |
+| DLVR-01 | Phase 9 | Pending |
+| DLVR-02 | Phase 9 | Pending |
+| DLVR-03 | Phase 9 | Pending |
+| DLVR-04 | Phase 9 | Pending |
 
 **Coverage:**
 - v1 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- Mapped to phases: 23
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after initial definition*
+*Last updated: 2026-03-13 after roadmap creation*

@@ -1,8 +1,8 @@
-# Roadmap: AllNew App Store Portfolio Recovery
+# Roadmap: AI Agent Infrastructure -- Market Research
 
 ## Overview
 
-This brownfield operations roadmap moves the 9-app portfolio from fragmented blockers to evidence-backed submission-ready packets by sequencing portfolio control, legal-host migration, live ASC audit, metadata and claim lock, creative refresh, and final readiness gating. The ordering front-loads shared blockers and proof collection so later app waves reuse the same operating pattern instead of repeating ad hoc remediation.
+This roadmap delivers a comprehensive market research report on AI agent infrastructure opportunities for a solo/small-team entrant. The research flows from foundational technology understanding through competitive and market analysis, to revenue model evaluation, strategic synthesis, and final report assembly. Each phase produces research artifacts that feed downstream phases, culminating in an actionable Go-to-Market recommendation with supporting evidence.
 
 ## Phases
 
@@ -12,110 +12,164 @@ This brownfield operations roadmap moves the 9-app portfolio from fragmented blo
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Portfolio Intake and Wave Control** - Create the single source of truth for app inventory, wave order, and evidence-linked ownership.
-- [ ] **Phase 2: Legal URL Baseline and Cloudflare Publish** - Standardize legal/support hosting on `apps.allnew.work` and verify the public cutover surface.
-- [ ] **Phase 3: ASC Live Audit and Rejection RCA** - Pull live ASC state, collect browser-only evidence, and classify rejected apps from verified facts.
-- [ ] **Phase 4: Remediation and Metadata Lock** - Replace legacy store-facing URLs, attach submission prerequisites, and freeze truthful metadata before creative work.
-- [ ] **Phase 5: Creative Production and ASC Asset Refresh** - Create storyboards and final screenshots/previews, upload them, and verify ASC read-back.
-- [ ] **Phase 6: Submission-Ready Gate and Reuse Hardening** - Produce PASS/BLOCK decisions, submission packets, and reusable runbooks for later waves.
+- [ ] **Phase 1: Protocol & Framework Landscape** - Map the current state of AI agent protocols (MCP, A2A, AG-UI) and major frameworks
+- [ ] **Phase 2: Infrastructure Standards & Trends** - Analyze standardization efforts and multi-agent system trends shaping the infrastructure layer
+- [ ] **Phase 3: Competitive Player Mapping** - Identify and catalog existing players across all 14 infrastructure categories
+- [ ] **Phase 4: Competitive Analysis & Gaps** - Analyze competitive dynamics, Big Tech absorption risk, and OSS vs SaaS positioning
+- [ ] **Phase 5: Developer Pain Points & Market Sizing** - Quantify market opportunity and rank developer pain points by severity
+- [ ] **Phase 6: Regulatory & Structural Opportunities** - Analyze regulation-driven demand (EU AI Act) and entry barriers for small teams
+- [ ] **Phase 7: Revenue Model Analysis** - Evaluate pricing models, unit economics, and OSS-to-paid conversion patterns
+- [ ] **Phase 8: Strategic Synthesis & Recommendations** - Synthesize all research into ranked domain recommendations with GTM strategies
+- [ ] **Phase 9: Report Assembly & Deliverables** - Package all findings into the final research report with executive summary and decision tools
 
 ## Phase Details
 
-### Phase 1: Portfolio Intake and Wave Control
-**Goal**: Establish the portfolio control plane for all 9 apps so later phases operate from one roster, one wave policy, and proof-linked ownership.
+### Phase 1: Protocol & Framework Landscape
+**Goal**: Reader understands the current protocol and framework ecosystem that defines where infrastructure can be inserted
 **Depends on**: Nothing (first phase)
-**Requirements**: [PORT-01, PORT-02, PORT-03]
+**Requirements**: TECH-01, TECH-02
 **Success Criteria** (what must be TRUE):
-  1. Operator can open a single inventory for all 9 target apps showing repo path, public site slug, ASC status, and current blocker state.
-  2. Rejected apps are explicitly prioritized into remediation waves and each app has a visible state of `not_started`, `in_progress`, `blocked`, or `submission_ready`.
-  3. Every app record links to an owner, next action, and evidence artifacts so status is derived from proof rather than chat notes.
-**Plans**: 2 plans
+  1. Report section clearly explains MCP, A2A, and AG-UI protocols with their maturity levels, adoption metrics, and roadmaps as of March 2026
+  2. Report section compares major agent frameworks (LangGraph, CrewAI, OpenAI Agents SDK, AutoGen, Google ADK) with market share indicators and architectural differences
+  3. Reader can identify which protocol boundaries are natural insertion points for infrastructure services
+**Plans**: TBD
 
 Plans:
-- [ ] 01-01: Build the portfolio inventory registry and target-app identity map.
-- [ ] 01-02: Define wave priority, ownership fields, and evidence-linked tracker rules.
+- [ ] 01-01: TBD
+- [ ] 01-02: TBD
 
-### Phase 2: Legal URL Baseline and Cloudflare Publish
-**Goal**: Replace legacy legal/support hosting with a verified Cloudflare pattern and prove the public destination surface is ready for cutover.
+### Phase 2: Infrastructure Standards & Trends
+**Goal**: Reader understands the standardization trajectory and multi-agent trends that will shape infrastructure demand over the next 12-24 months
 **Depends on**: Phase 1
-**Requirements**: [LEGAL-01, LEGAL-02]
+**Requirements**: TECH-03, TECH-04
 **Success Criteria** (what must be TRUE):
-  1. A verified matrix exists for every app showing current legal/support/marketing URLs and the target `apps.allnew.work` URLs.
-  2. Each app's legal/support documents are published on Cloudflare and the final custom-domain URLs return the correct app content.
-  3. A cutover-ready record exists for every app showing which verified Cloudflare URLs are safe to promote into store-facing references.
-**Plans**: 2 plans
+  1. Report section catalogs active standardization efforts (AAIF, OAuth 2.1 for MCP, OpenTelemetry GenAI conventions) with their timelines and expected impact
+  2. Report section presents multi-agent system trends with analyst predictions (Forrester/Gartner) and implications for infrastructure needs
+  3. Reader can assess which standards are mature enough to build on now vs. which require a wait-and-see approach
+**Plans**: TBD
 
 Plans:
-- [ ] 02-01: Capture the current-versus-target URL matrix and the reusable Cloudflare hosting template.
-- [ ] 02-02: Publish, verify, and record the final custom-domain legal/support endpoints and cutover-ready URL set for each app.
+- [ ] 02-01: TBD
+- [ ] 02-02: TBD
 
-### Phase 3: ASC Live Audit and Rejection RCA
-**Goal**: Build a live, evidence-backed view of ASC status and blocked-app root causes before any final readiness claim is made.
-**Depends on**: Phase 2
-**Requirements**: [ASC-01, ASC-02, ASC-03]
+### Phase 3: Competitive Player Mapping
+**Goal**: Reader has a comprehensive map of who is building what across every infrastructure category
+**Depends on**: Phase 1
+**Requirements**: COMP-01, COMP-02
 **Success Criteria** (what must be TRUE):
-  1. A current ASC snapshot exists for each app covering version, build, localization, screenshot/preview presence, and review status.
-  2. Browser-only ASC submission checks have evidence for each app, or an explicit blocker is recorded for every missing item.
-  3. Every rejected app has a root-cause packet that links rejection reason, affected layers, planned fix, and required retest proof.
-**Plans**: 2 plans
+  1. All 14 infrastructure categories have identified players with funding, team size, and product maturity data
+  2. Each category has a strengths/weaknesses/gaps analysis that reveals where incumbents are weak or absent
+  3. Reader can visually scan the competitive landscape to identify crowded vs. underserved categories
+**Plans**: TBD
 
 Plans:
-- [ ] 03-01: Pull live ASC truth and collect browser-only submission evidence across the portfolio.
-- [ ] 03-02: Produce rejected-app RCA packets and the remediation backlog from verified ASC findings.
+- [ ] 03-01: TBD
+- [ ] 03-02: TBD
 
-### Phase 4: Remediation and Metadata Lock
-**Goal**: Apply the verified pre-creative fixes so every app points at the correct public URLs, has the right ASC prerequisites, and exposes truthful store claims.
+### Phase 4: Competitive Analysis & Gaps
+**Goal**: Reader understands the strategic dynamics -- who will absorb what, and where open source creates defensible positions
 **Depends on**: Phase 3
-**Requirements**: [LEGAL-03, ASC-04, META-01]
+**Requirements**: COMP-03, COMP-04
 **Success Criteria** (what must be TRUE):
-  1. Each app's store-facing legal/support references use only verified Cloudflare URLs and no legacy GitHub Pages URLs remain in the intended submission set.
-  2. Each app is tied to the correct build and submission prerequisites, or is explicitly blocked with the missing prerequisite called out.
-  3. Approved localized App Store metadata drafts and claim sets exist for each app and match the actual behavior of that app.
-**Plans**: 2 plans
+  1. Big Tech (Cloudflare, AWS, Google, Microsoft) agent infrastructure moves are cataloged with absorption risk ratings per category
+  2. OSS vs. SaaS positioning analysis shows which categories favor open-source-first strategies and which require proprietary approaches
+  3. Reader can identify categories where small-team entrants have structural advantages over well-funded competitors
+**Plans**: TBD
 
 Plans:
-- [ ] 04-01: Replace legacy store-facing URLs and attach build/submission prerequisites from the audit backlog.
-- [ ] 04-02: Lock approved metadata and claims from verified post-remediation runtime truth.
+- [ ] 04-01: TBD
+- [ ] 04-02: TBD
 
-### Phase 5: Creative Production and ASC Asset Refresh
-**Goal**: Turn approved claims into production-ready creative assets and confirm ASC reflects the intended upload state.
-**Depends on**: Phase 4
-**Requirements**: [CRTV-01, CRTV-02, CRTV-03, CRTV-04]
+### Phase 5: Developer Pain Points & Market Sizing
+**Goal**: Reader knows which developer problems are most painful and how large the addressable market is for each infrastructure category
+**Depends on**: Phase 3
+**Requirements**: MRKT-01, MRKT-02
 **Success Criteria** (what must be TRUE):
-  1. A screenshot or preview storyboard exists for each in-scope app, grounded in approved claims, runtime evidence, and target locale.
-  2. Final screenshot sets exist in the required device-size and locale mapping for every in-scope app.
-  3. Preview video assets exist for apps where previews are part of scope, and non-preview apps have an explicit scope decision recorded.
-  4. Refreshed screenshots and previews are uploaded to ASC, and live read-back matches the intended app, locale, and device set.
-**Plans**: 2 plans
+  1. Each infrastructure category has a market size estimate (TAM/SAM/SOM) or qualitative opportunity assessment with supporting rationale
+  2. Developer pain points are organized by category and ranked by severity, frequency, and willingness-to-pay indicators
+  3. Reader can cross-reference pain severity with market size to identify high-impact, high-opportunity intersections
+**Plans**: TBD
 
 Plans:
-- [ ] 05-01: Create per-app storyboards and generate localized screenshot and preview bundles with QA evidence.
-- [ ] 05-02: Upload refreshed assets to ASC and verify live read-back integrity.
+- [ ] 05-01: TBD
+- [ ] 05-02: TBD
 
-### Phase 6: Submission-Ready Gate and Reuse Hardening
-**Goal**: Decide readiness from evidence, package each app for human approval, and capture reusable operating assets for later waves.
-**Depends on**: Phase 5
-**Requirements**: [READY-01, READY-02, READY-03]
+### Phase 6: Regulatory & Structural Opportunities
+**Goal**: Reader understands which market opportunities are structurally favorable for small teams and which are unlocked by upcoming regulation
+**Depends on**: Phase 4, Phase 5
+**Requirements**: MRKT-03, MRKT-04
 **Success Criteria** (what must be TRUE):
-  1. Every app has a PASS/BLOCK submission-readiness decision computed from legal URLs, ASC checks, build state, metadata, creative assets, and rejection evidence.
-  2. Every app has a submission packet that includes blockers, verified URLs, asset status, build state, ASC read-back, and the next human approval step.
-  3. Reusable templates, checklists, and runbooks from the first remediation wave are published and referenced for later-app rollout.
-**Plans**: 2 plans
+  1. Entry barriers and moat potential are evaluated per category with explicit assessment of what small teams can and cannot defend
+  2. EU AI Act (August 2026) and other regulatory drivers are analyzed for the specific infrastructure demand they create
+  3. Reader can filter categories by "small-team feasibility" to focus on realistically winnable domains
+**Plans**: TBD
 
 Plans:
-- [ ] 06-01: Compute readiness decisions and assemble per-app submission packets.
-- [ ] 06-02: Publish reusable runbooks, checklists, and templates for later waves.
+- [ ] 06-01: TBD
+- [ ] 06-02: TBD
+
+### Phase 7: Revenue Model Analysis
+**Goal**: Reader understands which business models work for AI infrastructure and has proven GTM patterns to follow
+**Depends on**: Phase 5, Phase 6
+**Requirements**: REV-01, REV-02, REV-03
+**Success Criteria** (what must be TRUE):
+  1. Major revenue model patterns (API usage, SaaS subscription, OSS+Cloud, marketplace) are documented with pros/cons and real-world examples
+  2. Unit economics structures are analyzed with explicit assessment of small-team viability (can one person run this profitably?)
+  3. At least 3 OSS-to-paid success stories (e.g., Langfuse, PostHog) are dissected for their GTM sequence, timeline, and community-building approach
+  4. Reader can match revenue models to specific infrastructure categories based on the analysis
+**Plans**: TBD
+
+Plans:
+- [ ] 07-01: TBD
+- [ ] 07-02: TBD
+
+### Phase 8: Strategic Synthesis & Recommendations
+**Goal**: Reader has a clear, evidence-backed recommendation of which domains to pursue and how to enter the market
+**Depends on**: Phase 2, Phase 4, Phase 6, Phase 7
+**Requirements**: STRT-01, STRT-02, STRT-03, STRT-04
+**Success Criteria** (what must be TRUE):
+  1. Top 3 recommended domains are presented with scoring rationale that traces back to competitive, market, and revenue analyses
+  2. Each recommended domain has a Go-to-Market strategy specifying entry sequence, initial target users, and differentiation points
+  3. An execution plan skeleton addresses the Japan-based/small-team constraints with concrete first steps
+  4. Risk assessment covers timing, competitive, platform, and regulatory risks with specific mitigation strategies
+  5. Reader can make an informed go/no-go decision on which domain to pursue for MVP development
+**Plans**: TBD
+
+Plans:
+- [ ] 08-01: TBD
+- [ ] 08-02: TBD
+
+### Phase 9: Report Assembly & Deliverables
+**Goal**: All research is packaged into a polished, navigable report that supports rapid decision-making
+**Depends on**: Phase 8
+**Requirements**: DLVR-01, DLVR-02, DLVR-03, DLVR-04
+**Success Criteria** (what must be TRUE):
+  1. Executive summary exists that a decision-maker can read in 5 minutes and understand the key recommendation
+  2. Competitive map visualization shows categories, players, and positioning in a scannable format
+  3. Decision matrix scores candidate domains across evaluation axes with transparent methodology
+  4. Next actions section lists concrete MVP implementation steps with clear priorities
+  5. Report is internally consistent -- executive summary claims match detailed section evidence
+**Plans**: TBD
+
+Plans:
+- [ ] 09-01: TBD
+- [ ] 09-02: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
+
+Note: Phases 1 and 3 can execute in parallel (no dependency). Phases 4 and 5 can execute in parallel (both depend on Phase 3, not each other).
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Portfolio Intake and Wave Control | 0/2 | Not started | - |
-| 2. Legal URL Baseline and Cloudflare Publish | 0/2 | Not started | - |
-| 3. ASC Live Audit and Rejection RCA | 0/2 | Not started | - |
-| 4. Remediation and Metadata Lock | 0/2 | Not started | - |
-| 5. Creative Production and ASC Asset Refresh | 0/2 | Not started | - |
-| 6. Submission-Ready Gate and Reuse Hardening | 0/2 | Not started | - |
+| 1. Protocol & Framework Landscape | 0/2 | Not started | - |
+| 2. Infrastructure Standards & Trends | 0/2 | Not started | - |
+| 3. Competitive Player Mapping | 0/2 | Not started | - |
+| 4. Competitive Analysis & Gaps | 0/2 | Not started | - |
+| 5. Developer Pain Points & Market Sizing | 0/2 | Not started | - |
+| 6. Regulatory & Structural Opportunities | 0/2 | Not started | - |
+| 7. Revenue Model Analysis | 0/2 | Not started | - |
+| 8. Strategic Synthesis & Recommendations | 0/2 | Not started | - |
+| 9. Report Assembly & Deliverables | 0/2 | Not started | - |
