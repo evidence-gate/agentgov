@@ -16,6 +16,7 @@ export default defineWorkersConfig({
       'src/budget/alerts.test.ts',
       'src/hitl/hitl.test.ts',
       'src/hitl/routes.test.ts',
+      'src/hitl/hitl-integration.test.ts',
     ],
   },
 });
