@@ -16,7 +16,7 @@
 ### HITL / Approval
 
 - [x] **HITL-01**: Approval request routing to external channel (webhook)
-- [ ] **HITL-02**: Approve/deny response path that feeds decision back to agent context
+- [x] **HITL-02**: Approve/deny response path that feeds decision back to agent context
 - [x] **HITL-03**: Async approval — agent pauses and resumes without blocking (non-blocking wait)
 - [x] **HITL-04**: Timeout and escalation handling for unanswered approval requests
 - [x] **HITL-05**: Approval history / audit trail with actor, timestamp, and action taken
@@ -88,7 +88,7 @@
 | SDK-01 | Phase 1 | Complete |
 | SDK-03 | Phase 1 | Complete |
 | HITL-01 | Phase 2 | Complete |
-| HITL-02 | Phase 2 | Pending |
+| HITL-02 | Phase 2 | Complete |
 | HITL-03 | Phase 2 | Complete |
 | HITL-04 | Phase 2 | Complete |
 | HITL-05 | Phase 2 | Complete |

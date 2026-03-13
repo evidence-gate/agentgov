@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-stopped_at: Completed 02-01-PLAN.md — HITL queue infrastructure
-last_updated: "2026-03-13T22:03:05Z"
-last_activity: 2026-03-13 — Plan 02-01 (HITL queue infrastructure) completed
+status: Plan 02-02 executed — HITL approval channels wired
+stopped_at: Completed 02-02-PLAN.md — HITL approval channels wired
+last_updated: "2026-03-13T22:17:17.176Z"
+last_activity: 2026-03-14 — Plan 02-02 (HITL approval channels) completed
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 80
 ---
 
@@ -21,39 +21,40 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** AIエージェントのコストを「追跡」ではなく「強制」する — 予算超過時にリクエストを決定論的にブロックし、コスト暴走を構造的に防止する
-**Current focus:** Phase 2 — HITL + Approval Channels
+**Current focus:** Phase 3 — ready to begin
 
 ## Current Position
 
-Phase: 2 of 4 (HITL + Approval Channels) — IN PROGRESS
-Plan: 1 of 2 in current phase — Plan 02-01 complete, Plan 02-02 ready
-Status: Plan 02-01 executed — HITL queue infrastructure built
-Last activity: 2026-03-13 — Plan 02-01 (HITL queue infrastructure) completed
+Phase: 2 of 4 (HITL + Approval Channels) — COMPLETE
+Plan: 2 of 2 in current phase — All plans complete
+Status: Plan 02-02 executed — HITL approval channels wired
+Last activity: 2026-03-14 — Plan 02-02 (HITL approval channels) completed
 
-Progress: [████████░░] 80% (Phase 1 done + Plan 02-01 done)
+Progress: [██████████] 100% (Phase 1 done + Phase 2 done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 6 min
-- Total execution time: 18 min
+- Total plans completed: 5
+- Average duration: 7 min
+- Total execution time: 33 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-budget-engine-proxy-foundation | 3 | 18m | 6m |
-| 02-hitl-approval-channels | 1 | 6m | 6m |
+| 02-hitl-approval-channels | 2 | 15m | 7.5m |
 
 **Recent Trend:**
-- Last 5 plans: 5m, 7m, 6m, 6m
+- Last 5 plans: 5m, 7m, 6m, 6m, 9m
 - Trend: stable
 
 *Updated after each plan completion*
 | Phase 01-budget-engine-proxy-foundation P02 | 7 | 2 tasks | 13 files |
 | Phase 01-budget-engine-proxy-foundation P03 | 6 | 2 tasks | 17 files |
 | Phase 02-hitl-approval-channels P01 | 6 | 2 tasks | 14 files |
+| Phase 02-hitl-approval-channels P02 | 9 | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Recent decisions affecting current work:
 - [Phase 02-01]: DB client created inside each step.do callback — Workflows serialize state between steps, connections don't survive
 - [Phase 02-01]: Unknown actions return required:false (open by default) — prevents over-blocking unclassified tool calls
 - [Phase 02-01]: Default HITL TTL 72h (259200s) — well under 30-day Workflows state retention limit on Paid plan
+- [Phase 02-02]: HITL_WORKFLOW.get() returns Promise<WorkflowInstance> — must be awaited (not synchronous)
+- [Phase 02-02]: hitlRoutes mounted on app via app.route('/') — HITL paths accessible at /v1/hitl/* and /v1/slack/*
+- [Phase 02-02]: extractToolCalls uses 'tool_call:<name>' prefix format matching classifier RISK_TABLE keys exactly
 
 ### Pending Todos
 
@@ -93,6 +97,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13
-Stopped at: Completed 02-01-PLAN.md — HITL queue infrastructure
+Last session: 2026-03-13T22:17:17.173Z
+Stopped at: Completed 02-02-PLAN.md — HITL approval channels wired
 Resume file: None

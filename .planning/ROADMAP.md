@@ -13,7 +13,7 @@ agentgov is built in four phases that follow the architecture's dependency chain
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Budget Engine + Proxy Foundation** - OpenAI-compatible proxy with Hold/Settle cost enforcement and append-only audit log (completed 2026-03-13)
-- [ ] **Phase 2: HITL + Approval Channels** - Risk-graded human approval with async pause/resume and webhook/Slack routing
+- [x] **Phase 2: HITL + Approval Channels** - Risk-graded human approval with async pause/resume and webhook/Slack routing (completed 2026-03-13)
 - [ ] **Phase 3: Error Handling + Production Hardening** - Error classification, finite retry, stuck/loop detection, timeout watchdog
 - [ ] **Phase 4: Dashboard + Python SDK + Self-Host** - Read-only cost dashboard, Python SDK, and Docker Compose self-host packaging
 
@@ -47,7 +47,7 @@ Plans:
   3. An approval request that receives no response within its TTL automatically transitions to DENIED, and the agent receives a denial with a reason — no orphaned approvals exist after a proxy restart
   4. Every approval decision is recorded in the audit log with actor identity, timestamp, action classification, and outcome
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 02-01-PLAN.md — HITL queue schema (Turso), action classifier (static risk tier table), Cloudflare Workflows waitForEvent, notification channels (webhook + Slack), HitlPending SDK error
@@ -93,6 +93,6 @@ Phases 1 → 2 → 3 are a strict dependency chain. Phase 4 can begin in paralle
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Budget Engine + Proxy Foundation | 3/3 | Complete    | 2026-03-13 |
-| 2. HITL + Approval Channels | 1/2 | In Progress|  |
+| 2. HITL + Approval Channels | 2/2 | Complete   | 2026-03-13 |
 | 3. Error Handling + Production Hardening | 0/2 | Not started | - |
 | 4. Dashboard + Python SDK + Self-Host | 0/3 | Not started | - |
