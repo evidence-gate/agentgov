@@ -46,11 +46,11 @@ Plans:
   1. Report section catalogs active standardization efforts (AAIF, OAuth 2.1 for MCP, OpenTelemetry GenAI conventions) with their timelines and expected impact
   2. Report section presents multi-agent system trends with analyst predictions (Forrester/Gartner) and implications for infrastructure needs
   3. Reader can assess which standards are mature enough to build on now vs. which require a wait-and-see approach
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [x] 02-01-PLAN.md -- Research and write standardization efforts section (AAIF, OAuth 2.1, OTel GenAI, EU AI Act)
+- [x] 02-02-PLAN.md -- Research and write multi-agent system trends section (Gartner/Deloitte/Salesforce predictions, 6 key trends)
 
 ### Phase 3: Competitive Player Mapping
 **Goal**: Reader has a comprehensive map of who is building what across every infrastructure category
@@ -63,8 +63,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
+- [ ] 03-01-PLAN.md -- Research and write competitive player mapping for categories 1-7 (LLM gateways, observability, auth/identity, tool management, cost control, error handling, sandboxes)
+- [ ] 03-02-PLAN.md -- Research and write competitive player mapping for categories 8-14 (memory, guardrails, secrets, HITL, evaluation, payments, deployment) plus cross-category summary
 
 ### Phase 4: Competitive Analysis & Gaps
 **Goal**: Reader understands the strategic dynamics -- who will absorb what, and where open source creates defensible positions
@@ -165,7 +165,7 @@ Note: Phases 1 and 3 can execute in parallel (no dependency). Phases 4 and 5 can
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Protocol & Framework Landscape | 2/2 | Complete | 2026-03-13 |
-| 2. Infrastructure Standards & Trends | 0/2 | Not started | - |
+| 2. Infrastructure Standards & Trends | 2/2 | Complete | 2026-03-13 |
 | 3. Competitive Player Mapping | 0/2 | Not started | - |
 | 4. Competitive Analysis & Gaps | 0/2 | Not started | - |
 | 5. Developer Pain Points & Market Sizing | 0/2 | Not started | - |
