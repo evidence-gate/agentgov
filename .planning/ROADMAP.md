@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Protocol & Framework Landscape** - Map the current state of AI agent protocols (MCP, A2A, AG-UI) and major frameworks
 - [ ] **Phase 2: Infrastructure Standards & Trends** - Analyze standardization efforts and multi-agent system trends shaping the infrastructure layer
-- [ ] **Phase 3: Competitive Player Mapping** - Identify and catalog existing players across all 14 infrastructure categories
+- [x] **Phase 3: Competitive Player Mapping** - Identify and catalog existing players across all 14 infrastructure categories
 - [ ] **Phase 4: Competitive Analysis & Gaps** - Analyze competitive dynamics, Big Tech absorption risk, and OSS vs SaaS positioning
 - [ ] **Phase 5: Developer Pain Points & Market Sizing** - Quantify market opportunity and rank developer pain points by severity
 - [ ] **Phase 6: Regulatory & Structural Opportunities** - Analyze regulation-driven demand (EU AI Act) and entry barriers for small teams
@@ -63,8 +63,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 03-01-PLAN.md -- Research and write competitive player mapping for categories 1-7 (LLM gateways, observability, auth/identity, tool management, cost control, error handling, sandboxes)
-- [ ] 03-02-PLAN.md -- Research and write competitive player mapping for categories 8-14 (memory, guardrails, secrets, HITL, evaluation, payments, deployment) plus cross-category summary
+- [x] 03-01-PLAN.md -- Research and write competitive player mapping for categories 1-7 (LLM gateways, observability, auth/identity, tool management, cost control, error handling, sandboxes)
+- [x] 03-02-PLAN.md -- Research and write competitive player mapping for categories 8-14 (memory, guardrails, secrets, HITL, evaluation, payments, deployment) plus cross-category summary
 
 ### Phase 4: Competitive Analysis & Gaps
 **Goal**: Reader understands the strategic dynamics -- who will absorb what, and where open source creates defensible positions
@@ -166,7 +166,7 @@ Note: Phases 1 and 3 can execute in parallel (no dependency). Phases 4 and 5 can
 |-------|----------------|--------|-----------|
 | 1. Protocol & Framework Landscape | 2/2 | Complete | 2026-03-13 |
 | 2. Infrastructure Standards & Trends | 2/2 | Complete | 2026-03-13 |
-| 3. Competitive Player Mapping | 0/2 | Not started | - |
+| 3. Competitive Player Mapping | 2/2 | Complete | 2026-03-13 |
 | 4. Competitive Analysis & Gaps | 0/2 | Not started | - |
 | 5. Developer Pain Points & Market Sizing | 0/2 | Not started | - |
 | 6. Regulatory & Structural Opportunities | 0/2 | Not started | - |
