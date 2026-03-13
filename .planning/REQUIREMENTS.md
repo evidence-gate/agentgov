@@ -11,7 +11,7 @@
 - [x] **COST-02**: Multi-level spend aggregation (model, provider, team, agent)
 - [x] **COST-03**: Budget definition at multiple scopes (global, per-provider, per-model)
 - [x] **COST-04**: Hard enforcement — block requests when budget is exceeded
-- [ ] **COST-05**: Budget alert notifications (webhook) at configurable thresholds (e.g., 80%, 100%)
+- [x] **COST-05**: Budget alert notifications (webhook) at configurable thresholds (e.g., 80%, 100%)
 
 ### HITL / Approval
 
@@ -30,7 +30,7 @@
 
 ### SDK & Integration
 
-- [ ] **SDK-01**: TypeScript SDK with `agentgov.wrap(client)` 1-line integration
+- [x] **SDK-01**: TypeScript SDK with `agentgov.wrap(client)` 1-line integration
 - [ ] **SDK-02**: Python SDK with equivalent `agentgov.wrap(client)` API
 - [x] **SDK-03**: OpenAI-compatible API surface (proxy accepts standard chat/completions format)
 - [ ] **SDK-04**: Docker Compose self-host deployment (5-minute setup)
@@ -84,8 +84,8 @@
 | COST-02 | Phase 1 | Complete |
 | COST-03 | Phase 1 | Complete |
 | COST-04 | Phase 1 | Complete |
-| COST-05 | Phase 1 | Pending |
-| SDK-01 | Phase 1 | Pending |
+| COST-05 | Phase 1 | Complete |
+| SDK-01 | Phase 1 | Complete |
 | SDK-03 | Phase 1 | Complete |
 | HITL-01 | Phase 2 | Pending |
 | HITL-02 | Phase 2 | Pending |
