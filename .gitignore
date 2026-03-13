@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.wrangler/
+
+# Local environment secrets — NEVER COMMIT THESE
+.dev.vars
+*.dev.vars
+.env
+.env.local
+.env*.local
+
+# Logs
+*.log
+debug/
+report/
+
+# macOS
+.DS_Store

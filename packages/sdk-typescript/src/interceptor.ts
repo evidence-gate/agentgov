@@ -1,0 +1,45 @@
+import { BudgetExceeded, type BudgetExceededBody } from './errors';
+
+export interface AgentgovOptions {
+  proxyUrl: string;   // e.g., "http://localhost:8787" or "https://proxy.example.com"
+  agentId: string;    // Injected as X-Agent-Id header on every request
+}
+
+export function buildProxyBaseUrl(proxyUrl: string): string {
+  // Strip trailing slash
+  return proxyUrl.replace(/\/$/, '');
+}
+
+export function createAgentgovFetch(options: AgentgovOptions): typeof fetch {
+  const base = buildProxyBaseUrl(options.proxyUrl);
+  return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    // Rewrite URL: replace any https://api.openai.com or https://api.anthropic.com prefix
+    // with the proxy base URL. If the URL is already relative or pointing elsewhere,
+    // strip to path only and prepend proxy base.
+    const originalUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
+    const url = new URL(originalUrl);
+    const proxiedUrl = `${base}${url.pathname}${url.search}`;
+
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : {}));
+    headers.set('X-Agent-Id', options.agentId);
+
+    const response = await fetch(proxiedUrl, { ...init, headers });
+
+    // Detect BudgetExceeded
+    if (response.status === 429) {
+      const clone = response.clone();
+      try {
+        const body = await clone.json() as { error?: { code?: string } };
+        if (body?.error?.code === 'BUDGET_EXCEEDED') {
+          const fullBody = body as BudgetExceededBody;
+          throw new BudgetExceeded(fullBody.error.message, fullBody);
+        }
+      } catch (e) {
+        if (e instanceof Error && e.name === 'BudgetExceeded') throw e;
+        // Not a BudgetExceeded — return original 429 response
+      }
+    }
+
+    return response;
+  };
+}

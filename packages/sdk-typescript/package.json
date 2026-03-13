@@ -1,0 +1,29 @@
+{
+  "name": "@agentgov/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for agentgov — 1-line governance for AI agents",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "openai": ">=4.0.0"
+  },
+  "devDependencies": {
+    "openai": "^4.0.0",
+    "tsup": "latest",
+    "typescript": "^5",
+    "vitest": "^2"
+  }
+}
