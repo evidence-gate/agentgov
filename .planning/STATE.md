@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: executing
+stopped_at: Completed 01-02-cost-engine-hold-settle-PLAN.md — budget gate + Hold/Settle + audit log done
+last_updated: "2026-03-13T09:06:06.621Z"
+last_activity: 2026-03-13 — Plan 01-01 (proxy scaffold) completed
+progress:
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 3
+  completed_plans: 2
+  percent: 67
+---
+
 # Project State
 
 ## Project Reference
@@ -14,7 +30,7 @@ Plan: 1 of 3 in current phase
 Status: In progress
 Last activity: 2026-03-13 — Plan 01-01 (proxy scaffold) completed
 
-Progress: [█░░░░░░░░░] 8%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -34,6 +50,7 @@ Progress: [█░░░░░░░░░] 8%
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 01-budget-engine-proxy-foundation P02 | 7 | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -48,6 +65,10 @@ Recent decisions affecting current work:
 - [01-01]: Use @libsql/client/web (not bare @libsql/client) — mandatory sub-path for Cloudflare Workers
 - [01-01]: DB-level triggers on audit_log enforce immutability — cannot be bypassed by application code
 - [01-01]: Two vitest configs needed: Workers pool (vitest.config.ts) + Node.js (vitest.config.node.ts)
+- [Phase 01-02]: estimateCost throws (not returns 0) for unknown models — fail closed prevents budget bypass via unknown model names
+- [Phase 01-02]: appendAuditEvent never throws — failed audit write must not abort a budget enforcement decision
+- [Phase 01-02]: createHold NOT in DB transaction (Turso HTTP no interactive transactions) — documented race condition, Phase 2 Durable Objects mitigation per-agent
+- [Phase 01-02]: Default $10.00 USD budget limit in gate.ts — TODO replace with config lookup in a later plan
 
 ### Pending Todos
 
@@ -61,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13
-Stopped at: Completed 01-01-proxy-scaffold-PLAN.md — proxy scaffold + Drizzle schema done
+Last session: 2026-03-13T09:06:06.618Z
+Stopped at: Completed 01-02-cost-engine-hold-settle-PLAN.md — budget gate + Hold/Settle + audit log done
 Resume file: None
