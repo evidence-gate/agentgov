@@ -12,7 +12,7 @@ This roadmap delivers a comprehensive market research report on AI agent infrast
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Protocol & Framework Landscape** - Map the current state of AI agent protocols (MCP, A2A, AG-UI) and major frameworks
+- [x] **Phase 1: Protocol & Framework Landscape** - Map the current state of AI agent protocols (MCP, A2A, AG-UI) and major frameworks
 - [ ] **Phase 2: Infrastructure Standards & Trends** - Analyze standardization efforts and multi-agent system trends shaping the infrastructure layer
 - [ ] **Phase 3: Competitive Player Mapping** - Identify and catalog existing players across all 14 infrastructure categories
 - [ ] **Phase 4: Competitive Analysis & Gaps** - Analyze competitive dynamics, Big Tech absorption risk, and OSS vs SaaS positioning
@@ -35,8 +35,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Research and write protocol landscape section (MCP, A2A, AG-UI)
-- [ ] 01-02-PLAN.md -- Research and write framework comparison section (LangGraph, CrewAI, OpenAI Agents SDK, AutoGen, Google ADK)
+- [x] 01-01-PLAN.md -- Research and write protocol landscape section (MCP, A2A, AG-UI)
+- [x] 01-02-PLAN.md -- Research and write framework comparison section (LangGraph, CrewAI, OpenAI Agents SDK, AutoGen, Google ADK)
 
 ### Phase 2: Infrastructure Standards & Trends
 **Goal**: Reader understands the standardization trajectory and multi-agent trends that will shape infrastructure demand over the next 12-24 months
@@ -164,7 +164,7 @@ Note: Phases 1 and 3 can execute in parallel (no dependency). Phases 4 and 5 can
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol & Framework Landscape | 0/2 | Planning complete | - |
+| 1. Protocol & Framework Landscape | 2/2 | Complete | 2026-03-13 |
 | 2. Infrastructure Standards & Trends | 0/2 | Not started | - |
 | 3. Competitive Player Mapping | 0/2 | Not started | - |
 | 4. Competitive Analysis & Gaps | 0/2 | Not started | - |
