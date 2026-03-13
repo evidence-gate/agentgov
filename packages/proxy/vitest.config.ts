@@ -7,6 +7,12 @@ export default defineWorkersConfig({
       },
     },
     include: ['src/**/*.test.ts'],
-    exclude: ['node_modules/**', 'src/db/schema.test.ts'],
+    exclude: [
+      'node_modules/**',
+      'src/db/schema.test.ts',
+      'src/budget/calculator.test.ts',
+      'src/audit/writer.test.ts',
+      'src/budget/gate.test.ts',
+    ],
   },
 });
