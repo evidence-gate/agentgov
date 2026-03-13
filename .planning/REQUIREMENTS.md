@@ -7,7 +7,7 @@
 
 ### Technology Trends
 
-- [ ] **TECH-01**: 2026年3月時点のAIエージェント主要プロトコル（MCP, A2A, AG-UI）の成熟度・採用状況・ロードマップを整理する
+- [x] **TECH-01**: 2026年3月時点のAIエージェント主要プロトコル（MCP, A2A, AG-UI）の成熟度・採用状況・ロードマップを整理する
 - [ ] **TECH-02**: 主要エージェントフレームワーク（LangGraph, CrewAI, OpenAI Agents SDK, AutoGen, Google ADK等）の比較と市場シェア動向を整理する
 - [ ] **TECH-03**: エージェント向けインフラの技術標準化動向（AAIF, OAuth 2.1 for MCP, OpenTelemetry GenAI等）を整理する
 - [ ] **TECH-04**: マルチエージェントシステムの2026年トレンド（Forrester/Gartner予測含む）を分析する
@@ -68,7 +68,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TECH-01 | Phase 1 | Pending |
+| TECH-01 | Phase 1 | Complete |
 | TECH-02 | Phase 1 | Pending |
 | TECH-03 | Phase 2 | Pending |
 | TECH-04 | Phase 2 | Pending |
