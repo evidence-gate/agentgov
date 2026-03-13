@@ -30,12 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Every budget enforcement decision (allow, block, hold, settle) appears in an append-only audit log with actor, timestamp, cost delta, and running balance
   5. An unknown model name fails closed (request blocked with a warning) rather than passing through with zero cost
 
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 01-01: Proxy scaffold, Hono routing, Turso schema (budget ledger + audit log), Drizzle migrations
-- [ ] 01-02: Cost calculator (pricing table, COST-01/02/03), Hold/Settle Durable Object (COST-04)
-- [ ] 01-03: TypeScript SDK (`agentgov.wrap`, base URL redirect, BudgetExceeded exception), budget alert webhook (COST-05)
+- [ ] 01-01-proxy-scaffold-PLAN.md — Monorepo scaffold, Hono proxy skeleton, Drizzle schema (budget_ledger + holds + audit_log), append-only DB trigger, Vitest config
+- [ ] 01-02-cost-engine-hold-settle-PLAN.md — Cost calculator (pricing.json, 11 models), Hold/Settle budget gate, audit writer (SHA-256 hash chain), wired into /v1/chat/completions
+- [ ] 01-03-sdk-alert-webhook-PLAN.md — TypeScript SDK (wrap + BudgetExceeded + base URL interceptor), LLM streaming passthrough with post-response settle, budget alert webhook
 
 ### Phase 2: HITL + Approval Channels
 **Goal**: Agents pause for human approval on risky actions, with decisions routed asynchronously and surviving proxy restarts
