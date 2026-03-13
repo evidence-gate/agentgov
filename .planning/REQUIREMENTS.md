@@ -28,9 +28,9 @@
 
 ### Revenue Models
 
-- [ ] **REV-01**: AIインフラサービスの主要な収益モデルパターン（API課金, 使用量ベース, SaaS, OSS+Cloud等）を整理する
-- [ ] **REV-02**: 各収益モデルのユニットエコノミクス構造と小規模チームへの適合性を分析する
-- [ ] **REV-03**: 参考となるOSS→有料化の成功事例（Langfuse, PostHog等）のGTMパターンを整理する
+- [x] **REV-01**: AIインフラサービスの主要な収益モデルパターン（API課金, 使用量ベース, SaaS, OSS+Cloud等）を整理する
+- [x] **REV-02**: 各収益モデルのユニットエコノミクス構造と小規模チームへの適合性を分析する
+- [x] **REV-03**: 参考となるOSS→有料化の成功事例（Langfuse, PostHog等）のGTMパターンを整理する
 
 ### Strategic Recommendation
 
@@ -80,9 +80,9 @@
 | MRKT-02 | Phase 5 | Complete |
 | MRKT-03 | Phase 6 | Complete |
 | MRKT-04 | Phase 6 | Complete |
-| REV-01 | Phase 7 | Pending |
-| REV-02 | Phase 7 | Pending |
-| REV-03 | Phase 7 | Pending |
+| REV-01 | Phase 7 | Complete |
+| REV-02 | Phase 7 | Complete |
+| REV-03 | Phase 7 | Complete |
 | STRT-01 | Phase 8 | Pending |
 | STRT-02 | Phase 8 | Pending |
 | STRT-03 | Phase 8 | Pending |

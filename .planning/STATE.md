@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Completed 06-02-PLAN.md (Phase 6 complete)
-last_updated: "2026-03-13T03:35:51.588Z"
-last_activity: 2026-03-13 -- Completed 06-02-PLAN.md (regulatory and structural opportunities complete)
+status: in_progress
+stopped_at: Completed 07-02-PLAN.md (Phase 7 complete)
+last_updated: "2026-03-13T03:55:00.000Z"
+last_activity: 2026-03-13 -- Completed 07-02-PLAN.md (revenue model analysis complete)
 progress:
   total_phases: 9
-  completed_phases: 6
-  total_plans: 12
-  completed_plans: 12
+  completed_phases: 7
+  total_plans: 14
+  completed_plans: 14
   percent: 100
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** AIエージェントのインフラ市場において、個人/小規模チームが勝てる空白領域を見極め、Go-to-Market戦略の根拠となるリサーチを届けること。
-**Current focus:** Phase 6: Regulatory & Structural Opportunities (COMPLETE)
+**Current focus:** Phase 7: Revenue Model Analysis (COMPLETE)
 
 ## Current Position
 
-Phase: 6 of 9 (Regulatory & Structural Opportunities)
-Plan: 2 of 2 in current phase (Phase 6 COMPLETE)
-Status: Phase complete -- ready for Phase 7
-Last activity: 2026-03-13 -- Completed 06-02-PLAN.md (regulatory and structural opportunities complete)
+Phase: 7 of 9 (Revenue Model Analysis)
+Plan: 2 of 2 in current phase (Phase 7 COMPLETE)
+Status: Phase complete -- ready for Phase 8
+Last activity: 2026-03-13 -- Completed 07-02-PLAN.md (revenue model analysis complete)
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
+- Total plans completed: 14
 - Average duration: 9min
-- Total execution time: 1.75 hours
+- Total execution time: 2.15 hours
 
 **By Phase:**
 
@@ -49,10 +49,11 @@ Progress: [██████████] 100%
 | 04-competitive-analysis-and-gaps | 2/2 | 9min | 5min |
 | 05-developer-pain-points-and-market-sizing | 2/2 | 30min | 15min |
 | 06-regulatory-and-structural-opportunities | 2/2 | 24min | 12min |
+| 07-revenue-model-analysis | 2/2 | 24min | 12min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02 (12min), 05-01 (15min), 05-02 (15min), 06-01 (12min), 06-02 (12min)
-- Trend: Stable (~12-15min per plan)
+- Last 5 plans: 05-02 (15min), 06-01 (12min), 06-02 (12min), 07-01 (12min), 07-02 (12min)
+- Trend: Stable (~12min per plan)
 
 *Updated after each plan completion*
 
@@ -115,6 +116,17 @@ Recent decisions affecting current work:
 - [06-02]: HITL demand is universal across jurisdictions (EU mandate, US sector regulation, Japan guidelines)
 - [06-02]: Optimal MVP launch: Q2-Q3 2026 (before August 2 deadline)
 - [06-02]: Gartner validates: AI governance platform market $492M in 2026 → $1B+ by 2030
+- [07-01]: Hybrid model (OSS core + cloud free + usage Pro + enterprise subscription) is optimal for Agent Governance
+- [07-01]: Agent Governance has SaaS-like gross margins (70-85%), not AI-first margins (50-60%) -- proxy/workflow does not consume LLM inference
+- [07-01]: Ramen profitability for Japan-based solo founder at MRR $3,000-5,000 (30-50 paying customers at ARPU $100)
+- [07-01]: Cost Control pricing: % of managed LLM spend (0.5-2%), naturally scaling with customer growth (NRR 120-150%)
+- [07-01]: HITL pricing includes EU AI Act compliance premium (2-3x standard) -- information goods with near-zero marginal cost
+- [07-01]: Seat-based pricing declining (21%→15%); hybrid pricing surging (27%→41%) in 2026
+- [07-02]: Langfuse is most directly applicable model (OSS SDK → self-host → cloud → enterprise → exit in ~3 years)
+- [07-02]: SDK-First launch is universal pattern across 5 case studies -- ship SDK before dashboard, time-to-value < 5 min
+- [07-02]: 90%+ free users acceptable (PostHog: 190K customers, 90% free, $1.4B evaluation)
+- [07-02]: 3 retreat signals: <200 stars at M6, <5 paid at M9, <$2K MRR at M12
+- [07-02]: Protocol-native building (MCP/A2A) parallels Langfuse's OTel-native as acquisition differentiator
 
 ### Pending Todos
 
@@ -128,6 +140,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T13:00:00.000Z
-Stopped at: Completed 06-02-PLAN.md (Phase 6 complete)
+Last session: 2026-03-13T03:55:00.000Z
+Stopped at: Completed 07-02-PLAN.md (Phase 7 complete)
 Resume file: None
