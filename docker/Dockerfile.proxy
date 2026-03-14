@@ -1,0 +1,16 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/proxy/package.json ./packages/proxy/
+RUN pnpm install --frozen-lockfile
+COPY packages/proxy ./packages/proxy
+# Copy migrations for runtime migrate()
+COPY packages/proxy/migrations ./packages/proxy/migrations
+
+FROM node:20-alpine AS runtime
+WORKDIR /app
+COPY --from=builder /app /app
+WORKDIR /app/packages/proxy
+EXPOSE 8787
+CMD ["npx", "tsx", "src/index.node.ts"]

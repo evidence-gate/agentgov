@@ -1,0 +1,22 @@
+services:
+  proxy:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.proxy
+    ports:
+      - "8787:8787"
+    volumes:
+      - agentgov-data:/data
+    environment:
+      DATABASE_URL: "file:/data/agentgov.db"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      AGENTGOV_ALERT_WEBHOOK_URL: "${AGENTGOV_ALERT_WEBHOOK_URL:-}"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8787/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  agentgov-data:
