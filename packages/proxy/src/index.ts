@@ -1,10 +1,13 @@
 import { Hono } from 'hono';
 import { createDbClient } from './db/client';
-import { budgetGate } from './budget/gate';
+import { budgetGate, budgetSettle } from './budget/gate';
 import { forwardToLlm } from './passthrough/forward';
 import { checkAndFireAlerts } from './budget/alerts';
 import { classifyAction } from './hitl/classifier';
 import { hitlRoutes } from './hitl/routes';
+import { createLoopDetector, fingerprintAction, recordAction } from './error/loop-detector';
+import { buildAgentErrorResponse } from './error/reporter';
+import { appendAuditEvent } from './audit/writer';
 import type { ChatCompletionRequest, BudgetExceededErrorBody } from './types';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -128,6 +131,49 @@ app.post('/v1/chat/completions', async (c) => {
         },
         202
       );
+    }
+  }
+
+  // Step 4.75: Stuck/loop detection
+  // Scan ALL messages in the request for repeated identical tool_calls.
+  // Per-request in-memory state — no DB required.
+  // Runs BEFORE forwardToLlm to halt stuck agents before consuming LLM budget.
+  const loopState = createLoopDetector();
+  for (const message of body.messages) {
+    if (!message.tool_calls) continue;
+    for (const tc of message.tool_calls) {
+      const fp = await fingerprintAction(tc.function.name, tc.function.arguments);
+      const stuckResult = recordAction(loopState, fp, tc.function.name, Date.now());
+      if (stuckResult.stuck) {
+        // Log stuck_detected audit event (never-throw)
+        appendAuditEvent(db, {
+          eventType: 'stuck_detected',
+          agentId,
+          model: body.model,
+          costDelta: 0,
+          runningBalance: 0,
+          meta: {
+            repeatedAction: stuckResult.actionName,
+            timestamps: stuckResult.timestamps,
+            fingerprint: stuckResult.repeatedFingerprint,
+            suggestedRemediation: stuckResult.suggestedRemediation,
+          },
+        });
+        // Settle hold at 0 cost — no LLM tokens consumed (halted before forward)
+        await budgetSettle(db, holdId, { promptTokens: 0, completionTokens: 0 }, body.model, agentId);
+        // Return structured 502 AGENT_ERROR
+        return buildAgentErrorResponse(
+          'stuck_detected',
+          agentId,
+          {
+            class: 'unknown',
+            retryable: false,
+            status: 0,
+            suggestedRemediation: stuckResult.suggestedRemediation,
+          },
+          0,
+        );
+      }
     }
   }
 

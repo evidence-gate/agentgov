@@ -276,3 +276,227 @@ describe('HITL pipeline integration (via index.ts app with mocked DB)', () => {
     expect(callOrder[1]).toBe('HITL_WORKFLOW.create');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Loop detection integration tests
+// ---------------------------------------------------------------------------
+
+describe('Loop detection integration (via index.ts with mocked DB)', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.mock('cloudflare:workers', () => ({
+      WorkflowEntrypoint: class WorkflowEntrypoint {},
+    }));
+  });
+
+  it('returns 502 AGENT_ERROR stuck_detected when same tool_call appears twice in messages', async () => {
+    vi.doMock('../budget/gate', () => ({
+      budgetGate: vi.fn().mockResolvedValue({ action: 'pass', holdId: 'hold-loop-test' }),
+      budgetSettle: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    vi.doMock('../db/client', () => ({
+      createDbClient: vi.fn().mockReturnValue({}),
+    }));
+
+    vi.doMock('../audit/writer', () => ({
+      appendAuditEvent: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    const { default: app } = await import('../index');
+
+    const mockEnv = {
+      TURSO_DATABASE_URL: 'http://mock-db',
+      TURSO_AUTH_TOKEN: 'mock-token',
+      HITL_WORKFLOW: { get: vi.fn(), create: vi.fn() },
+    };
+
+    // Two identical tool_calls in separate messages within a single request
+    const res = await app.request(
+      '/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Agent-Id': 'test-agent-stuck',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'assistant',
+              content: null,
+              tool_calls: [
+                {
+                  id: 'call_1',
+                  type: 'function',
+                  function: { name: 'read_file', arguments: '{"path":"/a"}' },
+                },
+              ],
+            },
+            {
+              role: 'tool',
+              content: 'file contents',
+            },
+            {
+              role: 'assistant',
+              content: null,
+              tool_calls: [
+                {
+                  id: 'call_2',
+                  type: 'function',
+                  function: { name: 'read_file', arguments: '{"path":"/a"}' },
+                },
+              ],
+            },
+          ],
+        }),
+      },
+      mockEnv,
+    );
+
+    expect(res.status).toBe(502);
+    const body = await res.json() as Record<string, unknown>;
+    const error = body['error'] as Record<string, unknown>;
+    expect(error['code']).toBe('AGENT_ERROR');
+    expect(error['type']).toBe('stuck_detected');
+    expect(typeof error['agentId']).toBe('string');
+    expect(error['agentId']).toBe('test-agent-stuck');
+  });
+
+  it('passes through when all tool_calls are unique (no false positives)', async () => {
+    vi.doMock('../budget/gate', () => ({
+      budgetGate: vi.fn().mockResolvedValue({ action: 'pass', holdId: 'hold-unique' }),
+      budgetSettle: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    vi.doMock('../db/client', () => ({
+      createDbClient: vi.fn().mockReturnValue({}),
+    }));
+
+    vi.doMock('../audit/writer', () => ({
+      appendAuditEvent: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    vi.doMock('../passthrough/forward', () => ({
+      forwardToLlm: vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ id: 'chatcmpl-unique', object: 'chat.completion', choices: [] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    }));
+
+    vi.doMock('../budget/alerts', () => ({
+      checkAndFireAlerts: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    const { default: app } = await import('../index');
+
+    const mockEnv = {
+      TURSO_DATABASE_URL: 'http://mock-db',
+      TURSO_AUTH_TOKEN: 'mock-token',
+      HITL_WORKFLOW: { get: vi.fn(), create: vi.fn() },
+    };
+
+    const res = await app.request(
+      '/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Agent-Id': 'test-agent-unique',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'assistant',
+              content: null,
+              tool_calls: [
+                {
+                  id: 'call_a',
+                  type: 'function',
+                  function: { name: 'read_file', arguments: '{"path":"/a"}' },
+                },
+              ],
+            },
+            {
+              role: 'tool',
+              content: 'result a',
+            },
+            {
+              role: 'assistant',
+              content: null,
+              tool_calls: [
+                {
+                  id: 'call_b',
+                  type: 'function',
+                  function: { name: 'read_file', arguments: '{"path":"/b"}' },
+                },
+              ],
+            },
+          ],
+        }),
+      },
+      mockEnv,
+    );
+
+    // Different paths — no stuck detection — proceeds to LLM
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body['id']).toBe('chatcmpl-unique');
+  });
+
+  it('passes through when no tool_calls present (loop detection not triggered)', async () => {
+    vi.doMock('../budget/gate', () => ({
+      budgetGate: vi.fn().mockResolvedValue({ action: 'pass', holdId: 'hold-notool-loop' }),
+      budgetSettle: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    vi.doMock('../db/client', () => ({
+      createDbClient: vi.fn().mockReturnValue({}),
+    }));
+
+    vi.doMock('../passthrough/forward', () => ({
+      forwardToLlm: vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ id: 'chatcmpl-notool-loop', object: 'chat.completion', choices: [] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    }));
+
+    vi.doMock('../budget/alerts', () => ({
+      checkAndFireAlerts: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    const { default: app } = await import('../index');
+
+    const mockEnv = {
+      TURSO_DATABASE_URL: 'http://mock-db',
+      TURSO_AUTH_TOKEN: 'mock-token',
+      HITL_WORKFLOW: { get: vi.fn(), create: vi.fn() },
+    };
+
+    const res = await app.request(
+      '/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Agent-Id': 'test-agent-notool-loop',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: 'Hello' }],
+        }),
+      },
+      mockEnv,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body['id']).toBe('chatcmpl-notool-loop');
+  });
+});
