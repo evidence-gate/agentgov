@@ -78,12 +78,12 @@ Plans:
   2. A developer running `docker compose up` has a fully working agentgov stack (proxy + database + dashboard) within 5 minutes, with no external service dependencies
   3. The dashboard shows current budget balance, session cost breakdown, enforcement events, and the approval queue — all updated from live audit log queries without requiring a page reload workflow
 
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 04-01: Python SDK (httpx transport override, agentgov.wrap, BudgetExceeded/HitlPending exceptions, PyPI packaging) (SDK-02)
-- [ ] 04-02: Docker Compose self-host stack (proxy via @hono/node-server, embedded libSQL, static dashboard bundle) (SDK-04)
-- [ ] 04-03: Dashboard SPA (React 19 + Vite 6, budget gauges, enforcement events, approval queue) (SDK-05)
+- [ ] 04-01-PLAN.md — Python SDK (httpx transport override, agentgov.wrap, BudgetExceeded/HitlPending/AgentError exceptions) (SDK-02)
+- [ ] 04-02-PLAN.md — Docker Compose self-host stack + dashboard API (Node.js entry point, embedded libSQL, dashboard read-only endpoints, Dockerfile) (SDK-04, SDK-05)
+- [ ] 04-03-PLAN.md — Dashboard SPA (React 19 + Vite 6, TanStack Query polling, costs/approvals/audit pages) (SDK-05)
 
 ## Progress
 
@@ -95,4 +95,4 @@ Phases 1 → 2 → 3 are a strict dependency chain. Phase 4 can begin in paralle
 | 1. Budget Engine + Proxy Foundation | 3/3 | Complete    | 2026-03-13 |
 | 2. HITL + Approval Channels | 2/2 | Complete   | 2026-03-13 |
 | 3. Error Handling + Production Hardening | 2/2 | Complete   | 2026-03-14 |
-| 4. Dashboard + Python SDK + Self-Host | 0/3 | Not started | - |
+| 4. Dashboard + Python SDK + Self-Host | 0/3 | In Progress | - |
