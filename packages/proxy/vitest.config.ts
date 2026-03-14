@@ -20,6 +20,7 @@ export default defineWorkersConfig({
       'src/error/classifier.test.ts',
       'src/error/reporter.test.ts',
       'src/error/retry.test.ts',
+      'src/error/loop-detector.test.ts',
     ],
   },
 });
