@@ -6,11 +6,14 @@
  * - Streams responses directly without buffering
  * - For streaming: uses stream_options.include_usage so the final SSE chunk contains token counts
  * - Calls budgetSettle after the stream/response completes with actual token usage
- * - Returns provider errors (4xx/5xx) as-is to the caller
+ * - Returns provider errors (4xx/5xx) wrapped in structured AgentError responses via retry engine
  * - Returns 503 if the required LLM provider API key is not configured
+ * - Automatically retries transient errors (429, 5xx) with exponential backoff and jitter
+ * - Immediately halts on permanent errors (401, 4xx) without wasting budget
  */
 
 import { budgetSettle } from '../budget/gate';
+import { forwardWithRetry, parseRetryConfig } from '../error/retry';
 import type { DbClient } from '../db/client';
 import type { HoldId, ChatCompletionRequest, AgentId } from '../types';
 
@@ -21,6 +24,8 @@ import type { HoldId, ChatCompletionRequest, AgentId } from '../types';
 export interface ForwardEnv {
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
+  AGENTGOV_MAX_RETRIES?: string;
+  AGENTGOV_RETRY_BASE_MS?: string;
 }
 
 type LlmProvider = 'openai' | 'anthropic' | 'google';
@@ -98,12 +103,17 @@ export async function forwardToLlm(
     );
   }
 
+  const retryEnv = {
+    AGENTGOV_MAX_RETRIES: env.AGENTGOV_MAX_RETRIES,
+    AGENTGOV_RETRY_BASE_MS: env.AGENTGOV_RETRY_BASE_MS,
+  };
+
   if (provider === 'openai') {
-    return forwardToOpenAI(requestBody, holdId, agentId, db, env.OPENAI_API_KEY!);
+    return forwardToOpenAI(requestBody, holdId, agentId, db, env.OPENAI_API_KEY!, retryEnv);
   }
 
   // Anthropic
-  return forwardToAnthropic(requestBody, holdId, agentId, db, env.ANTHROPIC_API_KEY!);
+  return forwardToAnthropic(requestBody, holdId, agentId, db, env.ANTHROPIC_API_KEY!, retryEnv);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +126,7 @@ async function forwardToOpenAI(
   agentId: AgentId,
   db: DbClient,
   apiKey: string,
+  retryEnv: Record<string, string | undefined> = {},
 ): Promise<Response> {
   const isStreaming = requestBody.stream === true;
 
@@ -124,21 +135,33 @@ async function forwardToOpenAI(
     ? { ...requestBody, stream_options: { include_usage: true } }
     : requestBody;
 
-  const llmResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(forwardBody),
-  });
+  const retryConfig = parseRetryConfig(retryEnv);
 
-  // Return provider errors as-is
+  // Use forwardWithRetry to wrap the fetch call with automatic retry on transient errors.
+  // On permanent errors or retry exhaustion, forwardWithRetry returns a 502 AgentError response
+  // and settles the hold at 0 cost — we return that directly.
+  // On success, response.ok is true and we continue with settle/streaming logic.
+  const llmResponse = await forwardWithRetry(
+    () =>
+      fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(forwardBody),
+      }),
+    retryConfig,
+    db,
+    holdId,
+    agentId,
+    requestBody.model,
+  );
+
+  // If retry engine returned an error response (502), pass it through directly.
+  // The hold has already been settled at 0 cost by forwardWithRetry.
   if (!llmResponse.ok) {
-    return new Response(llmResponse.body, {
-      status: llmResponse.status,
-      headers: { 'Content-Type': llmResponse.headers.get('Content-Type') ?? 'application/json' },
-    });
+    return llmResponse;
   }
 
   if (!isStreaming) {
@@ -285,25 +308,33 @@ async function forwardToAnthropic(
   agentId: AgentId,
   db: DbClient,
   apiKey: string,
+  retryEnv: Record<string, string | undefined> = {},
 ): Promise<Response> {
   const anthropicBody = convertToAnthropicFormat(requestBody);
+  const retryConfig = parseRetryConfig(retryEnv);
 
-  const llmResponse = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify(anthropicBody),
-  });
+  const llmResponse = await forwardWithRetry(
+    () =>
+      fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify(anthropicBody),
+      }),
+    retryConfig,
+    db,
+    holdId,
+    agentId,
+    requestBody.model,
+  );
 
-  // Return provider errors as-is
+  // If retry engine returned an error response (502), pass it through directly.
+  // The hold has already been settled at 0 cost by forwardWithRetry.
   if (!llmResponse.ok) {
-    return new Response(llmResponse.body, {
-      status: llmResponse.status,
-      headers: { 'Content-Type': llmResponse.headers.get('Content-Type') ?? 'application/json' },
-    });
+    return llmResponse;
   }
 
   if (!requestBody.stream) {
