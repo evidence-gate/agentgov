@@ -13,16 +13,19 @@
     "test:watch": "vitest",
     "types": "wrangler types",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "start:node": "tsx src/index.node.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "latest",
     "drizzle-kit": "^0.31.9",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^2",
     "wrangler": "^4"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.11",
     "@libsql/client": "^0.14.0",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.12.7"
