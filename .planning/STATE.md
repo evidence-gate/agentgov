@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Plan 02-02 executed — HITL approval channels wired
-stopped_at: Completed 02-02-PLAN.md — HITL approval channels wired
-last_updated: "2026-03-13T22:22:11.568Z"
-last_activity: 2026-03-14 — Plan 02-02 (HITL approval channels) completed
+status: Plan 03-01 executed — error classifier, retry engine, AgentError SDK
+stopped_at: Completed 03-01-PLAN.md — error classifier, retry engine, forwardToLlm integration
+last_updated: "2026-03-14T23:13:42Z"
+last_activity: 2026-03-14 — Plan 03-01 (error classifier + retry engine) completed
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_plans: 8
+  completed_plans: 6
+  percent: 75
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** AIエージェントのコストを「追跡」ではなく「強制」する — 予算超過時にリクエストを決定論的にブロックし、コスト暴走を構造的に防止する
-**Current focus:** Phase 3 — ready to begin
+**Current focus:** Phase 3 Plan 02 — loop detector
 
 ## Current Position
 
-Phase: 2 of 4 (HITL + Approval Channels) — COMPLETE
-Plan: 2 of 2 in current phase — All plans complete
-Status: Plan 02-02 executed — HITL approval channels wired
-Last activity: 2026-03-14 — Plan 02-02 (HITL approval channels) completed
+Phase: 3 of 4 (Error Handling + Production Hardening) — IN PROGRESS
+Plan: 1 of 2 in current phase — Plan 01 complete
+Status: Plan 03-01 executed — error classifier, retry engine, AgentError SDK
+Last activity: 2026-03-14 — Plan 03-01 (error classifier + retry engine) completed
 
-Progress: [██████████] 100% (Phase 1 done + Phase 2 done)
+Progress: [████████░░] 75% (Phase 1 done + Phase 2 done + Phase 3 Plan 01 done)
 
 ## Performance Metrics
 
@@ -45,16 +45,18 @@ Progress: [██████████] 100% (Phase 1 done + Phase 2 done)
 |-------|-------|-------|----------|
 | 01-budget-engine-proxy-foundation | 3 | 18m | 6m |
 | 02-hitl-approval-channels | 2 | 15m | 7.5m |
+| 03-error-handling-production-hardening | 1/2 | 15m | 15m |
 
 **Recent Trend:**
-- Last 5 plans: 5m, 7m, 6m, 6m, 9m
-- Trend: stable
+- Last 5 plans: 7m, 6m, 6m, 9m, 15m
+- Trend: slightly longer (larger plan scope)
 
 *Updated after each plan completion*
 | Phase 01-budget-engine-proxy-foundation P02 | 7 | 2 tasks | 13 files |
 | Phase 01-budget-engine-proxy-foundation P03 | 6 | 2 tasks | 17 files |
 | Phase 02-hitl-approval-channels P01 | 6 | 2 tasks | 14 files |
 | Phase 02-hitl-approval-channels P02 | 9 | 2 tasks | 11 files |
+| Phase 03-error-handling-production-hardening P01 | 15 | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -84,6 +86,11 @@ Recent decisions affecting current work:
 - [Phase 02-02]: HITL_WORKFLOW.get() returns Promise<WorkflowInstance> — must be awaited (not synchronous)
 - [Phase 02-02]: hitlRoutes mounted on app via app.route('/') — HITL paths accessible at /v1/hitl/* and /v1/slack/*
 - [Phase 02-02]: extractToolCalls uses 'tool_call:<name>' prefix format matching classifier RISK_TABLE keys exactly
+- [Phase 03-01]: Proxy always returns 502 for structured governance errors (not original 4xx/5xx) — originalStatus preserved in context field
+- [Phase 03-01]: forwardWithRetry is on the hot path (awaited), NOT in waitUntil() — caller needs the response
+- [Phase 03-01]: budgetSettle called inside forwardWithRetry on every halt path — keeps "error path = settle at 0" invariant colocated with error decision
+- [Phase 03-01]: sleepFn injectable as optional parameter — enables deterministic tests without real delays
+- [Phase 03-01]: AuditEventType extended with stuck_detected now (reserved for Plan 02 loop detector) to avoid second types.ts edit
 
 ### Pending Todos
 
@@ -97,6 +104,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T22:17:17.173Z
-Stopped at: Completed 02-02-PLAN.md — HITL approval channels wired
+Last session: 2026-03-14T23:13:42Z
+Stopped at: Completed 03-01-PLAN.md — error classifier, retry engine, forwardToLlm integration
 Resume file: None
