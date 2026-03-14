@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Plan 03-01 executed — error classifier, retry engine, AgentError SDK
-stopped_at: Completed 04-01-PLAN.md — Python SDK (httpx transport, wrap, exceptions)
-last_updated: "2026-03-14T23:46:55.764Z"
+stopped_at: Completed 04-02-PLAN.md — Docker Compose self-host stack + dashboard API
+last_updated: "2026-03-14T23:47:44.880Z"
 last_activity: 2026-03-14 — Plan 03-01 (error classifier + retry engine) completed
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 75
 ---
 
@@ -59,6 +59,7 @@ Progress: [████████░░] 75% (Phase 1 done + Phase 2 done + Ph
 | Phase 03-error-handling-production-hardening P01 | 15 | 2 tasks | 14 files |
 | Phase 03-error-handling-production-hardening P02 | 12 | 2 tasks | 6 files |
 | Phase 04-dashboard-python-sdk-self-host P01 | 2 | 1 tasks | 7 files |
+| Phase 04-dashboard-python-sdk-self-host P02 | 3 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,10 @@ Recent decisions affecting current work:
 - [Phase 04-01]: Python SDK uses httpx.BaseTransport sync-only (AsyncBaseTransport deferred per MVP scope)
 - [Phase 04-01]: wrap() mutates client._client — both openai.OpenAI and anthropic.Anthropic store httpx.Client as _client; alternative is http_client= constructor param
 - [Phase 04-01]: Python snake_case mapping: budgetId->budget_id, approvalId->approval_id, agentId->agent_id, expiresAt->expires_at, suggestedRemediation->suggested_remediation
+- [Phase 04-02]: bare @libsql/client (not /web) required for Node.js file: URL support — /web is HTTP-only for Turso cloud
+- [Phase 04-02]: HITL_WORKFLOW stub throws HitlNotAvailableError sentinel, caught at fetch wrapper boundary — returns 501 without modifying index.ts
+- [Phase 04-02]: tsx runs TypeScript directly in Docker — no tsc compile step needed, simpler Dockerfile
+- [Phase 04-02]: createDashboardRoutes(db) factory pattern — DB injected at startup, avoids Cloudflare binding coupling
 
 ### Pending Todos
 
@@ -112,6 +117,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T23:46:55.761Z
-Stopped at: Completed 04-01-PLAN.md — Python SDK (httpx transport, wrap, exceptions)
+Last session: 2026-03-14T23:47:44.877Z
+Stopped at: Completed 04-02-PLAN.md — Docker Compose self-host stack + dashboard API
 Resume file: None

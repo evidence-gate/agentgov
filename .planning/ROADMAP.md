@@ -78,7 +78,7 @@ Plans:
   2. A developer running `docker compose up` has a fully working agentgov stack (proxy + database + dashboard) within 5 minutes, with no external service dependencies
   3. The dashboard shows current budget balance, session cost breakdown, enforcement events, and the approval queue — all updated from live audit log queries without requiring a page reload workflow
 
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 04-01-PLAN.md — Python SDK (httpx transport override, agentgov.wrap, BudgetExceeded/HitlPending/AgentError exceptions) (SDK-02)
@@ -95,4 +95,4 @@ Phases 1 → 2 → 3 are a strict dependency chain. Phase 4 can begin in paralle
 | 1. Budget Engine + Proxy Foundation | 3/3 | Complete    | 2026-03-13 |
 | 2. HITL + Approval Channels | 2/2 | Complete   | 2026-03-13 |
 | 3. Error Handling + Production Hardening | 2/2 | Complete   | 2026-03-14 |
-| 4. Dashboard + Python SDK + Self-Host | 1/3 | In Progress|  |
+| 4. Dashboard + Python SDK + Self-Host | 2/3 | In Progress|  |
