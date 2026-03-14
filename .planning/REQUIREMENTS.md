@@ -25,7 +25,7 @@
 
 - [x] **ERR-01**: Error classification — transient (retriable: rate limit, 5xx) vs permanent (non-retriable: auth, 4xx)
 - [x] **ERR-02**: Finite retry with exponential backoff and jitter, configurable max retries
-- [ ] **ERR-03**: Stuck/loop detection — detect agents repeating the same action without progress
+- [x] **ERR-03**: Stuck/loop detection — detect agents repeating the same action without progress
 - [x] **ERR-04**: Structured error reporting with type, timestamp, agent context, and suggested remediation
 
 ### SDK & Integration
@@ -94,7 +94,7 @@
 | HITL-05 | Phase 2 | Complete |
 | ERR-01 | Phase 3 | Complete |
 | ERR-02 | Phase 3 | Complete |
-| ERR-03 | Phase 3 | Pending |
+| ERR-03 | Phase 3 | Complete |
 | ERR-04 | Phase 3 | Complete |
 | SDK-02 | Phase 4 | Pending |
 | SDK-04 | Phase 4 | Pending |
