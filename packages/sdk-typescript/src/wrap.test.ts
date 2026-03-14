@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BudgetExceeded, HitlPending, type HitlPendingBody } from './errors';
+import { AgentError, type AgentErrorBody, BudgetExceeded, HitlPending, type HitlPendingBody } from './errors';
 import { createAgentgovFetch, buildProxyBaseUrl } from './interceptor';
 import { wrap } from './wrap';
 
@@ -358,6 +358,153 @@ describe('createAgentgovFetch HitlPending detection', () => {
     const agentFetch = createAgentgovFetch({ proxyUrl: 'http://proxy:8787', agentId: 'agent-1' });
     const response = await agentFetch('https://api.openai.com/v1/chat/completions', { method: 'POST' });
     expect(response.status).toBe(202);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AgentError tests
+// ---------------------------------------------------------------------------
+describe('AgentError', () => {
+  const makeBody = (type: 'retry_exhausted' | 'permanent_error' = 'retry_exhausted'): AgentErrorBody => ({
+    error: {
+      code: 'AGENT_ERROR',
+      type,
+      message: 'LLM request failed after all retry attempts.',
+      agentId: 'agent-test-123',
+      timestamp: 1700000000000,
+      suggestedRemediation: 'Rate limit — retry with backoff.',
+      context: { originalStatus: 429, errorClass: 'transient' },
+    },
+  });
+
+  it('is an instance of Error', () => {
+    const err = new AgentError('test', makeBody());
+    expect(err).toBeInstanceOf(Error);
+  });
+
+  it('has name AgentError', () => {
+    const err = new AgentError('test', makeBody());
+    expect(err.name).toBe('AgentError');
+  });
+
+  it('has code AGENT_ERROR', () => {
+    const err = new AgentError('test', makeBody());
+    expect(err.code).toBe('AGENT_ERROR');
+  });
+
+  it('populates type from body', () => {
+    const err = new AgentError('test', makeBody('permanent_error'));
+    expect(err.type).toBe('permanent_error');
+  });
+
+  it('populates agentId from body', () => {
+    const err = new AgentError('test', makeBody());
+    expect(err.agentId).toBe('agent-test-123');
+  });
+
+  it('populates timestamp from body', () => {
+    const err = new AgentError('test', makeBody());
+    expect(err.timestamp).toBe(1700000000000);
+  });
+
+  it('populates suggestedRemediation from body', () => {
+    const err = new AgentError('test', makeBody());
+    expect(err.suggestedRemediation).toBe('Rate limit — retry with backoff.');
+  });
+
+  it('populates context from body', () => {
+    const err = new AgentError('test', makeBody());
+    expect(err.context?.originalStatus).toBe(429);
+    expect(err.context?.errorClass).toBe('transient');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AgentError detection in createAgentgovFetch
+// ---------------------------------------------------------------------------
+describe('createAgentgovFetch AgentError detection', () => {
+  let originalFetch: typeof fetch;
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('throws AgentError on 502 with AGENT_ERROR code', async () => {
+    const agentErrorBody: AgentErrorBody = {
+      error: {
+        code: 'AGENT_ERROR',
+        type: 'retry_exhausted',
+        message: 'LLM request failed after all retry attempts.',
+        agentId: 'agent-1',
+        timestamp: 1700000000000,
+        suggestedRemediation: 'Check rate limits.',
+      },
+    };
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(agentErrorBody), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    global.fetch = mockFetch;
+
+    const agentFetch = createAgentgovFetch({ proxyUrl: 'http://proxy:8787', agentId: 'agent-1' });
+    await expect(
+      agentFetch('https://api.openai.com/v1/chat/completions', { method: 'POST' }),
+    ).rejects.toThrow(AgentError);
+  });
+
+  it('returns original 502 response when code is not AGENT_ERROR', async () => {
+    const otherBody = { error: { code: 'GATEWAY_ERROR', message: 'upstream failed' } };
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(otherBody), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    global.fetch = mockFetch;
+
+    const agentFetch = createAgentgovFetch({ proxyUrl: 'http://proxy:8787', agentId: 'agent-1' });
+    const response = await agentFetch('https://api.openai.com/v1/chat/completions', { method: 'POST' });
+    expect(response.status).toBe(502);
+  });
+
+  it('thrown AgentError has correct type, agentId, timestamp, suggestedRemediation', async () => {
+    const agentErrorBody: AgentErrorBody = {
+      error: {
+        code: 'AGENT_ERROR',
+        type: 'permanent_error',
+        message: 'Permanent failure',
+        agentId: 'agent-exact',
+        timestamp: 9999999999999,
+        suggestedRemediation: 'Check your API key.',
+      },
+    };
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(agentErrorBody), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    global.fetch = mockFetch;
+
+    const agentFetch = createAgentgovFetch({ proxyUrl: 'http://proxy:8787', agentId: 'agent-exact' });
+    try {
+      await agentFetch('https://api.openai.com/v1/chat/completions', { method: 'POST' });
+      expect.fail('Should have thrown AgentError');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AgentError);
+      const agentErr = err as AgentError;
+      expect(agentErr.type).toBe('permanent_error');
+      expect(agentErr.agentId).toBe('agent-exact');
+      expect(agentErr.timestamp).toBe(9999999999999);
+      expect(agentErr.suggestedRemediation).toBe('Check your API key.');
+    }
   });
 });
 

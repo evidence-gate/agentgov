@@ -12,6 +12,9 @@ export default defineConfig({
       'src/hitl/hitl.test.ts',
       'src/hitl/routes.test.ts',
       'src/hitl/hitl-integration.test.ts',
+      'src/error/classifier.test.ts',
+      'src/error/reporter.test.ts',
+      'src/error/retry.test.ts',
     ],
   },
 });

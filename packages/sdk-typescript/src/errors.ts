@@ -1,3 +1,32 @@
+export interface AgentErrorBody {
+  error: {
+    code: 'AGENT_ERROR';
+    type: 'retry_exhausted' | 'permanent_error' | 'stuck_detected';
+    message: string;
+    agentId: string;
+    timestamp: number;
+    context?: Record<string, unknown>;
+    suggestedRemediation: string;
+  };
+}
+export class AgentError extends Error {
+  readonly code = 'AGENT_ERROR' as const;
+  readonly type: 'retry_exhausted' | 'permanent_error' | 'stuck_detected';
+  readonly agentId: string;
+  readonly timestamp: number;
+  readonly context?: Record<string, unknown>;
+  readonly suggestedRemediation: string;
+  constructor(message: string, body: AgentErrorBody) {
+    super(message);
+    this.name = 'AgentError';
+    this.type = body.error.type;
+    this.agentId = body.error.agentId;
+    this.timestamp = body.error.timestamp;
+    this.context = body.error.context;
+    this.suggestedRemediation = body.error.suggestedRemediation;
+  }
+}
+
 export interface BudgetExceededBody {
   error: { code: 'BUDGET_EXCEEDED'; message: string; budgetId: string; spent: number; limit: number };
 }

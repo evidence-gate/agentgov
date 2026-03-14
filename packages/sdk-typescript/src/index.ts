@@ -1,6 +1,6 @@
 export { wrap } from './wrap';
-export { BudgetExceeded, HitlPending } from './errors';
-export type { BudgetExceededBody, HitlPendingBody } from './errors';
+export { AgentError, BudgetExceeded, HitlPending } from './errors';
+export type { AgentErrorBody, BudgetExceededBody, HitlPendingBody } from './errors';
 export { createAgentgovFetch, buildProxyBaseUrl } from './interceptor';
 export type { AgentgovOptions } from './interceptor';
 

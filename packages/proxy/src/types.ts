@@ -41,7 +41,12 @@ export type AuditEventType =
   | 'hitl_suspended'
   | 'hitl_approved'
   | 'hitl_denied'
-  | 'hitl_expired';
+  | 'hitl_expired'
+  | 'error_classified'
+  | 'retry_attempt'
+  | 'retry_exhausted'
+  | 'permanent_error'
+  | 'stuck_detected';
 
 export interface AuditEvent {
   eventType: AuditEventType;

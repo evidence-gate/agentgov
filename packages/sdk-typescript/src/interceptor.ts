@@ -1,4 +1,4 @@
-import { BudgetExceeded, type BudgetExceededBody, HitlPending, type HitlPendingBody } from './errors';
+import { AgentError, type AgentErrorBody, BudgetExceeded, type BudgetExceededBody, HitlPending, type HitlPendingBody } from './errors';
 
 export interface AgentgovOptions {
   proxyUrl: string;   // e.g., "http://localhost:8787" or "https://proxy.example.com"
@@ -52,6 +52,21 @@ export function createAgentgovFetch(options: AgentgovOptions): typeof fetch {
       } catch (e) {
         if (e instanceof Error && e.name === 'HitlPending') throw e;
         // Not a HitlPending — return original 202 response
+      }
+    }
+
+    // Detect AgentError (502 with AGENT_ERROR code)
+    if (response.status === 502) {
+      const clone = response.clone();
+      try {
+        const body = await clone.json() as { error?: { code?: string } };
+        if (body?.error?.code === 'AGENT_ERROR') {
+          const fullBody = body as AgentErrorBody;
+          throw new AgentError(fullBody.error.message, fullBody);
+        }
+      } catch (e) {
+        if (e instanceof Error && e.name === 'AgentError') throw e;
+        // Not an AgentError — return original 502 response
       }
     }
 
