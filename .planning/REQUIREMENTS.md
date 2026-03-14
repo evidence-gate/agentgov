@@ -31,7 +31,7 @@
 ### SDK & Integration
 
 - [x] **SDK-01**: TypeScript SDK with `agentgov.wrap(client)` 1-line integration
-- [ ] **SDK-02**: Python SDK with equivalent `agentgov.wrap(client)` API
+- [x] **SDK-02**: Python SDK with equivalent `agentgov.wrap(client)` API
 - [x] **SDK-03**: OpenAI-compatible API surface (proxy accepts standard chat/completions format)
 - [ ] **SDK-04**: Docker Compose self-host deployment (5-minute setup)
 - [ ] **SDK-05**: Basic dashboard — budget status, session cost, enforcement events, approval queue
@@ -96,7 +96,7 @@
 | ERR-02 | Phase 3 | Complete |
 | ERR-03 | Phase 3 | Complete |
 | ERR-04 | Phase 3 | Complete |
-| SDK-02 | Phase 4 | Pending |
+| SDK-02 | Phase 4 | Complete |
 | SDK-04 | Phase 4 | Pending |
 | SDK-05 | Phase 4 | Pending |
 

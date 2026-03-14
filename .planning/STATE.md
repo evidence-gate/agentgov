@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Plan 03-01 executed — error classifier, retry engine, AgentError SDK
-stopped_at: Completed 03-02-PLAN.md — loop detector, proxy pipeline integration
-last_updated: "2026-03-14T21:43:47.727Z"
+stopped_at: Completed 04-01-PLAN.md — Python SDK (httpx transport, wrap, exceptions)
+last_updated: "2026-03-14T23:46:55.764Z"
 last_activity: 2026-03-14 — Plan 03-01 (error classifier + retry engine) completed
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 10
+  completed_plans: 8
   percent: 75
 ---
 
@@ -58,6 +58,7 @@ Progress: [████████░░] 75% (Phase 1 done + Phase 2 done + Ph
 | Phase 02-hitl-approval-channels P02 | 9 | 2 tasks | 11 files |
 | Phase 03-error-handling-production-hardening P01 | 15 | 2 tasks | 14 files |
 | Phase 03-error-handling-production-hardening P02 | 12 | 2 tasks | 6 files |
+| Phase 04-dashboard-python-sdk-self-host P01 | 2 | 1 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,9 @@ Recent decisions affecting current work:
 - [Phase 03-02]: Loop detection is per-request (not per-session) — scans all messages in a single request for repeated identical tool_calls
 - [Phase 03-02]: appendAuditEvent called fire-and-forget in stuck halt path — never-throw contract means no await or try/catch needed
 - [Phase 03-02]: sortKeysReplacer normalizes object key order before SHA-256 — prevents false negatives from key-order divergence in fingerprinting
+- [Phase 04-01]: Python SDK uses httpx.BaseTransport sync-only (AsyncBaseTransport deferred per MVP scope)
+- [Phase 04-01]: wrap() mutates client._client — both openai.OpenAI and anthropic.Anthropic store httpx.Client as _client; alternative is http_client= constructor param
+- [Phase 04-01]: Python snake_case mapping: budgetId->budget_id, approvalId->approval_id, agentId->agent_id, expiresAt->expires_at, suggestedRemediation->suggested_remediation
 
 ### Pending Todos
 
@@ -108,6 +112,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T15:38:20.656Z
-Stopped at: Completed 03-02-PLAN.md — loop detector, proxy pipeline integration
+Last session: 2026-03-14T23:46:55.761Z
+Stopped at: Completed 04-01-PLAN.md — Python SDK (httpx transport, wrap, exceptions)
 Resume file: None
