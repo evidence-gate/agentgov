@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 06-python-async-sdk-budget-crud-02-PLAN.md
-last_updated: "2026-03-15T10:34:58.304Z"
-last_activity: 2026-03-15 — v1.1 roadmap created
+stopped_at: Completed 05-provider-completeness-01-PLAN.md
+last_updated: "2026-03-15T10:36:46Z"
+last_activity: 2026-03-15 — Gemini provider forwarding implemented (05-01)
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 14
-  completed_plans: 12
-  percent: 0
+  completed_plans: 14
+  percent: 93
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 
 ## Current Position
 
-Phase: Not started (roadmap defined, pending phase planning)
-Plan: —
-Status: Ready to plan Phase 5 (or Phase 5 + 6 in parallel)
-Last activity: 2026-03-15 — v1.1 roadmap created
+Phase: 05-provider-completeness
+Plan: 01 complete (2 total) — 05-01 Gemini forwarding done
+Status: Phase 5 in progress — 05-02 Anthropic streaming settle remaining
+Last activity: 2026-03-15 — Gemini provider forwarding (PROV-01, PROV-02) complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -71,6 +71,8 @@ Recent decisions affecting current work:
 - [v1.1 Roadmap]: AsyncAgentgovTransport subclasses httpx.AsyncBaseTransport — never use asyncio.run() inside handle_async_request
 - [v1.1 Roadmap]: Cloudflare Workers bindings are non-inheritable — [[workflows]] and all vars must be redeclared in [env.production]
 - [v1.1 Roadmap]: Every new env var in ForwardEnv must be wired in both index.ts and index.node.ts
+- [Phase 05-01]: @cloudflare/vitest-pool-workers pinned to ^0.12.21 — 0.13.0 dropped ./config export, breaking vitest v2 Workers pool tests
+- [Phase 05-01]: Gemini streaming uses processStreamAndSettle without modification — Gemini OpenAI-compat returns identical SSE format to OpenAI
 - [Phase 06-python-async-sdk-budget-crud]: AsyncAgentgovTransport subclasses httpx.AsyncBaseTransport — never use asyncio.run() inside handle_async_request
 - [Phase 06-01]: wrap_async() uses _client attribute (both AsyncOpenAI and AsyncAnthropic store httpx async client as _client)
 - [Phase 06-python-async-sdk-budget-crud]: routes.ts changed from DockerDbClient to DbClient — structurally identical, enables Workers deploy in Phase 7
@@ -89,6 +91,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-15T10:34:58.301Z
-Stopped at: Completed 06-python-async-sdk-budget-crud-02-PLAN.md
+Last session: 2026-03-15T10:36:46Z
+Stopped at: Completed 05-provider-completeness-01-PLAN.md
 Resume file: None

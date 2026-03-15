@@ -100,10 +100,10 @@ Plans:
   2. A `gemini-*` request made without `GEMINI_API_KEY` configured returns HTTP 503 with a clear error message identifying the missing key — consistent with the existing OpenAI and Anthropic unconfigured behavior
   3. An Anthropic streaming response has its `input_tokens` (from `message_start`) and `output_tokens` (from `message_delta`) both extracted and settled — the budget ledger reflects actual prompt + completion cost, not zero
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans complete
 
 Plans:
-- [ ] 05-01-PLAN.md — Gemini forwarding (forwardToGemini + processStreamAndSettle reuse), GEMINI_API_KEY wiring (ForwardEnv + wrangler.jsonc + index.ts + index.node.ts), 503 guard (PROV-01, PROV-02)
+- [x] 05-01-PLAN.md — Gemini forwarding (forwardToGemini + processStreamAndSettle reuse), GEMINI_API_KEY wiring (ForwardEnv + wrangler.jsonc + index.ts + index.node.ts), 503 guard (PROV-01, PROV-02)
 - [ ] 05-02-PLAN.md — Anthropic SSE parser (processAnthropicStreamAndSettle), message_start/message_delta token extraction, pipeAndSettle removal (PROV-03)
 
 ### Phase 6: Python Async SDK + Budget CRUD
@@ -144,6 +144,6 @@ v1.0 complete. v1.1: Phases 5 and 6 are independent and can be parallelized. Pha
 | 2. HITL + Approval Channels | 2/2 | Complete | 2026-03-13 |
 | 3. Error Handling + Production Hardening | 2/2 | Complete | 2026-03-14 |
 | 4. Dashboard + Python SDK + Self-Host | 3/3 | Complete | 2026-03-15 |
-| 5. Provider Completeness | 0/2 | Planned | - |
+| 5. Provider Completeness | 1/2 | In Progress | - |
 | 6. Python Async SDK + Budget CRUD | 2/2 | Complete   | 2026-03-15 |
 | 7. Cloudflare Workers Production Deploy | 0/? | Not started | - |
