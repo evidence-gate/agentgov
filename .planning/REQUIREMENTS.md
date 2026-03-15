@@ -3,7 +3,7 @@
 **Defined:** 2026-03-13
 **Core Value:** AIエージェントのコストを「追跡」ではなく「強制」する -- 予算超過時にリクエストを決定論的にブロックし、コスト暴走を構造的に防止すること。
 
-## v1 Requirements
+## v1.0 Requirements (Complete)
 
 ### Cost Control
 
@@ -33,78 +33,100 @@
 - [x] **SDK-01**: TypeScript SDK with `agentgov.wrap(client)` 1-line integration
 - [x] **SDK-02**: Python SDK with equivalent `agentgov.wrap(client)` API
 - [x] **SDK-03**: OpenAI-compatible API surface (proxy accepts standard chat/completions format)
-- [ ] **SDK-04**: Docker Compose self-host deployment (5-minute setup)
-- [ ] **SDK-05**: Basic dashboard — budget status, session cost, enforcement events, approval queue
+- [x] **SDK-04**: Docker Compose self-host deployment (5-minute setup)
+- [x] **SDK-05**: Basic dashboard — budget status, session cost, enforcement events, approval queue
 
-## v2 Requirements
+## v1.1 Requirements
+
+### Provider Completeness
+
+- [ ] **PROV-01**: `gemini-*` モデルのリクエストがGemini OpenAI互換エンドポイント経由でLLMに転送され、非ストリーミング/ストリーミング両方で正確なトークン精算が行われる
+- [ ] **PROV-02**: Gemini APIキー未設定時に503 + 明確なエラーメッセージが返る（既存OpenAI/Anthropicと同パターン）
+- [ ] **PROV-03**: Anthropicストリーミングレスポンスの`message_start`/`message_delta`からinput/output tokensを抽出し、0トークンではなく実コストで精算する
+
+### SDK Enhancement
+
+- [ ] **SDK-06**: Python `AsyncOpenAI`/`AsyncAnthropic`クライアントに対して`agentgov.wrap()`が動作し、async httpxトランスポート経由でプロキシにルーティングされる
+- [ ] **SDK-07**: Python async SDKで`BudgetExceeded`/`HitlPending`/`AgentError`例外がsync版と同一の契約で発生する
+
+### Infrastructure
+
+- [ ] **DEPLOY-01**: `wrangler deploy`でプロキシがCloudflare Workersにデプロイされ、Turso cloud + Workflows bindingで全機能が動作する
+- [ ] **DEPLOY-02**: Cloudflare Workers環境で`GEMINI_API_KEY`を含む全シークレットが`wrangler secret put`で設定される
+- [ ] **BUDGET-01**: ダッシュボードからper-agentの予算上限を設定・変更でき、変更が即座にbudget_ledgerに反映される
+- [ ] **BUDGET-02**: 予算変更がaudit_logに記録され、変更履歴が追跡可能である
+
+## Future Requirements
 
 ### Cost Control — Differentiators
 
-- **COST-06**: Hold/Settle pessimistic budget reservation (banto pattern) — crash-safe budget state
 - **COST-07**: Graceful degradation — auto-downgrade to cheaper model when budget threshold reached
 - **COST-08**: Per-session budget isolation — independent budget per agent execution session
 
 ### HITL — Differentiators
 
-- **HITL-06**: Risk-Graded static action classification (Reversible/Semi-Reversible/Irreversible/External)
 - **HITL-07**: EU AI Act Article 14 compliance mode — evidence export with oversight documentation
-- **HITL-08**: Cryptographic audit log integrity (SHA-256 hash chain for tamper detection)
-- **HITL-09**: Slack Block Kit native approval integration
 
 ### Error Handling — Differentiators
 
 - **ERR-05**: 3-tier timeout (soft warning → idle detection → hard stop)
-- **ERR-06**: Error-type to handler static mapping (declarative config, not runtime LLM judgment)
 - **ERR-07**: Partial result return on hard stop (preserve completed work)
 
-### Infrastructure — Differentiators
+### SDK — Differentiators
 
-- **INFRA-01**: Cloudflare Workers edge deployment (cloud version)
-- **INFRA-02**: Capability-based security model (agent as untrusted contractor)
-- **INFRA-03**: Multi-channel approval (Slack, email, SMS)
+- **SDK-08**: Anthropic prompt caching token awareness (cache_read_input_tokens discount)
+- **SDK-09**: Extended thinking token handling (different billing rate)
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| LLM routing / load balancing | Commoditized (LiteLLM, Portkey). No differentiation possible. Let users choose their router |
-| Guardrails / content filtering | Separate domain with different buyers. Highly competitive (Guardrails.ai, Lakera) |
-| Agent framework features | Becomes competing framework, destroys "wrap any client" positioning |
-| ML-based anomaly detection | High false positive rate. Deterministic thresholds are more trustworthy and auditable |
-| Real-time WebSocket for all events | Significant infrastructure complexity. Polling + webhook sufficient for MVP |
-| Fine-grained RBAC | Deep surface area. Small teams don't need it. Add only after PMF |
-| Mobile approval app | Slack's mobile app handles this. No native app needed |
-| Billing / invoicing | Financial-grade compliance required. Track costs for users, don't process payments |
+| LLM routing / load balancing | Commoditized (LiteLLM, Portkey). No differentiation possible |
+| Guardrails / content filtering | Separate domain, highly competitive |
+| Agent framework features | Destroys "wrap any client" positioning |
+| ML-based anomaly detection | Deterministic thresholds more trustworthy and auditable |
+| Vertex AI / service account auth | GCP IAM complexity; use generativelanguage.googleapis.com with API key |
+| Native Gemini API (generateContent) | OpenAI-compat layer sufficient; avoids format translation complexity |
+| Anthropic cache/thinking token settle | HIGH complexity; defer to v1.2 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| COST-01 | Phase 1 | Complete |
-| COST-02 | Phase 1 | Complete |
-| COST-03 | Phase 1 | Complete |
-| COST-04 | Phase 1 | Complete |
-| COST-05 | Phase 1 | Complete |
-| SDK-01 | Phase 1 | Complete |
-| SDK-03 | Phase 1 | Complete |
-| HITL-01 | Phase 2 | Complete |
-| HITL-02 | Phase 2 | Complete |
-| HITL-03 | Phase 2 | Complete |
-| HITL-04 | Phase 2 | Complete |
-| HITL-05 | Phase 2 | Complete |
-| ERR-01 | Phase 3 | Complete |
-| ERR-02 | Phase 3 | Complete |
-| ERR-03 | Phase 3 | Complete |
-| ERR-04 | Phase 3 | Complete |
-| SDK-02 | Phase 4 | Complete |
-| SDK-04 | Phase 4 | Pending |
-| SDK-05 | Phase 4 | Pending |
+| COST-01 | Phase 1 (v1.0) | Complete |
+| COST-02 | Phase 1 (v1.0) | Complete |
+| COST-03 | Phase 1 (v1.0) | Complete |
+| COST-04 | Phase 1 (v1.0) | Complete |
+| COST-05 | Phase 1 (v1.0) | Complete |
+| SDK-01 | Phase 1 (v1.0) | Complete |
+| SDK-03 | Phase 1 (v1.0) | Complete |
+| HITL-01 | Phase 2 (v1.0) | Complete |
+| HITL-02 | Phase 2 (v1.0) | Complete |
+| HITL-03 | Phase 2 (v1.0) | Complete |
+| HITL-04 | Phase 2 (v1.0) | Complete |
+| HITL-05 | Phase 2 (v1.0) | Complete |
+| ERR-01 | Phase 3 (v1.0) | Complete |
+| ERR-02 | Phase 3 (v1.0) | Complete |
+| ERR-03 | Phase 3 (v1.0) | Complete |
+| ERR-04 | Phase 3 (v1.0) | Complete |
+| SDK-02 | Phase 4 (v1.0) | Complete |
+| SDK-04 | Phase 4 (v1.0) | Complete |
+| SDK-05 | Phase 4 (v1.0) | Complete |
+| PROV-01 | — | Pending |
+| PROV-02 | — | Pending |
+| PROV-03 | — | Pending |
+| SDK-06 | — | Pending |
+| SDK-07 | — | Pending |
+| DEPLOY-01 | — | Pending |
+| DEPLOY-02 | — | Pending |
+| BUDGET-01 | — | Pending |
+| BUDGET-02 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 19 total
-- Mapped to phases: 19
-- Unmapped: 0
+- v1.0 requirements: 19 total — 19 complete
+- v1.1 requirements: 9 total — 0 complete
+- Unmapped: 9 (pending roadmap)
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after roadmap creation — traceability complete*
+*Last updated: 2026-03-15 after v1.1 milestone requirements*
