@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Production Readiness
-status: Defining requirements
+status: Roadmap defined — ready to plan Phase 5
 stopped_at: —
 last_updated: "2026-03-15T09:00:00.000Z"
-last_activity: 2026-03-15 — Milestone v1.1 started
+last_activity: 2026-03-15 — v1.1 roadmap created (Phases 5–7)
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** AIエージェントのコストを「追跡」ではなく「強制」する — 予算超過時にリクエストを決定論的にブロックし、コスト暴走を構造的に防止する
-**Current focus:** Milestone v1.1 — Production Readiness
+**Current focus:** Milestone v1.1 — Production Readiness (Phases 5–7)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (roadmap defined, pending phase planning)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-03-15 — Milestone v1.1 started
+Status: Ready to plan Phase 5 (or Phase 5 + 6 in parallel)
+Last activity: 2026-03-15 — v1.1 roadmap created
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -54,24 +54,34 @@ Recent decisions affecting current work:
 - [Phase 01-02]: estimateCost throws (not returns 0) for unknown models — fail closed
 - [Phase 01-02]: appendAuditEvent never throws — audit failures don't abort enforcement
 - [Phase 01-03]: vitest pinned to v2 — v4 requires vite@6 but workspace has vite@5
-- [Phase 01-03]: Anthropic streaming settle uses 0 tokens — SSE usage parsing deferred (v1.1 target)
+- [Phase 01-03]: Anthropic streaming settle uses 0 tokens — SSE usage parsing deferred (v1.1 target → PROV-03)
 - [Phase 02-01]: waitForEvent type='hitl-decision' (hyphens not periods)
 - [Phase 02-01]: DB client created inside each step.do callback — Workflows state serialization
 - [Phase 03-01]: Proxy always returns 502 for structured governance errors
 - [Phase 03-01]: sleepFn injectable — deterministic tests without real delays
 - [Phase 03-02]: Loop detection per-request, SHA-256 fingerprinting with sortKeysReplacer
-- [Phase 04-01]: Python SDK uses httpx.BaseTransport sync-only — async deferred (v1.1 target)
+- [Phase 04-01]: Python SDK uses httpx.BaseTransport sync-only — async deferred (v1.1 target → SDK-06/07)
 - [Phase 04-02]: bare @libsql/client (not /web) for Node.js file: URL
 - [Phase 04-02]: tsx runs TypeScript directly in Docker — no tsc compile step
 - [Phase 04-03]: No React Router in dashboard — useState tabs (MVP)
+- [v1.1 Roadmap]: Phases 5 and 6 are independent — can be parallelized; Phase 7 must be last (integration validation)
+- [v1.1 Roadmap]: Gemini uses OpenAI-compat endpoint — no format translation, reuses processStreamAndSettle
+- [v1.1 Roadmap]: Anthropic SSE parser must track message_start (input_tokens) AND message_delta (output_tokens) — do not sum message_delta values (they are cumulative)
+- [v1.1 Roadmap]: Budget CRUD PATCH endpoint must only update limit_usd — never spent_usd (owned exclusively by Hold/Settle)
+- [v1.1 Roadmap]: AsyncAgentgovTransport subclasses httpx.AsyncBaseTransport — never use asyncio.run() inside handle_async_request
+- [v1.1 Roadmap]: Cloudflare Workers bindings are non-inheritable — [[workflows]] and all vars must be redeclared in [env.production]
+- [v1.1 Roadmap]: Every new env var in ForwardEnv must be wired in both index.ts and index.node.ts
 
 ### Pending Todos
 
-None yet.
+- Verify Gemini OpenAI-compat endpoint supports `stream_options: { include_usage: true }` (integration test in Phase 5)
+- Confirm `AsyncOpenAI` internal httpx client attribute name (`_async_http_client` vs `_client`) before Phase 6 implementation
+- Decide dashboard deploy target (Cloudflare Pages vs static assets bundled in Worker) before Phase 7
 
 ### Blockers/Concerns
 
 - [v1.0]: Pricing sync source not yet decided (pricepertoken.com API vs tokencost library vs community JSON)
+- [v1.1]: Gemini `stream_options` streaming usage support is MEDIUM confidence — needs integration test before shipping Phase 5
 
 ## Session Continuity
 

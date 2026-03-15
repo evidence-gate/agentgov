@@ -112,21 +112,21 @@
 | SDK-02 | Phase 4 (v1.0) | Complete |
 | SDK-04 | Phase 4 (v1.0) | Complete |
 | SDK-05 | Phase 4 (v1.0) | Complete |
-| PROV-01 | — | Pending |
-| PROV-02 | — | Pending |
-| PROV-03 | — | Pending |
-| SDK-06 | — | Pending |
-| SDK-07 | — | Pending |
-| DEPLOY-01 | — | Pending |
-| DEPLOY-02 | — | Pending |
-| BUDGET-01 | — | Pending |
-| BUDGET-02 | — | Pending |
+| PROV-01 | Phase 5 (v1.1) | Pending |
+| PROV-02 | Phase 5 (v1.1) | Pending |
+| PROV-03 | Phase 5 (v1.1) | Pending |
+| SDK-06 | Phase 6 (v1.1) | Pending |
+| SDK-07 | Phase 6 (v1.1) | Pending |
+| BUDGET-01 | Phase 6 (v1.1) | Pending |
+| BUDGET-02 | Phase 6 (v1.1) | Pending |
+| DEPLOY-01 | Phase 7 (v1.1) | Pending |
+| DEPLOY-02 | Phase 7 (v1.1) | Pending |
 
 **Coverage:**
 - v1.0 requirements: 19 total — 19 complete
-- v1.1 requirements: 9 total — 0 complete
-- Unmapped: 9 (pending roadmap)
+- v1.1 requirements: 9 total — 0 complete, 9 mapped
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-15 after v1.1 milestone requirements*
+*Last updated: 2026-03-15 after v1.1 roadmap (Phases 5–7)*
