@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -68,5 +68,23 @@ export function usePendingApprovals() {
     queryKey: ['approvals'],
     queryFn: () => fetchJson(`${API_BASE}/api/v1/dashboard/approvals`),
     refetchInterval: 5000,
+  });
+}
+
+export function useUpdateBudgetLimit() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, limitUsd }: { agentId: string; limitUsd: number }) =>
+      fetch(`${API_BASE}/api/v1/dashboard/budgets/${encodeURIComponent(agentId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limitUsd }),
+      }).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+    },
   });
 }

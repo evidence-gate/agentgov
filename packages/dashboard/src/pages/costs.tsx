@@ -1,4 +1,5 @@
-import { useBudgets, BudgetRow } from '../hooks/useDashboard';
+import { useState } from 'react';
+import { useBudgets, useUpdateBudgetLimit, BudgetRow } from '../hooks/useDashboard';
 
 function formatUsd(value: number): string {
   return `$${value.toFixed(4)}`;
@@ -10,6 +11,9 @@ function formatTs(ts: number): string {
 
 export default function Costs() {
   const { data, isLoading, error } = useBudgets();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const mutation = useUpdateBudgetLimit();
 
   if (isLoading) {
     return <p style={{ color: '#888' }}>Loading budget data...</p>;
@@ -39,21 +43,71 @@ export default function Costs() {
             <th style={thStyle}>Reserved (USD)</th>
             <th style={thStyle}>Available (USD)</th>
             <th style={thStyle}>Last Updated</th>
+            <th style={thStyle}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {data.map((row: BudgetRow, i: number) => {
             const available = row.limitUsd - row.spentUsd - row.reservedUsd;
+            const isEditing = editingId === row.agentId;
             return (
               <tr key={row.agentId} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                 <td style={tdStyle}>{row.agentId}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>{formatUsd(row.limitUsd)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editValue}
+                      onChange={e => setEditValue(e.target.value)}
+                      style={{ width: 100, padding: '4px 8px' }}
+                    />
+                  ) : (
+                    formatUsd(row.limitUsd)
+                  )}
+                </td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{formatUsd(row.spentUsd)}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{formatUsd(row.reservedUsd)}</td>
                 <td style={{ ...tdStyle, textAlign: 'right', color: available < 0 ? '#c00' : '#060' }}>
                   {formatUsd(available)}
                 </td>
                 <td style={tdStyle}>{formatTs(row.updatedAt)}</td>
+                <td style={tdStyle}>
+                  {isEditing ? (
+                    <>
+                      <button
+                        disabled={mutation.isPending}
+                        onClick={() => {
+                          const val = parseFloat(editValue);
+                          if (!isNaN(val) && val >= 0) {
+                            mutation.mutate({ agentId: row.agentId, limitUsd: val });
+                            setEditingId(null);
+                          }
+                        }}
+                        style={{ padding: '4px 8px', cursor: 'pointer', background: '#0a0', color: '#fff', border: 'none', borderRadius: 3, marginRight: 4 }}
+                      >
+                        {mutation.isPending ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        style={{ padding: '4px 8px', cursor: 'pointer', background: '#f5f5f5', border: '1px solid #ccc', borderRadius: 3 }}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingId(row.agentId);
+                        setEditValue(String(row.limitUsd));
+                      }}
+                      style={{ padding: '4px 8px', cursor: 'pointer', background: '#e8f0fe', border: '1px solid #ccc', borderRadius: 3 }}
+                    >
+                      Edit
+                    </button>
+                  )}
+                </td>
               </tr>
             );
           })}
