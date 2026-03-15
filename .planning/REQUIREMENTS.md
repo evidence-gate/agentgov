@@ -51,8 +51,8 @@
 
 ### Infrastructure
 
-- [ ] **DEPLOY-01**: `wrangler deploy`でプロキシがCloudflare Workersにデプロイされ、Turso cloud + Workflows bindingで全機能が動作する
-- [ ] **DEPLOY-02**: Cloudflare Workers環境で`GEMINI_API_KEY`を含む全シークレットが`wrangler secret put`で設定される
+- [x] **DEPLOY-01**: `wrangler deploy`でプロキシがCloudflare Workersにデプロイされ、Turso cloud + Workflows bindingで全機能が動作する
+- [x] **DEPLOY-02**: Cloudflare Workers環境で`GEMINI_API_KEY`を含む全シークレットが`wrangler secret put`で設定される
 - [x] **BUDGET-01**: ダッシュボードからper-agentの予算上限を設定・変更でき、変更が即座にbudget_ledgerに反映される
 - [x] **BUDGET-02**: 予算変更がaudit_logに記録され、変更履歴が追跡可能である
 
@@ -119,8 +119,8 @@
 | SDK-07 | Phase 6 (v1.1) | Complete |
 | BUDGET-01 | Phase 6 (v1.1) | Complete |
 | BUDGET-02 | Phase 6 (v1.1) | Complete |
-| DEPLOY-01 | Phase 7 (v1.1) | Pending |
-| DEPLOY-02 | Phase 7 (v1.1) | Pending |
+| DEPLOY-01 | Phase 7 (v1.1) | Complete |
+| DEPLOY-02 | Phase 7 (v1.1) | Complete |
 
 **Coverage:**
 - v1.0 requirements: 19 total — 19 complete

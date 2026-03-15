@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: planning
-stopped_at: Completed 05-provider-completeness-02-PLAN.md
-last_updated: "2026-03-15T10:46:00Z"
-last_activity: 2026-03-15 — Anthropic SSE streaming token extraction implemented (05-02)
+milestone: v1.1
+milestone_name: Production Readiness
+status: in-progress
+stopped_at: Completed 07-cloudflare-workers-production-deploy-01-PLAN.md (checkpoint:human-action — awaiting deploy)
+last_updated: "2026-03-15T12:02:00Z"
+last_activity: 2026-03-15 — wrangler.jsonc env.production configured, types regenerated (07-01)
 progress:
   total_phases: 7
-  completed_phases: 5
-  total_plans: 15
-  completed_plans: 15
-  percent: 96
+  completed_phases: 6
+  total_plans: 16
+  completed_plans: 16
+  percent: 98
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** AIエージェントのコストを「追跡」ではなく「強制」する — 予算超過時にリクエストを決定論的にブロックし、コスト暴走を構造的に防止する
-**Current focus:** Milestone v1.1 — Production Readiness (Phases 5–7)
+**Current focus:** Milestone v1.1 — Production Readiness (Phase 7: Cloudflare Workers deploy)
 
 ## Current Position
 
-Phase: 05-provider-completeness
-Plan: 02 complete (2 total) — Phase 5 fully complete
-Status: Phase 5 done — all providers (OpenAI, Anthropic, Gemini) settle with accurate token counts
-Last activity: 2026-03-15 — Anthropic SSE streaming token extraction (PROV-03) complete
+Phase: 07-cloudflare-workers-production-deploy
+Plan: 01 complete (awaiting Task 2 checkpoint:human-action — deploy + smoke tests)
+Status: wrangler.jsonc env.production configured; awaiting human to set secrets + deploy
+Last activity: 2026-03-15 — wrangler.jsonc env.production + regenerated types (07-01)
 
-Progress: [██████████] 96%
+Progress: [██████████] 98%
 
 ## Performance Metrics
 
@@ -78,6 +78,9 @@ Recent decisions affecting current work:
 - [Phase 06-01]: wrap_async() uses _client attribute (both AsyncOpenAI and AsyncAnthropic store httpx async client as _client)
 - [Phase 06-python-async-sdk-budget-crud]: routes.ts changed from DockerDbClient to DbClient — structurally identical, enables Workers deploy in Phase 7
 - [Phase 06-python-async-sdk-budget-crud]: updateBudgetLimit only sets limitUsd + updatedAt — spentUsd/reservedUsd exclusively owned by Hold/Settle
+- [Phase 07-01]: env.production name set to agentgov-proxy-production — avoids dev/production Worker collision
+- [Phase 07-01]: Workflow name agentgov-hitl-production in env.production (separate from dev agentgov-hitl instance)
+- [Phase 07-01]: classifyToolCalls return type narrowed to tier: RiskTier — pre-existing type annotation bug fixed
 
 ### Pending Todos
 
@@ -92,6 +95,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-15T10:46:00Z
-Stopped at: Completed 05-provider-completeness-02-PLAN.md
+Last session: 2026-03-15T12:02:00Z
+Stopped at: Completed 07-cloudflare-workers-production-deploy-01-PLAN.md (Task 2 checkpoint:human-action)
 Resume file: None

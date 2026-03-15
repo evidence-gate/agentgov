@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **v1.1 (current milestone):**
 - [x] **Phase 5: Provider Completeness** - Gemini full implementation + Anthropic streaming settle — all three LLM providers enforced accurately (completed 2026-03-15)
 - [x] **Phase 6: Python Async SDK + Budget CRUD** - Async Python transport and operator-configurable per-agent budget limits (completed 2026-03-15)
-- [ ] **Phase 7: Cloudflare Workers Production Deploy** - Edge deploy integration validation with Turso cloud and all v1.1 features verified
+- [x] **Phase 7: Cloudflare Workers Production Deploy** - Edge deploy integration validation with Turso cloud and all v1.1 features verified (completed 2026-03-15)
 
 ## Phase Details
 
@@ -131,7 +131,7 @@ Plans:
   2. All secrets (`GEMINI_API_KEY` and all existing provider keys) are set exclusively via `wrangler secret put` — no secrets appear in `wrangler.jsonc` committed to source control
   3. HITL approval workflow triggers and resolves correctly in the Workers runtime — `c.env.HITL_WORKFLOW` is defined, meaning `[[workflows]]` and all vars are redeclared in `[env.production]`
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 07-01-PLAN.md — Add env.production to wrangler.jsonc (workflows + all 12 vars redeclared), regenerate worker-configuration.d.ts, set secrets via wrangler secret put, deploy and smoke-test (DEPLOY-01, DEPLOY-02)
@@ -149,4 +149,4 @@ v1.0 complete. v1.1: Phases 5 and 6 are independent and can be parallelized. Pha
 | 4. Dashboard + Python SDK + Self-Host | 3/3 | Complete | 2026-03-15 |
 | 5. Provider Completeness | 2/2 | Complete | 2026-03-15 |
 | 6. Python Async SDK + Budget CRUD | 2/2 | Complete   | 2026-03-15 |
-| 7. Cloudflare Workers Production Deploy | 0/1 | Planned | - |
+| 7. Cloudflare Workers Production Deploy | 1/1 | Complete   | 2026-03-15 |
