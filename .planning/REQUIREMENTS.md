@@ -40,9 +40,9 @@
 
 ### Provider Completeness
 
-- [ ] **PROV-01**: `gemini-*` モデルのリクエストがGemini OpenAI互換エンドポイント経由でLLMに転送され、非ストリーミング/ストリーミング両方で正確なトークン精算が行われる
-- [ ] **PROV-02**: Gemini APIキー未設定時に503 + 明確なエラーメッセージが返る（既存OpenAI/Anthropicと同パターン）
-- [ ] **PROV-03**: Anthropicストリーミングレスポンスの`message_start`/`message_delta`からinput/output tokensを抽出し、0トークンではなく実コストで精算する
+- [x] **PROV-01**: `gemini-*` モデルのリクエストがGemini OpenAI互換エンドポイント経由でLLMに転送され、非ストリーミング/ストリーミング両方で正確なトークン精算が行われる
+- [x] **PROV-02**: Gemini APIキー未設定時に503 + 明確なエラーメッセージが返る（既存OpenAI/Anthropicと同パターン）
+- [x] **PROV-03**: Anthropicストリーミングレスポンスの`message_start`/`message_delta`からinput/output tokensを抽出し、0トークンではなく実コストで精算する
 
 ### SDK Enhancement
 
@@ -112,9 +112,9 @@
 | SDK-02 | Phase 4 (v1.0) | Complete |
 | SDK-04 | Phase 4 (v1.0) | Complete |
 | SDK-05 | Phase 4 (v1.0) | Complete |
-| PROV-01 | Phase 5 (v1.1) | Pending |
-| PROV-02 | Phase 5 (v1.1) | Pending |
-| PROV-03 | Phase 5 (v1.1) | Pending |
+| PROV-01 | Phase 5 (v1.1) | Complete |
+| PROV-02 | Phase 5 (v1.1) | Complete |
+| PROV-03 | Phase 5 (v1.1) | Complete |
 | SDK-06 | Phase 6 (v1.1) | Complete |
 | SDK-07 | Phase 6 (v1.1) | Complete |
 | BUDGET-01 | Phase 6 (v1.1) | Complete |

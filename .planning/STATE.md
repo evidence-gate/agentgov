@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 05-provider-completeness-01-PLAN.md
-last_updated: "2026-03-15T10:36:46Z"
-last_activity: 2026-03-15 — Gemini provider forwarding implemented (05-01)
+stopped_at: Completed 05-provider-completeness-02-PLAN.md
+last_updated: "2026-03-15T10:46:00Z"
+last_activity: 2026-03-15 — Anthropic SSE streaming token extraction implemented (05-02)
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 14
-  completed_plans: 14
-  percent: 93
+  total_plans: 15
+  completed_plans: 15
+  percent: 96
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 ## Current Position
 
 Phase: 05-provider-completeness
-Plan: 01 complete (2 total) — 05-01 Gemini forwarding done
-Status: Phase 5 in progress — 05-02 Anthropic streaming settle remaining
-Last activity: 2026-03-15 — Gemini provider forwarding (PROV-01, PROV-02) complete
+Plan: 02 complete (2 total) — Phase 5 fully complete
+Status: Phase 5 done — all providers (OpenAI, Anthropic, Gemini) settle with accurate token counts
+Last activity: 2026-03-15 — Anthropic SSE streaming token extraction (PROV-03) complete
 
-Progress: [█████████░] 93%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -54,7 +54,8 @@ Recent decisions affecting current work:
 - [Phase 01-02]: estimateCost throws (not returns 0) for unknown models — fail closed
 - [Phase 01-02]: appendAuditEvent never throws — audit failures don't abort enforcement
 - [Phase 01-03]: vitest pinned to v2 — v4 requires vite@6 but workspace has vite@5
-- [Phase 01-03]: Anthropic streaming settle uses 0 tokens — SSE usage parsing deferred (v1.1 target → PROV-03)
+- [Phase 01-03]: Anthropic streaming settle uses 0 tokens — SSE usage parsing deferred (v1.1 target → PROV-03) [RESOLVED in 05-02]
+- [Phase 05-02]: Anthropic message_start.message.usage.output_tokens is always 1 (placeholder) — ignored; message_delta.usage.output_tokens used for completion tokens (OVERWRITE not sum)
 - [Phase 02-01]: waitForEvent type='hitl-decision' (hyphens not periods)
 - [Phase 02-01]: DB client created inside each step.do callback — Workflows state serialization
 - [Phase 03-01]: Proxy always returns 502 for structured governance errors
@@ -91,6 +92,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-15T10:36:46Z
-Stopped at: Completed 05-provider-completeness-01-PLAN.md
+Last session: 2026-03-15T10:46:00Z
+Stopped at: Completed 05-provider-completeness-02-PLAN.md
 Resume file: None

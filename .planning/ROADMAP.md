@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Dashboard + Python SDK + Self-Host** - Read-only cost dashboard, Python SDK, and Docker Compose self-host packaging (completed 2026-03-15)
 
 **v1.1 (current milestone):**
-- [ ] **Phase 5: Provider Completeness** - Gemini full implementation + Anthropic streaming settle — all three LLM providers enforced accurately
+- [x] **Phase 5: Provider Completeness** - Gemini full implementation + Anthropic streaming settle — all three LLM providers enforced accurately (completed 2026-03-15)
 - [x] **Phase 6: Python Async SDK + Budget CRUD** - Async Python transport and operator-configurable per-agent budget limits (completed 2026-03-15)
 - [ ] **Phase 7: Cloudflare Workers Production Deploy** - Edge deploy integration validation with Turso cloud and all v1.1 features verified
 
@@ -100,11 +100,11 @@ Plans:
   2. A `gemini-*` request made without `GEMINI_API_KEY` configured returns HTTP 503 with a clear error message identifying the missing key — consistent with the existing OpenAI and Anthropic unconfigured behavior
   3. An Anthropic streaming response has its `input_tokens` (from `message_start`) and `output_tokens` (from `message_delta`) both extracted and settled — the budget ledger reflects actual prompt + completion cost, not zero
 
-**Plans:** 1/2 plans complete
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 05-01-PLAN.md — Gemini forwarding (forwardToGemini + processStreamAndSettle reuse), GEMINI_API_KEY wiring (ForwardEnv + wrangler.jsonc + index.ts + index.node.ts), 503 guard (PROV-01, PROV-02)
-- [ ] 05-02-PLAN.md — Anthropic SSE parser (processAnthropicStreamAndSettle), message_start/message_delta token extraction, pipeAndSettle removal (PROV-03)
+- [x] 05-02-PLAN.md — Anthropic SSE parser (processAnthropicStreamAndSettle), message_start/message_delta token extraction, pipeAndSettle removal (PROV-03)
 
 ### Phase 6: Python Async SDK + Budget CRUD
 **Goal**: Python async agent developers get the same governance enforcement as sync users, and operators can set per-agent budget limits from the dashboard without redeploying
@@ -144,6 +144,6 @@ v1.0 complete. v1.1: Phases 5 and 6 are independent and can be parallelized. Pha
 | 2. HITL + Approval Channels | 2/2 | Complete | 2026-03-13 |
 | 3. Error Handling + Production Hardening | 2/2 | Complete | 2026-03-14 |
 | 4. Dashboard + Python SDK + Self-Host | 3/3 | Complete | 2026-03-15 |
-| 5. Provider Completeness | 1/2 | In Progress | - |
+| 5. Provider Completeness | 2/2 | Complete | 2026-03-15 |
 | 6. Python Async SDK + Budget CRUD | 2/2 | Complete   | 2026-03-15 |
 | 7. Cloudflare Workers Production Deploy | 0/? | Not started | - |
