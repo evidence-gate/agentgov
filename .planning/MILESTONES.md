@@ -1,5 +1,34 @@
 # Milestones
 
+## v1.1 — Production Readiness (Shipped: 2026-03-15)
+
+**Goal:** v1.0で残った5つのギャップを解消し、Cloudflare Workersエッジデプロイに対応
+
+**Phases:** 3 phases (5-7), 5 plans
+
+| Phase | Name | Plans | Completed |
+|-------|------|-------|-----------|
+| 5 | Provider Completeness | 2 | 2026-03-15 |
+| 6 | Python Async SDK + Budget CRUD | 2 | 2026-03-15 |
+| 7 | Cloudflare Workers Production Deploy | 1 | 2026-03-15 |
+
+**Requirements completed:** 9/9 (PROV-01~03, SDK-06~07, BUDGET-01~02, DEPLOY-01~02)
+
+**Key accomplishments:**
+- Gemini provider forwarding via OpenAI-compat endpoint — reuses processStreamAndSettle unchanged
+- Anthropic SSE streaming settle — processAnthropicStreamAndSettle extracts real input/output tokens (overwrite, not sum)
+- Python async SDK — AsyncAgentgovTransport + wrap_async() with 11 async tests
+- Per-agent budget CRUD — PATCH endpoint + dashboard inline edit + audit trail
+- Cloudflare Workers env.production config — all non-inheritable bindings redeclared, types regenerated
+
+**Key artifacts:**
+- `forwardToGemini()` + `processAnthropicStreamAndSettle()` in forward.ts
+- `AsyncAgentgovTransport` + `wrap_async()` in Python SDK
+- `updateBudgetLimit()` + PATCH endpoint + `budget_limit_changed` audit event
+- `env.production` block in wrangler.jsonc with HITL workflow binding
+
+---
+
 ## v1.0 — Core Governance Platform (completed 2026-03-15)
 
 **Goal:** AIエージェントのガバナンス層MVP — コスト制御、HITL承認、エラーハンドリング、SDK、ダッシュボード
