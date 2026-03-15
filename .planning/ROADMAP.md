@@ -100,7 +100,11 @@ Plans:
   2. A `gemini-*` request made without `GEMINI_API_KEY` configured returns HTTP 503 with a clear error message identifying the missing key — consistent with the existing OpenAI and Anthropic unconfigured behavior
   3. An Anthropic streaming response has its `input_tokens` (from `message_start`) and `output_tokens` (from `message_delta`) both extracted and settled — the budget ledger reflects actual prompt + completion cost, not zero
 
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Gemini forwarding (forwardToGemini + processStreamAndSettle reuse), GEMINI_API_KEY wiring (ForwardEnv + wrangler.jsonc + index.ts + index.node.ts), 503 guard (PROV-01, PROV-02)
+- [ ] 05-02-PLAN.md — Anthropic SSE parser (processAnthropicStreamAndSettle), message_start/message_delta token extraction, pipeAndSettle removal (PROV-03)
 
 ### Phase 6: Python Async SDK + Budget CRUD
 **Goal**: Python async agent developers get the same governance enforcement as sync users, and operators can set per-agent budget limits from the dashboard without redeploying
@@ -112,7 +116,11 @@ Plans:
   3. A dashboard operator can change an agent's budget limit via an inline edit on the Costs page, and the new limit is reflected immediately in the budget ledger (subsequent requests are enforced against the new limit, not the old one)
   4. Every budget limit change appears in the audit log with the previous value, new value, timestamp, and actor — the change history is traceable
 
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Python async SDK (AsyncAgentgovTransport, wrap_async(), pytest-asyncio tests) (SDK-06, SDK-07)
+- [ ] 06-02-PLAN.md — Budget CRUD (updateBudgetLimit ledger fn, PATCH endpoint, audit event, dashboard inline edit) (BUDGET-01, BUDGET-02)
 
 ### Phase 7: Cloudflare Workers Production Deploy
 **Goal**: agentgov proxy is deployable to Cloudflare Workers edge as an alternative to Docker Compose, with all v1.1 features (Gemini, Anthropic streaming, async Python SDK, budget CRUD) verified against the Workers runtime and Turso cloud
@@ -136,6 +144,6 @@ v1.0 complete. v1.1: Phases 5 and 6 are independent and can be parallelized. Pha
 | 2. HITL + Approval Channels | 2/2 | Complete | 2026-03-13 |
 | 3. Error Handling + Production Hardening | 2/2 | Complete | 2026-03-14 |
 | 4. Dashboard + Python SDK + Self-Host | 3/3 | Complete | 2026-03-15 |
-| 5. Provider Completeness | 0/? | Not started | - |
-| 6. Python Async SDK + Budget CRUD | 0/? | Not started | - |
+| 5. Provider Completeness | 0/2 | Planned | - |
+| 6. Python Async SDK + Budget CRUD | 0/2 | Planned | - |
 | 7. Cloudflare Workers Production Deploy | 0/? | Not started | - |
