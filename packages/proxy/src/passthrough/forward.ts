@@ -452,13 +452,12 @@ async function forwardToAnthropic(
     });
   }
 
-  // Streaming: pipe through (Anthropic SSE format — settle with 0 tokens for Phase 1)
-  // TODO: parse Anthropic SSE usage events in a later plan
+  // Streaming: parse Anthropic SSE events for token extraction
   const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
   const writer = writable.getWriter();
 
   const model = requestBody.model;
-  pipeAndSettle(llmResponse.body!, writer, db, holdId, agentId, model).catch((err) =>
+  processAnthropicStreamAndSettle(llmResponse.body!, writer, db, holdId, agentId, model).catch((err) =>
     console.error('forwardToLlm (Anthropic streaming): error:', err),
   );
 
@@ -472,10 +471,16 @@ async function forwardToAnthropic(
 }
 
 /**
- * Pipe a stream directly without usage extraction (used for Anthropic streaming in Phase 1).
- * budgetSettle is called with 0 tokens — hold is released without accurate cost.
+ * Pipe an Anthropic SSE stream through a TransformStream writer, parsing event-specific
+ * data lines to extract actual token usage for budget settlement.
+ *
+ * Anthropic SSE format:
+ *   event: message_start  → message.usage.input_tokens  (prompt tokens)
+ *   event: message_delta  → usage.output_tokens         (completion tokens, cumulative — OVERWRITE not sum)
+ *
+ * The message_start.message.usage.output_tokens is always 1 (placeholder) and is ignored.
  */
-async function pipeAndSettle(
+async function processAnthropicStreamAndSettle(
   body: ReadableStream<Uint8Array>,
   writer: WritableStreamDefaultWriter<Uint8Array>,
   db: DbClient,
@@ -484,18 +489,49 @@ async function pipeAndSettle(
   model: string,
 ): Promise<void> {
   const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let buffer = '';
+  let currentEvent = '';
+
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      await writer.write(value);
+
+      await writer.write(value); // pipe to client FIRST
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? ''; // last incomplete line stays in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+          try {
+            const evt = JSON.parse(data) as Record<string, unknown>;
+            if (currentEvent === 'message_start') {
+              const msg = evt['message'] as Record<string, unknown> | undefined;
+              const usage = msg?.['usage'] as Record<string, unknown> | undefined;
+              inputTokens = (usage?.['input_tokens'] as number) ?? 0;
+            }
+            if (currentEvent === 'message_delta') {
+              const usage = evt['usage'] as Record<string, unknown> | undefined;
+              // OVERWRITE, not sum — output_tokens is cumulative across message_delta events
+              outputTokens = (usage?.['output_tokens'] as number) ?? outputTokens;
+            }
+          } catch { /* skip malformed JSON */ }
+        }
+      }
     }
   } finally {
     await writer.close();
   }
 
-  // Settle with 0 tokens — Anthropic streaming usage parsing is a TODO for later plans
-  budgetSettle(db, holdId, { promptTokens: 0, completionTokens: 0 }, model, agentId).catch((err) =>
-    console.error('pipeAndSettle: budgetSettle failed:', err),
-  );
+  budgetSettle(db, holdId, { promptTokens: inputTokens, completionTokens: outputTokens }, model, agentId)
+    .catch((err) => console.error('processAnthropicStreamAndSettle: budgetSettle failed:', err));
 }

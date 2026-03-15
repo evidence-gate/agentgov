@@ -257,6 +257,310 @@ describe('Gemini streaming', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Anthropic SSE streaming tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper: Build an Anthropic SSE stream from an array of {event, data} pairs.
+ * Each entry is encoded as:
+ *   event: <event>\n
+ *   data: <JSON>\n
+ *   \n
+ */
+function createAnthropicSSEStream(
+  events: Array<{ event: string; data: object }>,
+): ReadableStream<Uint8Array> {
+  const chunks = events.map(
+    ({ event, data }) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+  );
+  return makeStream(chunks);
+}
+
+describe('Anthropic SSE streaming', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  const anthropicHoldId = 'hold-anthropic-sse-test';
+  const anthropicAgentId = 'agent-anthropic-sse-test';
+
+  function makeAnthropicEnv() {
+    return { ANTHROPIC_API_KEY: 'test-anthropic-key' };
+  }
+
+  function makeAnthropicRequest(extra: Record<string, unknown> = {}) {
+    return {
+      model: 'claude-3-5-sonnet-20241022',
+      messages: [{ role: 'user' as const, content: 'Hello' }],
+      stream: true,
+      ...extra,
+    };
+  }
+
+  /** Full Anthropic SSE event sequence */
+  function makeFullSSEStream(inputTokens = 25, finalOutputTokens = 15) {
+    return createAnthropicSSEStream([
+      {
+        event: 'message_start',
+        data: {
+          type: 'message_start',
+          message: { usage: { input_tokens: inputTokens, output_tokens: 1 } },
+        },
+      },
+      {
+        event: 'content_block_start',
+        data: { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+      },
+      {
+        event: 'content_block_delta',
+        data: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: 'Hello' },
+        },
+      },
+      {
+        event: 'message_delta',
+        data: {
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn' },
+          usage: { output_tokens: finalOutputTokens },
+        },
+      },
+      { event: 'message_stop', data: { type: 'message_stop' } },
+    ]);
+  }
+
+  beforeEach(() => {
+    mockBudgetSettle.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('message_start: extracts input_tokens (ignores placeholder output_tokens: 1)', async () => {
+    fetchMock = vi.fn().mockResolvedValue(
+      new Response(makeFullSSEStream(25, 15), {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await forwardToLlm(
+      makeAnthropicRequest(),
+      anthropicHoldId,
+      anthropicAgentId,
+      makeDbMock(),
+      makeAnthropicEnv(),
+    );
+
+    // Consume the stream to trigger processAnthropicStreamAndSettle
+    await readStream(res.body!);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockBudgetSettle).toHaveBeenCalledWith(
+      expect.anything(),
+      anthropicHoldId,
+      { promptTokens: 25, completionTokens: 15 },
+      'claude-3-5-sonnet-20241022',
+      anthropicAgentId,
+    );
+  });
+
+  it('message_delta: uses overwrite (not sum) — two message_delta events with output_tokens 8 then 15 yields 15', async () => {
+    // Two message_delta events: first output_tokens=8, second output_tokens=15
+    // Expected: completionTokens=15 (overwrite), NOT 23 (sum)
+    const stream = createAnthropicSSEStream([
+      {
+        event: 'message_start',
+        data: {
+          type: 'message_start',
+          message: { usage: { input_tokens: 25, output_tokens: 1 } },
+        },
+      },
+      {
+        event: 'message_delta',
+        data: {
+          type: 'message_delta',
+          delta: { stop_reason: null },
+          usage: { output_tokens: 8 },
+        },
+      },
+      {
+        event: 'message_delta',
+        data: {
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn' },
+          usage: { output_tokens: 15 },
+        },
+      },
+      { event: 'message_stop', data: { type: 'message_stop' } },
+    ]);
+
+    fetchMock = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await forwardToLlm(
+      makeAnthropicRequest(),
+      anthropicHoldId,
+      anthropicAgentId,
+      makeDbMock(),
+      makeAnthropicEnv(),
+    );
+
+    await readStream(res.body!);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockBudgetSettle).toHaveBeenCalledWith(
+      expect.anything(),
+      anthropicHoldId,
+      { promptTokens: 25, completionTokens: 15 },
+      'claude-3-5-sonnet-20241022',
+      anthropicAgentId,
+    );
+  });
+
+  it('no message_delta: degrades safely to completionTokens=0', async () => {
+    const stream = createAnthropicSSEStream([
+      {
+        event: 'message_start',
+        data: {
+          type: 'message_start',
+          message: { usage: { input_tokens: 25, output_tokens: 1 } },
+        },
+      },
+      { event: 'message_stop', data: { type: 'message_stop' } },
+    ]);
+
+    fetchMock = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await forwardToLlm(
+      makeAnthropicRequest(),
+      anthropicHoldId,
+      anthropicAgentId,
+      makeDbMock(),
+      makeAnthropicEnv(),
+    );
+
+    await readStream(res.body!);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockBudgetSettle).toHaveBeenCalledWith(
+      expect.anything(),
+      anthropicHoldId,
+      { promptTokens: 25, completionTokens: 0 },
+      'claude-3-5-sonnet-20241022',
+      anthropicAgentId,
+    );
+  });
+
+  it('chunk boundary split: event: and data: lines arrive in separate chunks', async () => {
+    // Split the message_start SSE event across two chunks at the line boundary
+    const chunk1 = 'event: message_start\n';
+    const chunk2 =
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":42,"output_tokens":1}}}\n\n';
+    const chunk3 =
+      'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":7}}\n\n';
+    const chunk4 = 'event: message_stop\ndata: {"type":"message_stop"}\n\n';
+
+    const stream = makeStream([chunk1, chunk2, chunk3, chunk4]);
+
+    fetchMock = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await forwardToLlm(
+      makeAnthropicRequest(),
+      anthropicHoldId,
+      anthropicAgentId,
+      makeDbMock(),
+      makeAnthropicEnv(),
+    );
+
+    await readStream(res.body!);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockBudgetSettle).toHaveBeenCalledWith(
+      expect.anything(),
+      anthropicHoldId,
+      { promptTokens: 42, completionTokens: 7 },
+      'claude-3-5-sonnet-20241022',
+      anthropicAgentId,
+    );
+  });
+
+  it('all SSE chunks are piped to client without data loss', async () => {
+    const events = [
+      {
+        event: 'message_start',
+        data: {
+          type: 'message_start',
+          message: { usage: { input_tokens: 10, output_tokens: 1 } },
+        },
+      },
+      {
+        event: 'content_block_delta',
+        data: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Hi' } },
+      },
+      {
+        event: 'message_delta',
+        data: {
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn' },
+          usage: { output_tokens: 5 },
+        },
+      },
+      { event: 'message_stop', data: { type: 'message_stop' } },
+    ];
+
+    // Compute expected bytes (the exact same encoding used in createAnthropicSSEStream)
+    const encoder = new TextEncoder();
+    const expectedBytes = events.reduce(
+      (sum, { event, data }) =>
+        sum + encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).byteLength,
+      0,
+    );
+
+    const stream = createAnthropicSSEStream(events);
+
+    fetchMock = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await forwardToLlm(
+      makeAnthropicRequest(),
+      anthropicHoldId,
+      anthropicAgentId,
+      makeDbMock(),
+      makeAnthropicEnv(),
+    );
+
+    const output = await readStream(res.body!);
+    const outputBytes = encoder.encode(output).byteLength;
+    expect(outputBytes).toBe(expectedBytes);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Gemini missing key tests
 // ---------------------------------------------------------------------------
 
