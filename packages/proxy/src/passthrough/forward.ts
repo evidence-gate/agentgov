@@ -24,6 +24,7 @@ import type { HoldId, ChatCompletionRequest, AgentId } from '../types';
 export interface ForwardEnv {
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
+  GEMINI_API_KEY?: string;
   AGENTGOV_MAX_RETRIES?: string;
   AGENTGOV_RETRY_BASE_MS?: string;
 }
@@ -72,6 +73,11 @@ export async function forwardToLlm(
     );
   }
 
+  const retryEnv = {
+    AGENTGOV_MAX_RETRIES: env.AGENTGOV_MAX_RETRIES,
+    AGENTGOV_RETRY_BASE_MS: env.AGENTGOV_RETRY_BASE_MS,
+  };
+
   // Validate API key availability before making the request
   if (provider === 'openai' && !env.OPENAI_API_KEY) {
     return new Response(
@@ -91,25 +97,22 @@ export async function forwardToLlm(
       { status: 503, headers: { 'Content-Type': 'application/json' } },
     );
   }
-  if (provider === 'google') {
-    // Google Gemini uses a different API key — for Phase 1, return 503 if not configured
-    // (GEMINI_API_KEY support can be added in a later plan)
+  if (provider === 'google' && !env.GEMINI_API_KEY) {
     return new Response(
       JSON.stringify({
         error:
-          'LLM provider API key not configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in wrangler secrets.',
+          'LLM provider API key not configured. Set GEMINI_API_KEY in wrangler secrets.',
       }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },
     );
   }
 
-  const retryEnv = {
-    AGENTGOV_MAX_RETRIES: env.AGENTGOV_MAX_RETRIES,
-    AGENTGOV_RETRY_BASE_MS: env.AGENTGOV_RETRY_BASE_MS,
-  };
-
   if (provider === 'openai') {
     return forwardToOpenAI(requestBody, holdId, agentId, db, env.OPENAI_API_KEY!, retryEnv);
+  }
+
+  if (provider === 'google') {
+    return forwardToGemini(requestBody, holdId, agentId, db, env.GEMINI_API_KEY!, retryEnv);
   }
 
   // Anthropic
@@ -262,6 +265,99 @@ async function processStreamAndSettle(
   budgetSettle(db, holdId, { promptTokens, completionTokens }, model, agentId).catch((err) =>
     console.error('processStreamAndSettle: budgetSettle failed:', err),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Gemini forwarding
+// ---------------------------------------------------------------------------
+
+/**
+ * Forward a request to Google Gemini via the OpenAI-compatible endpoint.
+ *
+ * Gemini's OpenAI-compat API is structurally identical to OpenAI's:
+ * - Same request/response schema (chat completions)
+ * - Same streaming SSE format with stream_options.include_usage
+ * - Bearer token authentication (GEMINI_API_KEY)
+ * - processStreamAndSettle() reused without modification
+ */
+async function forwardToGemini(
+  requestBody: ChatCompletionRequest,
+  holdId: HoldId,
+  agentId: AgentId,
+  db: DbClient,
+  apiKey: string,
+  retryEnv: Record<string, string | undefined> = {},
+): Promise<Response> {
+  const isStreaming = requestBody.stream === true;
+
+  // For streaming: add stream_options.include_usage so we get token counts in the final chunk
+  const forwardBody = isStreaming
+    ? { ...requestBody, stream_options: { include_usage: true } }
+    : requestBody;
+
+  const retryConfig = parseRetryConfig(retryEnv);
+
+  const llmResponse = await forwardWithRetry(
+    () =>
+      fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(forwardBody),
+      }),
+    retryConfig,
+    db,
+    holdId,
+    agentId,
+    requestBody.model,
+  );
+
+  // If retry engine returned an error response (502), pass it through directly.
+  // The hold has already been settled at 0 cost by forwardWithRetry.
+  if (!llmResponse.ok) {
+    return llmResponse;
+  }
+
+  if (!isStreaming) {
+    // Non-streaming: buffer the response, extract usage, settle, return
+    const responseJson = await llmResponse.json() as {
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
+
+    const promptTokens = responseJson.usage?.prompt_tokens ?? 0;
+    const completionTokens = responseJson.usage?.completion_tokens ?? 0;
+
+    // Settle budget asynchronously (non-blocking)
+    budgetSettle(db, holdId, { promptTokens, completionTokens }, requestBody.model, agentId).catch(
+      (err) => console.error('forwardToGemini: budgetSettle failed:', err),
+    );
+
+    return new Response(JSON.stringify(responseJson), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Streaming: pipe through a TransformStream, intercept the final chunk for usage data.
+  // Gemini OpenAI-compat returns the same SSE format as OpenAI — processStreamAndSettle works unchanged.
+  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = writable.getWriter();
+
+  const model = requestBody.model;
+  processStreamAndSettle(llmResponse.body!, writer, db, holdId, agentId, model).catch((err) =>
+    console.error('forwardToGemini: stream processing error:', err),
+  );
+
+  return new Response(readable, {
+    status: 200,
+    headers: {
+      'Content-Type': llmResponse.headers.get('Content-Type') ?? 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------

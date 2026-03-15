@@ -17,7 +17,7 @@
     "start:node": "tsx src/index.node.ts"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "latest",
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
     "drizzle-kit": "^0.31.9",
     "tsx": "^4.21.0",
     "typescript": "^5",
