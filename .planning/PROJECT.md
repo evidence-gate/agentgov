@@ -12,22 +12,37 @@ AIエージェントのコストを「追跡」ではなく「強制」する --
 
 ### Validated
 
-(None yet — ship to validate)
+<!-- v1.0 shipped and verified (2026-03-15) -->
+
+- ✓ SDK（TypeScript/Python）で`agentgov.wrap(client)`による1行統合 — v1.0
+- ✓ プロキシレイヤーでのリアルタイム予算強制（Hold/Settle） — v1.0
+- ✓ Risk-Graded Action分類によるHITLトリガー（静的・決定論的） — v1.0
+- ✓ マルチチャネル承認（Slack/Webhook） — v1.0
+- ✓ Append-Only監査ログ（SHA-256ハッシュチェーン） — v1.0
+- ✓ エラー分類と型別ルーティング（ループ検出、Stuck検出） — v1.0
+- ✓ Docker Composeによるセルフホスト — v1.0
+- ✓ 基本ダッシュボード（コスト概要、予算残高、承認キュー） — v1.0
 
 ### Active
 
-- [ ] SDK（TypeScript/Python）で`agentgov.wrap(client)`による1行統合
-- [ ] プロキシレイヤーでのリアルタイム予算強制（global/provider/model階層）
-- [ ] 予算超過時のグレースフル縮退（安価モデルへの自動切替）
-- [ ] Hold/Settle予算パターン（悲観的予約、クラッシュ安全）
-- [ ] Risk-Graded Action分類によるHITLトリガー（静的・決定論的）
-- [ ] マルチチャネル承認（Slack/Webhook）
-- [ ] Append-Only監査ログ（予算判断・承認判断の完全な証跡）
-- [ ] エラー分類と型別ルーティング（ループ検出、Stuck検出）
-- [ ] 3層タイムアウト（ソフト警告→アイドル検出→ハード停止）
-- [ ] Docker Composeによるセルフホスト
-- [ ] Cloud版（Cloudflare Workers）
-- [ ] 基本ダッシュボード（コスト概要、予算残高、承認キュー）
+<!-- v1.1 scope -->
+
+- [ ] Geminiプロバイダー完全実装（503スタブ → Vertex AI / Gemini API変換+ストリーミング）
+- [ ] Anthropicストリーミングのトークン精算（SSE message_delta usage parsing）
+- [ ] Python SDK async対応（httpx.AsyncBaseTransport）
+- [ ] Cloudflare Workersクラウドデプロイ（wrangler.toml + Turso cloud + Workflows）
+- [ ] per-agent予算設定UI（ダッシュボードからCRUD、デフォルト$10固定 → 設定可能）
+
+## Current Milestone: v1.1 Production Readiness
+
+**Goal:** v1.0のスタブ/制限を解消し、3大LLMプロバイダー完全対応+クラウドデプロイ+予算管理UIで本番投入可能な状態にする
+
+**Target features:**
+- Geminiプロバイダー完全実装（OpenAI互換 → Gemini API変換）
+- Anthropicストリーミング精算（SSEからusage抽出）
+- Python SDK async対応
+- Cloudflare Workersクラウドデプロイ
+- per-agent予算設定ダッシュボード
 
 ### Out of Scope
 
@@ -84,4 +99,4 @@ EU AI Act Article 14が高リスクAIシステムに人間の監視を義務付�
 | Hold/Settle予算パターンをbantoから移植 | 悲観的予約によるクラッシュ安全性。bantoで概念実証済み | — Pending |
 
 ---
-*Last updated: 2026-03-13 after initialization*
+*Last updated: 2026-03-15 after v1.1 milestone start*
