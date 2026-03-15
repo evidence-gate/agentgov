@@ -60,6 +60,7 @@ async function main() {
     env['TURSO_AUTH_TOKEN'] = 'local';
     env['OPENAI_API_KEY'] = process.env['OPENAI_API_KEY'] ?? '';
     env['ANTHROPIC_API_KEY'] = process.env['ANTHROPIC_API_KEY'] ?? '';
+    env['GEMINI_API_KEY'] = process.env['GEMINI_API_KEY'] ?? '';
     env['AGENTGOV_ALERT_WEBHOOK_URL'] = process.env['AGENTGOV_ALERT_WEBHOOK_URL'] ?? '';
     env['AGENTGOV_ALERT_THRESHOLDS'] = process.env['AGENTGOV_ALERT_THRESHOLDS'] ?? '0.80,1.00';
     env['AGENTGOV_HITL_TTL_SECONDS'] = process.env['AGENTGOV_HITL_TTL_SECONDS'] ?? '259200';

@@ -24,6 +24,7 @@
     // NEVER commit real key values here
     "OPENAI_API_KEY": "",
     "ANTHROPIC_API_KEY": "",
+    "GEMINI_API_KEY": "",
     // Alert webhook configuration
     "AGENTGOV_ALERT_WEBHOOK_URL": "",
     // Alert thresholds as comma-separated ratios (default: 80% and 100%)

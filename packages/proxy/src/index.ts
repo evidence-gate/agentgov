@@ -191,6 +191,7 @@ app.post('/v1/chat/completions', async (c) => {
   const llmResponse = await forwardToLlm(body, holdId, agentId, db, {
     OPENAI_API_KEY: c.env?.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: c.env?.ANTHROPIC_API_KEY,
+    GEMINI_API_KEY: c.env?.GEMINI_API_KEY,
   });
 
   // Fire budget alerts fire-and-forget (not on the hot path)
