@@ -168,3 +168,26 @@ export async function settleHold(
     })
     .where(eq(budgetLedger.agentId, agentId));
 }
+
+/**
+ * Update the budget limit for an existing agent.
+ *
+ * CRITICAL: Only updates limitUsd and updatedAt.
+ * NEVER touches spentUsd or reservedUsd — those are owned exclusively by Hold/Settle.
+ * Including them would race-write stale values and corrupt budget data.
+ *
+ * Returns the updated row, or null if the agent does not exist.
+ */
+export async function updateBudgetLimit(
+  db: DbClient,
+  agentId: AgentId,
+  limitUsd: number,
+): Promise<typeof budgetLedger.$inferSelect | null> {
+  const now = Date.now();
+  const rows = await db
+    .update(budgetLedger)
+    .set({ limitUsd, updatedAt: now })
+    .where(eq(budgetLedger.agentId, agentId))
+    .returning();
+  return rows[0] ?? null;
+}
