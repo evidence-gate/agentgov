@@ -1,203 +1,431 @@
 # Feature Research
 
-**Domain:** Agent Governance Platform (cost control + HITL + error handling)
-**Researched:** 2026-03-13
-**Confidence:** MEDIUM-HIGH
+**Domain:** Agent Governance Platform — v1.1 Production Readiness (5 target features)
+**Researched:** 2026-03-15
+**Confidence:** HIGH (verified against official docs and codebase inspection)
 
 ---
 
-## Feature Landscape
+## Overview: What v1.1 Is Doing
+
+v1.0 shipped with stubs and known gaps. v1.1 closes five specific gaps:
+
+1. **Gemini provider** — proxy routes `gemini-*` to 503 stub; needs real Gemini API forwarding
+2. **Anthropic streaming settle** — streaming settles at 0 tokens; needs SSE usage extraction
+3. **Python async SDK** — sync-only `AgentgovTransport`; needs `AsyncBaseTransport`
+4. **Cloudflare Workers deploy** — local Docker Compose only; needs production wrangler config
+5. **Per-agent budget UI** — `$10` hardcoded; needs dashboard CRUD to set per-agent limits
+
+---
+
+## Feature 1: Gemini Provider
+
+### What Gemini API Actually Is
+
+Gemini exposes two surfaces:
+- **OpenAI-compatible layer**: `https://generativelanguage.googleapis.com/v1beta/openai/` — accepts standard `chat/completions` format, Authorization header with Gemini API key, responds with OpenAI-shaped JSON (MEDIUM confidence — WebSearch verified)
+- **Native Gemini API**: `generateContent` endpoint with `usageMetadata.promptTokenCount` / `candidatesTokenCount` fields (not OpenAI-style `usage.prompt_tokens`)
+
+The OpenAI-compatible surface is the correct target for agentgov because the proxy already receives OpenAI-format requests and needs only to forward them to a different URL with a different key header — no format translation needed.
+
+**Key difference from Anthropic path:** Anthropic requires format translation (`system` field separation, `max_tokens` injection, `input_tokens`/`output_tokens` field remapping). Gemini OpenAI-compat layer requires only URL change and key swap.
+
+**Streaming token usage:** Gemini OpenAI-compat supports `stream_options: { include_usage: true }` — the same pattern already working for OpenAI. Final SSE chunk carries `usage.prompt_tokens` and `usage.completion_tokens` (MEDIUM confidence — forum discussion confirms `stream_options` supported, but exact field name should be tested).
+
+**Key format gotchas:**
+- Model names are `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2.0-flash` — prefix routing already exists in `resolveProvider()` via `model.startsWith('gemini-')`
+- Pricing table already has three Gemini models; adding new models requires `pricing.json` update
+- `GEMINI_API_KEY` is a separate env var — not `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist in any "agent governance" product. Missing any of these means the product feels broken or incomplete before users even evaluate differentiators.
-
-#### Pillar 1: Cost Control
-
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Per-request cost calculation | Without this, no budget tracking is possible — it's the atomic primitive | LOW | Token counts × model pricing. Must handle input/output asymmetry. Pricing table must be maintainable |
-| Multi-level spend aggregation | Developers need to see cost by model, provider, user, team — without this, "cost tracking" is a single undifferentiated number | MEDIUM | Requires tagging/labeling on every request. LiteLLM, Portkey both do this |
-| Budget definition (global + per-entity) | Any serious multi-tenant or multi-agent setup needs budgets at multiple scopes, not just one top-level limit | MEDIUM | Global / provider / model / team / agent scopes. LiteLLM has user+team+provider+tag budgets |
-| Hard enforcement (block on exceeded budget) | Alerting alone is insufficient — agents don't respond to alerts; developers can't babysit. The blocking is the whole point | MEDIUM | This is what Portkey/LiteLLM do partially. The gap is enforcement at agent-session granularity, not just key-level |
-| Cost dashboard (read-only observability) | Developers expect to see what's happening. A proxy with no UI feels like a black box | MEDIUM | Table stakes for trust. AgentOps, Langfuse, Portkey all have dashboards |
-| Budget alert/notification | Before hard enforcement, developers expect soft warnings | LOW | Email, webhook, Slack. All major players have this |
-
-#### Pillar 2: HITL / Approval
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Approval request routing | Without delivery mechanism, HITL is a concept not a product | MEDIUM | At minimum: webhook. Slack is expected by enterprise users. HumanLayer supports Slack, email, SMS, WhatsApp |
-| Approve / deny response path | A request must flow back to the agent — not just notify the human | MEDIUM | Denied actions must be fed back into agent context. HumanLayer confirmed this pattern |
-| Async approval (non-blocking wait) | Agents must pause and resume; synchronous blocking HITL is unusable in real workflows | HIGH | Requires state persistence across the pause. LangGraph uses checkpointers for this |
-| Timeout / escalation handling | If the human doesn't respond, the agent must know what to do (auto-deny, escalate, retry) | MEDIUM | HumanLayer has escalation. No clear standard pattern yet |
-| Approval history / audit trail | Compliance requires knowing who approved what and when | MEDIUM | Immutable log of approval decisions with actor, timestamp, action taken |
-
-#### Pillar 3: Error Handling
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Error classification (transient vs permanent) | Retrying a permanent error wastes budget; not retrying a transient error loses work | MEDIUM | Retriable (rate limits, 5xx) vs non-retriable (auth, 4xx). Standard pattern in distributed systems |
-| Finite retry with backoff | Infinite retry is the enemy. Exponential backoff with jitter is the established safe pattern | LOW | Max retries cap is essential. Without it, runaway loops burn budget |
-| Stuck/loop detection | Agents that recurse without progress are a known failure mode — users expect the platform to catch this | HIGH | Requires state tracking across turns. GSD-2 uses 2-failure-stop rule. Dead letter queue pattern is industry standard |
-| Structured error reporting | "Something failed" is not actionable. Structured error objects with type, context, and suggested action are expected | LOW | Schema: error type + timestamp + agent context + suggested remediation |
-
-#### Cross-Pillar
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| SDK integration (1-line wrap) | Developers will not adopt a product that requires significant instrumentation overhead | MEDIUM | `agentgov.wrap(client)` or equivalent. AgentOps does `agentops.init(API_KEY)`. HumanLayer is framework-agnostic |
-| OpenAI-compatible API surface | Most agent frameworks target OpenAI API format. Deviating creates adoption friction | LOW | Proxy must accept standard `chat/completions` and tool call format |
-| Self-hostable deployment | Enterprise developers won't send agent traffic through a third-party cloud without an on-prem option | MEDIUM | Docker Compose minimum. This is why Langfuse MIT+self-host beats proprietary observability tools |
-
----
+| Forward `gemini-*` requests to Gemini API | Gemini is a top-3 LLM provider; 503 stub is a blocking gap for Gemini users | LOW | URL swap + key header only; reuse `forwardWithRetry` pattern |
+| Non-streaming token settle (accurate) | Budget enforcement meaningless without accurate cost | LOW | Gemini compat returns `usage.prompt_tokens` / `usage.completion_tokens` — same as OpenAI |
+| Streaming token settle (accurate) | Streaming is common usage; 0-token settle is an unacceptable bug | MEDIUM | Use `stream_options: { include_usage: true }` — same pattern as OpenAI path, reuse `processStreamAndSettle` |
+| `GEMINI_API_KEY` env binding | API key must not be committed; needs wrangler secret | LOW | Add to `wrangler.jsonc` vars (empty default) and `ForwardEnv` interface |
+| Gemini model pricing entries | Unknown model fails closed — need current Gemini model prices | LOW | `pricing.json` already has `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2.0-flash`; add `gemini-2.0-pro` etc. |
 
 ### Differentiators (Competitive Advantage)
 
-Features where agentgov can win by doing what competitors structurally cannot or have not done.
-
-#### Pillar 1: Cost Control — Differentiators
-
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Hold/Settle budget pattern (pessimistic reservation) | Prevents concurrent agent sessions from over-drafting a shared budget — a race condition every proxy-level approach misses | HIGH | banto proved the concept: reserve budget before call, settle actual cost after. No competitor implements this at the session layer. Critical for multi-agent parallelism |
-| Graceful degradation to cheaper model | When a budget is near-exceeded, automatically route to a cheaper model rather than just failing — preserves task completion | HIGH | Requires model tier knowledge + budget state + routing logic. No competitor does automatic downgrade at budget threshold |
-| Per-session budget isolation | Not just per-key or per-user, but per agent execution session — allows independent budget accounting for autonomous agents spawned from a parent | HIGH | AgentBudget.dev offers hierarchical parent/child budgets as a differentiator. Portkey/LiteLLM budget at key/team level, not session level |
-| Crash-safe budget state | If the proxy crashes mid-session, budget should not be corrupted — reserved amounts must be recoverable | HIGH | Requires durable state (not in-memory). File-based or DB-backed state machine. GSD-2 principle: file-based state machine for crash recovery |
+| Transparent provider routing (no SDK change) | Agent code using `agentgov.wrap()` works unchanged for Gemini as for OpenAI | LOW | Already implemented in `resolveProvider()`; Gemini is the missing branch |
+| Gemini-specific retry semantics | Gemini returns different rate limit codes than OpenAI | MEDIUM | Verify Gemini 429 vs 503 retry behavior; extend `forwardWithRetry` if needed |
 
-#### Pillar 2: HITL — Differentiators
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Risk-graded action classification (static, deterministic) | Instead of requiring LLMs to decide what needs approval, classify action types statically — Reversible / Semi-Reversible / Irreversible / External. Deterministic and auditable | HIGH | GSD-2 design principle. HumanLayer routes all tool calls to humans — agentgov routes only based on risk class. Reduces approval fatigue |
-| HITL decision feeds agent context | Denial reasons are injected back into the agent's context window, allowing agent to self-correct | MEDIUM | HumanLayer does this. It should be table stakes but many HITL implementations just block and fail |
-| EU AI Act Article 14 compliance mode | Export evidence of human oversight with timestamps, actor identity, and decision chain for high-risk AI systems | HIGH | Article 14 requires human-machine interface tools and oversight documentation. Enforcement date 2026-08-02. No competitor positions explicitly for this |
-| Approval audit log with cryptographic integrity | Append-only log with hash chaining — not just logs that happen to be append-only, but logs where tampering is detectable | HIGH | OneUptime 2026 blog describes OTel + append-only pipeline. Differentiates from simple DB logs |
-
-#### Pillar 3: Error Handling — Differentiators
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| 3-tier timeout (soft warning → idle detection → hard stop) | More nuanced than simple timeout. Soft warning lets agent wind down gracefully; idle detection catches agents that stopped producing without crashing; hard stop is last resort | HIGH | GSD-2 design. No competitor product implements this 3-tier structure explicitly |
-| Error-type to handler static mapping | Declare at configuration time what happens for each error class — don't let the agent decide at runtime whether to retry, escalate, or abort | MEDIUM | GSD-2 principle: deterministic code, not LLM judgment, for error routing |
-| Partial result return on hard stop | When the hard budget or timeout limit hits, return the work completed so far rather than discarding. Preserves partial value | MEDIUM | AgentBudget.dev describes "return partial result" on budget exceeded. Not standard in observability tools |
-
-#### Cross-Pillar Differentiators
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Unified governance in one SDK (cost + HITL + error) | Competitors address one pillar each. Integration of all three in a single `wrap()` call eliminates the integration tax | HIGH | Portkey = cost/routing. HumanLayer = HITL. AgentOps = observability. No single product combines all three |
-| Cloudflare Workers edge deployment | Sub-millisecond governance overhead globally. Competitors run on traditional cloud (LiteLLM/Langfuse on VMs, Portkey on AWS) | HIGH | Enables $5/month self-host with global distribution. Unique positioning |
-| Capability-based security model | Treat the agent as an untrusted contractor, not a trusted employee. Governance enforced by capability grants, not by trusting agent self-reporting | HIGH | GSD-2 principle. Relevant for agentic security concerns being raised by Strata (2026 research) |
-
----
-
-### Anti-Features (Commonly Requested, Often Problematic)
+### Anti-Features (Avoid)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| LLM routing / load balancing | Seems natural for a proxy layer to also route between models for latency/cost optimization | Commoditized. LiteLLM, Portkey, Helicone all do this. No differentiation possible. Scope creep distraction from core governance | Let users choose their routing layer. agentgov wraps on top of whatever client they already use |
-| Guardrails / content filtering | Natural addition to a "governance" product | Separate problem domain with different buyers (safety teams vs eng teams). Highly competitive (Guardrails.ai, NeMo Guardrails, Lakera). Risk of becoming mediocre at everything | Stay focused on cost/HITL/error. Document integration patterns with guardrail tools |
-| Agent framework features (orchestration, memory, planning) | Users building complex agents want their governance tool to "understand" the agent | Becomes a competing framework, not a governance layer. Destroys the "wrap any client" positioning | Provide framework adapters (LangChain callback, CrewAI middleware) without owning the framework |
-| ML-based anomaly detection for cost | Sounds smart — detect unusual spend patterns with ML | High implementation cost, high false positive rate, difficult to debug. Deterministic thresholds (3x rolling average) are more trustworthy and auditable | Use deterministic threshold-based alerts with configurable multipliers |
-| Real-time everything (WebSocket push for all events) | Dashboard showing live spend feels impressive | Significant infrastructure complexity. Most governance decisions don't require real-time updates — polling with 30s intervals is sufficient for most use cases | Use polling + webhook notifications for threshold events. Reserve WebSocket for approval queue only |
-| Fine-grained RBAC on approval workflows | Enterprise feature requests always include role-based access control | RBAC is a deep surface area that can consume roadmap for quarters. Most early adopters are small teams where it's not needed | Start with simple API-key-based auth. Add RBAC only after PMF validation |
-| Mobile approval app | "Approvals on the go" sounds useful | Requires iOS/Android development. Governance approvals are not mobile-first — they happen in Slack or email already | Support Slack + webhook. Let Slack's mobile app handle mobile notifications |
-| Billing and invoicing | Natural if the product tracks cost | Requires financial-grade infrastructure, legal compliance (payment processing), and support overhead | Track costs for users' own billing. Do not process payments |
+| Vertex AI / service account auth | Gemini-on-GCP uses OAuth2 service accounts not API keys | Adds GCP IAM complexity; out of scope for self-host positioning | Use `generativelanguage.googleapis.com` with API key; document Vertex as future work |
+| Native Gemini format (generateContent) | More capabilities (vision, grounding) | Requires full request/response format translation; breaks OpenAI-compat surface | Use Gemini's OpenAI-compat layer; extend later if needed |
+
+### Edge Cases
+
+- `gemini-*` model not in pricing table already fails closed with 422 (existing behavior, correct)
+- `GEMINI_API_KEY` not set should return 503 with clear error (same pattern as OpenAI/Anthropic)
+- Gemini streaming: if `stream_options` is ignored by the compat layer, fallback to non-streaming settle needed — verify in integration test
+
+### Existing Code Hooks
+
+- `resolveProvider()` in `forward.ts` already returns `'google'` for `gemini-*` but hits the 503 stub
+- `forwardWithRetry` is provider-agnostic — can be reused directly
+- `processStreamAndSettle` expects `usage.prompt_tokens` / `usage.completion_tokens` — matches Gemini compat format
+
+---
+
+## Feature 2: Anthropic Streaming Settle
+
+### What the Current Bug Is
+
+`pipeAndSettle()` in `forward.ts` pipes the Anthropic SSE stream but calls `budgetSettle(0, 0)` — all streaming Claude calls cost $0 in the ledger. This means every streaming Claude request runs "free" until the hold expires.
+
+### How Anthropic Streaming SSE Works
+
+Anthropic sends named SSE event types in sequence (HIGH confidence — official docs):
+
+```
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_...","usage":{"input_tokens":25,"output_tokens":1}}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta    (many)
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":15}}
+
+event: message_stop
+data: {"type":"message_stop"}
+```
+
+**Token extraction strategy:**
+- `message_start.message.usage.input_tokens` = prompt tokens (appears once, at start)
+- `message_delta.usage.output_tokens` = cumulative output tokens at that point (appears in last `message_delta`)
+- `message_stop` carries no usage data
+
+**Critical pitfall:** `message_delta.usage.output_tokens` is cumulative, not a delta. If there are multiple `message_delta` events (extended thinking), take the last one, not a sum. The `message_start.usage.output_tokens` is always 1 (partial) — do not use it for final settle.
+
+### Table Stakes (Users Expect These)
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Extract `input_tokens` from `message_start` event | Budget enforcement accuracy; current 0-settle is a known bug | MEDIUM | Parse SSE lines, detect `event: message_start`, JSON parse data field |
+| Extract final `output_tokens` from last `message_delta` | Streaming settle must use actual completion tokens | MEDIUM | Track last seen `message_delta.usage.output_tokens`; overwrite on each occurrence |
+| Replace `pipeAndSettle` with usage-aware version | Prerequisite for correct budget tracking | MEDIUM | New function `anthropicStreamAndSettle`; drop-in replacement for `pipeAndSettle` |
+| Pass both token counts to `budgetSettle` | Settle maps `input_tokens` to `promptTokens`, `output_tokens` to `completionTokens` | LOW | Field rename only; `budgetSettle` signature already accepts `{promptTokens, completionTokens}` |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Cache token awareness | Anthropic prompt caching gives 90% discount on cached input; counting cached tokens as full price overstates cost | HIGH | `message_start.usage` may include `cache_read_input_tokens`, `cache_creation_input_tokens`; out of scope for v1.1 |
+| Extended thinking token handling | Thinking tokens billed at different rate | HIGH | Defer to v1.2 |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Re-parse entire response body | Seems safer | Doubles memory use on large responses; Cloudflare Workers memory constrained | Parse SSE incrementally as chunks arrive (existing pattern in `processStreamAndSettle`) |
+| Sum all `message_delta.usage.output_tokens` | Seems correct for multi-turn | Wrong — values are cumulative not incremental, summing causes double-count | Take the last `message_delta.usage.output_tokens` value |
+
+### Edge Cases
+
+- `message_start` arrives in a partial chunk boundary — TextDecoder must use `{ stream: true }` (already the case in `processStreamAndSettle`)
+- No `message_delta` event (error mid-stream) — settle with 0 tokens (safe degradation; audit log records actual cost as 0)
+- Extended thinking: additional `message_delta` events with thinking tokens — use only the final one
+
+### Existing Code Hooks
+
+- `pipeAndSettle()` function is the replacement target — remove it after `anthropicStreamAndSettle` is complete
+- `processStreamAndSettle` (OpenAI version) is the reference implementation — follow same pattern
+- `convertToAnthropicFormat()` correctly passes `stream: true` when streaming
+
+---
+
+## Feature 3: Python Async SDK
+
+### What the Current State Is
+
+`AgentgovTransport` extends `httpx.BaseTransport` (sync). The Python SDK `wrap()` function creates `httpx.Client(transport=...)` and patches `client._client`. Async OpenAI/Anthropic SDK clients use `httpx.AsyncClient` internally and require `httpx.AsyncBaseTransport`.
+
+### How AsyncBaseTransport Works
+
+The pattern mirrors sync exactly, with three changes (HIGH confidence — httpx official docs):
+
+```python
+class AgentgovAsyncTransport(httpx.AsyncBaseTransport):
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        ...
+
+    async def aclose(self) -> None:
+        await self._inner.aclose()
+```
+
+Key API differences from sync version:
+- Method: `handle_async_request` (not `handle_request`)
+- Lifecycle: `aclose()` (not `close()`)
+- Inner transport: `httpx.AsyncHTTPTransport` (not `httpx.HTTPTransport`)
+- Client: `httpx.AsyncClient(transport=...)` (not `httpx.Client`)
+
+The `request.content` read is synchronous even in async context — httpx pre-reads request body before calling the transport method. No `await` needed for request body access.
+
+Response reading: `response.read()` is sync in httpx even for async transports when used with `httpx.Response(content=...)` construction. For agentgov's use case (inspect full body for governance codes), the sync `response.read()` works after constructing from content.
+
+### Table Stakes (Users Expect These)
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| `AgentgovAsyncTransport(httpx.AsyncBaseTransport)` class | `openai.AsyncOpenAI` and `anthropic.AsyncAnthropic` use async httpx clients; sync transport silently hangs | LOW | Parallel class to `AgentgovTransport`; same logic, async method signatures |
+| `async def handle_async_request` method | Required by httpx async transport protocol | LOW | Same URL rewrite + header inject + error inspect logic as sync version |
+| `async def aclose` method | Resource cleanup; production async code uses context managers | LOW | `await self._inner.aclose()` |
+| `wrap_async()` function (or async-capable `wrap()`) | Developers using `AsyncOpenAI` need a drop-in equivalent | LOW | Either overload `wrap()` to detect async client, or add `wrap_async()` |
+| Export `AgentgovAsyncTransport` from `__init__.py` | SDK consistency; users should be able to inject transport manually | LOW | Add to `__all__` |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Auto-detect sync vs async client in `wrap()` | Single API surface; no need to remember `wrap()` vs `wrap_async()` | LOW | Check `isinstance(client, openai.AsyncOpenAI)` or check `hasattr(client, '_async_http_client')` |
+| Streaming response pass-through for async | Async streaming returns `httpx.Response` with streaming body; governance codes are in sync headers | MEDIUM | Governance codes (429, 202, 502) arrive before body; inspect status + headers only for streaming, not body |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Single transport class for both sync and async | Reduces code duplication | httpx does not support duck-typed transport; sync and async transports are separate class hierarchies | Two classes sharing a helper function for the shared logic (URL rewrite, header inject, error parse) |
+| Trio / AnyIO support | Some frameworks use Trio | Adds `anyio` dependency; scope creep | httpx's built-in AsyncHTTPTransport is asyncio-native; document asyncio requirement |
+
+### Edge Cases
+
+- `openai.AsyncOpenAI` stores its httpx client as `_async_http_client` (not `_client`) — verify attribute name before patching
+- `anthropic.AsyncAnthropic` may use a different attribute — inspect at implementation time
+- Python 3.8 compatibility: `async def` and `await` are supported; no issue
+
+### Existing Code Hooks
+
+- `AgentgovTransport` in `_transport.py` is the reference implementation — extract shared logic to `_base.py` helper
+- `_exceptions.py` is shared — no changes needed
+- `tests/` directory exists — add async test using `httpx.MockTransport` or `pytest-asyncio`
+
+---
+
+## Feature 4: Cloudflare Workers Production Deploy
+
+### What "Deploy" Actually Means Here
+
+Current `docker-compose.yml` runs proxy + dashboard on a local machine. "Cloudflare Workers deploy" means:
+- proxy moves to Cloudflare Worker (already runs on Workers in dev with `wrangler dev`)
+- Turso local replaces with Turso cloud instance
+- Secrets (API keys, DB credentials) move to `wrangler secret put`
+- Static dashboard deploys to Cloudflare Pages or bundled into Worker as static assets
+
+The `wrangler.jsonc` already exists with Workflows binding; this feature is primarily about production environment configuration and deployment documentation/automation.
+
+### What wrangler.toml Production Config Requires
+
+Key sections needed (HIGH confidence — Cloudflare official docs):
+
+```toml
+name = "agentgov-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[[workflows]]
+name = "agentgov-hitl"
+binding = "HITL_WORKFLOW"
+class_name = "HitlWorkflow"
+
+[env.production]
+name = "agentgov-proxy"
+# No vars here — all secrets via wrangler secret put
+```
+
+Secrets (never in wrangler config):
+- `TURSO_DATABASE_URL` — `wrangler secret put TURSO_DATABASE_URL --env production`
+- `TURSO_AUTH_TOKEN`
+- `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`
+- `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`
+
+**Turso cloud vs local:** `@libsql/client/web` already used (required for Workers). Turso cloud connection string format: `libsql://[db-name].turso.io`. Auth token from Turso dashboard. Schema migrations must run against cloud DB before first deploy.
+
+**Workflows compatibility:** `compatibility_date = "2024-10-22"` minimum for Workflows binding (already set to `"2025-01-01"` — no change needed).
+
+### Table Stakes (Users Expect These)
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| `[env.production]` section in `wrangler.jsonc` | Production deploy should not share dev config | LOW | Separate `name`, route, and environment-specific vars |
+| All secrets via `wrangler secret put` (not vars) | Security requirement; keys must not appear in version control | LOW | Document the exact `wrangler secret put` commands for each required secret |
+| Turso cloud schema migration step | DB must match schema before first deploy | MEDIUM | Document `turso db shell` migration; or provide a migration script |
+| Dashboard deploy path | Users need to access the React dashboard | MEDIUM | Cloudflare Pages is simpler than bundling static assets into the Worker |
+| `GEMINI_API_KEY` in wrangler config vars (empty default) | Pattern already established for other keys | LOW | Add `"GEMINI_API_KEY": ""` to `vars` block and `ForwardEnv` interface |
+| Deploy documentation | Self-host users need step-by-step | LOW | `DEPLOY.md` or updated README section |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| GitHub Actions workflow for `wrangler deploy` | One-command CI/CD deploy | LOW | Use `cloudflare/wrangler-action`; secrets injected as GitHub secrets |
+| Staged deploy (staging env then production) | Catch regressions before production | MEDIUM | `[env.staging]` + separate Turso DB; adds operational complexity |
+| Custom domain + `routes` config | Production URL branding | LOW | Add `routes` array to `[env.production]` |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Docker in production | Existing self-host works with Docker | Cloudflare Workers cannot run Docker; Docker is for local dev only | Keep Docker Compose for local/self-host; Workers for cloud |
+| D1 instead of Turso | Native Cloudflare DB, no external dependency | D1 does not support `libsql://` protocol; codebase uses Drizzle + `@libsql/client/web` which targets Turso | Stay with Turso; add Turso DB provisioning step to deploy docs |
+| Durable Objects for DB | True Workers-native storage | Requires full DB layer rewrite; not compatible with Drizzle schema | Keep Turso; Durable Objects are for HITL state machine (already planned separately) |
+
+### Edge Cases
+
+- `wrangler.jsonc` (not `.toml`) — Cloudflare supports JSONC format; no change needed, but some docs use `.toml` syntax which requires translation
+- Workflows binding requires the Worker to export the `HitlWorkflow` class — already done in `index.ts`
+- `@libsql/client/web` may require `nodejs_compat` or a specific compatibility flag — verify with current `compatibility_date`
+- Dashboard VITE_API_URL must point to the deployed Worker URL, not localhost — build-time env var injection
+
+### Existing Code Hooks
+
+- `wrangler.jsonc` already has all bindings defined; production env section is the missing piece
+- `createDbClient(url, authToken)` already uses `@libsql/client/web` — no changes needed
+- `index.ts` already exports `HitlWorkflow` class — Workflows binding already wired
+
+---
+
+## Feature 5: Per-Agent Budget UI
+
+### What the Current State Is
+
+`budgetGate()` calls `ensureAgent(db, agentId, DEFAULT_BUDGET_LIMIT_USD)` where `DEFAULT_BUDGET_LIMIT_USD = 10.0` is hardcoded. There is no API to update a specific agent's limit. The dashboard `Costs` page is read-only (displays `limitUsd`, `spentUsd`, `reservedUsd`).
+
+`budget_ledger` table schema: `agentId TEXT PK`, `limitUsd REAL`, `spentUsd REAL`, `reservedUsd REAL`, `updatedAt INTEGER`.
+
+### What CRUD Operations Are Needed
+
+The feature is not a full CRUD — "Create" is implicit on first request via `ensureAgent`. Required operations:
+
+- **Read** (already exists): `/api/v1/dashboard/budgets` returns all agent budget rows
+- **Update**: `PUT /api/v1/budget/:agentId` with `{ limitUsd: number }` — update `limitUsd` for existing agent
+- **Create** (explicit): `POST /api/v1/budget` with `{ agentId: string, limitUsd: number }` — pre-provision an agent before first request
+- **Reset**: `POST /api/v1/budget/:agentId/reset` — set `spentUsd = 0` and `reservedUsd = 0` (for testing/manual correction)
+
+**Validation rules:**
+- `limitUsd >= 0` (0 = effectively disabled / blocked immediately)
+- `limitUsd` must be a number, not NaN or Infinity
+- Cannot lower `limitUsd` below `spentUsd + reservedUsd` without explicit override (or warn user)
+- `agentId` must be non-empty string
+
+### Table Stakes (Users Expect These)
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| `PUT /api/v1/budget/:agentId` proxy API endpoint | Update limit without redeploying; core purpose of the feature | LOW | Drizzle UPDATE on `budget_ledger` where `agentId`; return updated row |
+| Inline edit in Costs page | Row-level "Edit" button to input field to Save | MEDIUM | React 19 state; no form library needed for this level of complexity |
+| Validation: `limitUsd >= 0`, numeric | Prevent nonsense limits | LOW | Client-side + server-side validation |
+| Optimistic UI update after save | Avoid stale display | LOW | React Query `invalidateQueries(['budgets'])` after successful PUT |
+| Error display on save failure | Show validation error inline | LOW | Local state `error` field per row |
+| `POST /api/v1/budget` create-agent endpoint | Pre-provision agents not yet active | LOW | Calls `ensureAgent` with specified limit; 409 if already exists (or upsert) |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Budget utilization bar in row | Visual % used (spent + reserved / limit) | LOW | Pure CSS bar; high visual signal without extra API calls |
+| "Reset spent" action in UI | Testing/monthly reset without SQL | MEDIUM | Add reset endpoint + confirmation modal; careful: resets audit history context |
+| Bulk limit update | Set same limit for multiple agents | MEDIUM | Checkbox selection + bulk PUT; useful for enterprise onboarding |
+| Budget limit history in audit log | When was limit changed, by whom | MEDIUM | Append `budget_limit_changed` audit event on every PUT; display in audit page |
+
+### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Per-model budget limits within an agent | Fine-grained cost control | Adds nested configuration UI and database complexity; banto's multi-tier budget was a known over-engineering trap | Document that agents can be named `agent-id:gpt-4o` for model-level tracking |
+| Budget templates / inheritance | Set a global default then override per agent | Complex config hierarchy; banto's multi-layer budget design proved overly complex | Simple per-agent flat limit; configure default via `DEFAULT_BUDGET_LIMIT_USD` env var |
+| Automatic budget top-up | Recurring budget refresh | Requires cron + payment integration; out of scope for governance layer | Document manual reset endpoint; budget renewal is a business process |
+| Delete agent | Remove agent from ledger | Dangerous — audit history is append-only and references agentId | Soft-disable via setting `limitUsd = 0` |
+
+### Edge Cases
+
+- Agent with active holds when limit is lowered — hold reservation is already deducted from available budget; lowering limit below `spentUsd + reservedUsd` makes `available < 0` but does not cancel active holds. Warn user, but allow the update (holds settle normally).
+- Setting `limitUsd = 0` effectively blocks agent on next request — document this as "pause agent" pattern
+- Concurrent UI + direct API update races — `updatedAt` timestamp in response enables conflict detection; not critical for v1.1
+
+### Existing Code Hooks
+
+- `getBudget()` in `ledger.ts` reads current state — add `updateBudgetLimit(db, agentId, limitUsd)` function alongside it
+- Dashboard routes in proxy are at `/api/v1/dashboard/*` — new budget write endpoints follow same mounting pattern
+- `useBudgets()` React Query hook already polls `/api/v1/dashboard/budgets` — reuse for invalidation
+- `BudgetRow` interface in `useDashboard.ts` already has `limitUsd` — extend for write operations
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Cost calculation (per-request)]
-    └──requires──> [Pricing table (model → $/token)]
-    └──enables──> [Spend aggregation]
-                      └──enables──> [Budget definition]
-                                        └──enables──> [Hard enforcement]
-                                                          └──enables──> [Graceful degradation]
-                                        └──enables──> [Budget alerts]
+Gemini Provider
+    requires──> GEMINI_API_KEY env binding (Cloudflare Workers deploy feature)
+    requires──> Gemini pricing entries in pricing.json (already present)
+    enhances──> accurate streaming settle (Feature 2 pattern reused)
 
-[Hold/Settle pattern]
-    └──requires──> [Budget definition]
-    └──requires──> [Durable state (crash-safe)]
+Anthropic Streaming Settle
+    requires──> existing pipeAndSettle() removal (self-replacement)
+    enhances──> budget accuracy for all streaming Claude calls
 
-[HITL approval routing]
-    └──requires──> [Risk classification (static)]
-    └──requires──> [Async state persistence]
-                       └──requires──> [Durable state (crash-safe)]
-    └──enables──> [Approval audit log]
+Python Async SDK
+    requires──> AgentgovTransport sync version (reference implementation, already built)
+    mirrors──> TypeScript SDK wrap() pattern
 
-[Error classification]
-    └──requires──> [Error taxonomy definition]
-    └──enables──> [Finite retry]
-    └──enables──> [Stuck/loop detection]
-    └──enables──> [3-tier timeout]
+Cloudflare Workers Deploy
+    requires──> GEMINI_API_KEY var added to wrangler.jsonc (Feature 1)
+    requires──> Turso cloud DB provisioned externally
+    enables──> per-agent budget UI (UI needs deployed API URL for production)
 
-[3-tier timeout]
-    └──requires──> [Durable state (crash-safe)]
-    └──enhances──> [HITL approval routing] (timeout on approval wait)
-
-[Append-only audit log]
-    └──requires──> [Cost calculation]
-    └──requires──> [HITL approval routing]
-    └──enhances──> [EU AI Act Article 14 compliance mode]
-
-[SDK (1-line wrap)]
-    └──requires──> [OpenAI-compatible API surface]
-    └──enables──> [All other features] (integration point)
-
-[Durable state (crash-safe)]
-    └──is-shared-by──> [Hold/Settle pattern]
-    └──is-shared-by──> [Async HITL wait]
-    └──is-shared-by──> [3-tier timeout]
-    └──is-shared-by──> [Stuck/loop detection]
+Per-Agent Budget UI
+    requires──> PUT /api/v1/budget/:agentId proxy endpoint (new)
+    requires──> deployed proxy URL for VITE_API_URL (Feature 4, for production)
+    enhances──> Costs page (extends existing read-only table)
 ```
 
 ### Dependency Notes
 
-- **Durable state is the infrastructure primitive:** Hold/Settle, async HITL, 3-tier timeout, and loop detection all require crash-safe persistent state. This must be built in Phase 1 as a shared foundation — not discovered later per feature.
-- **Pricing table gates everything:** Without an accurate, maintainable pricing table, cost calculation is wrong, budgets are wrong, and enforcement is wrong. Must be updated as providers change pricing (this is an ongoing operational cost).
-- **Risk classification must precede HITL routing:** The static action classification taxonomy must be defined before HITL wiring, because classification determines which actions enter the approval queue.
-- **Hold/Settle requires concurrent budget writes to be serialized:** Two agent sessions must not be able to simultaneously read the same budget balance and both conclude they have remaining headroom. Requires row-level locking or optimistic concurrency at the budget store.
+- **Gemini and Cloudflare deploy are coupled**: `GEMINI_API_KEY` must be a wrangler secret before Gemini works in production; these should land in the same phase
+- **Anthropic streaming is independent**: No other feature depends on it; can land in any phase
+- **Python async is independent**: No proxy changes; SDK-only change; can be tested without a deployed proxy
+- **Per-agent budget UI is partially blocked by deploy in production**: The React app needs `VITE_API_URL` pointed at a real proxy; but local dev (Docker Compose) can be used for development and testing
 
 ---
 
-## MVP Definition
+## MVP Definition for v1.1
 
-### Launch With (v1)
+### Must Ship (v1.1 Core)
 
-Minimum needed to validate the core thesis: "1-line governance wrapping an existing client enforces cost budgets deterministically."
+- [ ] Gemini provider forwarding (non-streaming + streaming with accurate settle)
+- [ ] Anthropic streaming settle (replace 0-token settle with SSE parse)
+- [ ] `GEMINI_API_KEY` wrangler binding
+- [ ] `PUT /api/v1/budget/:agentId` API endpoint
+- [ ] Inline edit in dashboard Costs page
 
-- [ ] Per-request cost calculation with pricing table (OpenAI, Anthropic, Google minimum) — without this nothing works
-- [ ] Budget definition: global + per-agent-session — validates the multi-scope hypothesis
-- [ ] Hard enforcement (block on exceeded budget) — the core differentiator vs Portkey/LiteLLM which alert only
-- [ ] Hold/Settle budget pattern — unique proof point vs any competitor; validates crash-safe design
-- [ ] SDK TypeScript: `agentgov.wrap(client)` — adoption requires frictionless integration
-- [ ] Append-only audit log (budget decisions) — compliance starting point; builds trust
-- [ ] Self-host via Docker Compose — enterprise prerequisite; opens dev adoption
-- [ ] Basic dashboard: budget status, session cost, enforcement events — minimum observability
+### Can Slip to v1.1.x
 
-### Add After Validation (v1.x)
+- [ ] Python async SDK (`wrap_async()`) — developers can use sync SDK while waiting; no proxy dependency
+- [ ] Full Cloudflare Workers production deploy config — Docker Compose continues to work for self-host; cloud deploy is a distribution improvement not a functionality gap
+- [ ] `POST /api/v1/budget` (create agent endpoint) — agents auto-create on first request; explicit create is convenience
+- [ ] GitHub Actions CI/CD for wrangler deploy
 
-Add when v1 has users and feedback validates the direction.
+### Defer to v1.2
 
-- [ ] Risk-graded HITL routing (Slack webhook) — add once cost control has traction; HITL is the next pillar
-- [ ] Python SDK — expand to second major ecosystem after TypeScript proves out
-- [ ] Error classification + finite retry — error handling pillar; add once HITL is validated
-- [ ] Stuck/loop detection — higher complexity; add once error classification taxonomy is proven
-- [ ] Graceful degradation to cheaper model — power feature; requires model tier knowledge + routing config
-
-### Future Consideration (v2+)
-
-Defer until product-market fit is established and resources justify the complexity.
-
-- [ ] 3-tier timeout (full implementation) — the soft warning + idle detection layer adds significant complexity over a simple hard timeout; defer until v1 timeouts prove insufficient
-- [ ] EU AI Act Article 14 compliance mode — regulatory deadline 2026-08-02 creates natural forcing function; build when enterprise pipeline materializes
-- [ ] Cryptographic audit log integrity (hash chaining) — important for regulated industries; defer until compliance buyers appear
-- [ ] Cloudflare Workers edge deployment (cloud version) — higher complexity than Docker self-host; validate self-host adoption first
-- [ ] Multi-channel approval (SMS, WhatsApp, email) — Slack webhook is sufficient for early adopters; expand channels based on user requests
-- [ ] Per-session budget inheritance (parent/child) — needed for multi-agent hierarchies; defer until users report needing it
+- [ ] Budget limit change audit log events
+- [ ] Budget utilization bar visualization
+- [ ] Cache token awareness for Anthropic (prompt caching cost accuracy)
+- [ ] Vertex AI / service account auth for Gemini enterprise users
+- [ ] Extended thinking token settle for Anthropic
 
 ---
 
@@ -205,91 +433,52 @@ Defer until product-market fit is established and resources justify the complexi
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Per-request cost calculation | HIGH | LOW | P1 |
-| Hard budget enforcement (block) | HIGH | MEDIUM | P1 |
-| Hold/Settle pattern | HIGH | HIGH | P1 |
-| SDK 1-line wrap (TypeScript) | HIGH | MEDIUM | P1 |
-| Append-only audit log | HIGH | LOW | P1 |
-| Self-host Docker Compose | HIGH | MEDIUM | P1 |
-| Basic dashboard | MEDIUM | MEDIUM | P1 |
-| Budget alerts/notifications | MEDIUM | LOW | P1 |
-| Risk-graded HITL routing | HIGH | HIGH | P2 |
-| Python SDK | HIGH | MEDIUM | P2 |
-| Error classification + retry | HIGH | MEDIUM | P2 |
-| Stuck/loop detection | HIGH | HIGH | P2 |
-| Graceful model degradation | MEDIUM | HIGH | P2 |
-| 3-tier timeout | MEDIUM | HIGH | P3 |
-| EU AI Act compliance mode | HIGH | HIGH | P3 |
-| Cryptographic audit log | MEDIUM | HIGH | P3 |
-| Edge (Cloudflare Workers) cloud | MEDIUM | HIGH | P3 |
-| Multi-channel approval | MEDIUM | MEDIUM | P3 |
-| Per-session budget inheritance | MEDIUM | HIGH | P3 |
+| Gemini provider (non-streaming) | HIGH — top-3 LLM provider, currently 503 | LOW — URL swap + key | P1 |
+| Gemini provider (streaming settle) | HIGH — streaming common; 0-cost is a bug | MEDIUM — reuse existing pattern | P1 |
+| Anthropic streaming settle | HIGH — silent 0-cost bug affects all streaming Claude | MEDIUM — SSE parse | P1 |
+| Per-agent budget API (PUT endpoint) | HIGH — $10 hardcoded is table-stakes blocker | LOW — Drizzle UPDATE | P1 |
+| Per-agent budget UI (inline edit) | HIGH — dashboard is the user-facing surface | MEDIUM — React state + form | P1 |
+| GEMINI_API_KEY wrangler binding | HIGH — prerequisite for Gemini in production | LOW — config addition | P1 |
+| Python async SDK | MEDIUM — affects async Python users specifically | LOW — parallel class | P2 |
+| Cloudflare Workers production deploy config | MEDIUM — cloud deploy, not functionality | LOW — config + docs | P2 |
+| Cloudflare Workers deploy documentation | MEDIUM — self-host users need this | LOW — documentation | P2 |
+| Budget create explicit endpoint | LOW — auto-create on first request covers most cases | LOW | P3 |
+| GitHub Actions CI/CD workflow | LOW — can deploy manually via wrangler | LOW | P3 |
 
 **Priority key:**
-- P1: Must have for launch
-- P2: Should have, add when possible
-- P3: Nice to have, future consideration
+- P1: Must have for v1.1 launch
+- P2: Should have, add when core is complete
+- P3: Nice to have, defer to v1.1.x
 
 ---
 
-## Competitor Feature Analysis
+## Complexity Notes by Feature
 
-| Feature | Portkey | LiteLLM | Langfuse | HumanLayer | AgentOps | AgentBudget | agentgov |
-|---------|---------|---------|---------|------------|---------|------------|---------|
-| Per-request cost calc | Yes | Yes | Yes | No | Yes | Yes | Yes |
-| Hard budget enforcement | Partial (enterprise, key-level) | Yes (key/team/tag/model) | No (tracking only) | No | No | Yes | Yes |
-| Hold/Settle (pessimistic reserve) | No | No | No | No | No | No | Yes |
-| Per-session budget isolation | No | No | No | No | No | Yes (hierarchical) | Yes |
-| Graceful model degradation | No | No | No | No | No | No | Yes (planned) |
-| HITL approval routing | No | No | No | Yes | No | No | Yes |
-| Risk-graded static classification | No | No | No | No | No | No | Yes |
-| Async HITL with state persistence | No | No | No | Yes (basic) | No | No | Yes |
-| Stuck/loop detection | No | No | No | No | No | Yes (loop detection) | Yes |
-| 3-tier timeout | No | No | No | No | No | No | Yes |
-| Append-only audit log | Partial (request log) | Partial (request log) | Yes (traces) | Partial | Yes (traces) | No | Yes |
-| Crash-safe budget state | No | No | No | No | No | No | Yes |
-| SDK 1-line wrap | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Self-host | Yes (OSS) | Yes (OSS) | Yes (OSS) | No | No | No | Yes |
-| EU AI Act compliance positioning | No | No | No | No | No | No | Yes (planned) |
-
-### Key Gaps in Competitors
-
-**Portkey:** Has budget enforcement but it's enterprise-gated (not available in OSS tier), operates at virtual key level (not session level), and has no Hold/Settle pattern. No HITL, no error handling.
-
-**LiteLLM:** Strong budget enforcement across multiple scopes (user/team/provider/tag/model), but no session-level isolation, no Hold/Settle, no HITL, no error handling. Python-only, concurrency concerns under high load.
-
-**Langfuse:** Pure observability — tracking and dashboards but deliberately no enforcement. Was acquired by ClickHouse; focus is shifting to analytics infrastructure, not governance enforcement.
-
-**HumanLayer:** HITL specialist with good multi-channel routing, but no cost control and no error handling. Pivoted to "CodeLayer" (agent coding tools), suggesting HITL-only positioning is insufficient.
-
-**AgentOps:** Monitoring and observability only. No enforcement of any kind. Cost is tracked, not controlled.
-
-**AgentBudget.dev:** Closest to agentgov's cost control vision — has hierarchical sessions, loop detection, webhooks, and hard enforcement. Pure Python library (no proxy/server). No HITL, no error handling. Only one pillar.
-
-**The market gap:** No product combines all three pillars (cost enforcement + HITL + error handling) in a single integration. Every team building production agents assembles this themselves or goes without.
+| Feature | Overall Complexity | Dominant Risk |
+|---------|-------------------|---------------|
+| Gemini provider | LOW-MEDIUM | `stream_options` support on compat layer needs verification; test before shipping |
+| Anthropic streaming settle | MEDIUM | Cumulative vs delta token bug if `message_delta` is misread; easy to get wrong |
+| Python async SDK | LOW | Attribute name `_async_http_client` vs `_client` may differ by SDK version |
+| Cloudflare Workers deploy | LOW | Turso cloud migration step needs explicit documentation; `@libsql/client/web` compat flag |
+| Per-agent budget UI | MEDIUM | Concurrent edit / optimistic update edge case; lowering limit below active holds |
 
 ---
 
 ## Sources
 
-- [Portkey Budget Limits Docs](https://portkey.ai/docs/product/ai-gateway-streamline-llm-integrations/virtual-keys/budget-limits-enterprise-feature) — Portkey's enforcement features (enterprise-tier)
-- [Portkey: How to implement budget limits and alerts](https://portkey.ai/blog/budget-limits-and-alerts-in-llm-apps/) — Hard cap vs soft cap distinction
-- [LiteLLM Budgets, Rate Limits](https://docs.litellm.ai/docs/proxy/users) — User/team-level budget enforcement
-- [LiteLLM Budget Routing](https://docs.litellm.ai/docs/proxy/provider_budget_routing) — Provider-level budget routing
-- [Langfuse Token and Cost Tracking](https://langfuse.com/docs/observability/features/token-and-cost-tracking) — Observability-only cost tracking
-- [HumanLayer HITL features](https://www.permit.io/blog/human-in-the-loop-for-ai-agents-best-practices-frameworks-use-cases-and-demo) — Multi-channel approval, denied message feedback
-- [LangGraph Human-in-the-Loop interrupt](https://blog.langchain.com/making-it-easier-to-build-human-in-the-loop-agents-with-interrupt/) — State persistence for async approval
-- [AgentBudget.dev](https://agentbudget.dev) — Hierarchical budgets, loop detection, hard enforcement
-- [AgentOps GitHub](https://github.com/AgentOps-AI/agentops) — Agent monitoring SDK, cost tracking
-- [EU AI Act Article 14](https://artificialintelligenceact.eu/article/14/) — Human oversight requirements for high-risk AI
-- [5 AI Agent Failure Patterns](https://earezki.com/ai-news/2026-03-07-5-ai-agent-failures-that-will-kill-your-production-deployment-and-how-i-fixed-them/) — Production error patterns
-- [AI Agent Error Handling: 5 Production Patterns](https://blog.jztan.com/ai-agent-error-handling-patterns/) — Circuit breakers, validation gates, dead letter queues
-- [Immutable Audit Log Pipeline using OpenTelemetry](https://oneuptime.com/blog/post/2026-02-06-immutable-audit-log-pipeline-otel/view) — Append-only + hash integrity pattern
-- [GitHub Agent Control Plane GA](https://github.blog/changelog/2026-02-26-enterprise-ai-controls-agent-control-plane-now-generally-available/) — Enterprise control plane concept
-- [Mintlify acquires Helicone](https://www.mintlify.com/blog/mintlify-acquires-helicone) — Helicone in maintenance mode post-acquisition
-- [AI Cost Surges Force New Infrastructure Battle](https://thinkintokens.com/ai-cost-surges-force-new-infrastructure-battle-among-providers/) — FinOps pressure in 2026
-- [How to get AI agent budgets right 2026 (CIO)](https://www.cio.com/article/4099548/how-to-get-ai-agent-budgets-right-in-2026.html) — Enterprise budget concerns
+- [Gemini OpenAI Compatibility Docs](https://ai.google.dev/gemini-api/docs/openai) — MEDIUM confidence (URL pattern and API key format verified via WebSearch)
+- [Gemini stream_options forum discussion](https://discuss.ai.google.dev/t/gemini-openai-compatibility-does-it-support-the-stream-options-parameter/92785) — MEDIUM confidence (community-reported, not official docs)
+- [Anthropic Streaming Messages Docs](https://docs.anthropic.com/en/api/messages-streaming) — HIGH confidence (SSE event structure verified via multiple sources)
+- [Cline issue #4346](https://github.com/cline/cline/issues/4346) — cumulative token counting bug in `message_delta` confirmed in real-world implementation
+- [LangChain issue #10249](https://github.com/langchain-ai/langchainjs/issues/10249) — double-count bug confirmed from summing message_delta values
+- [httpx Transports Docs](https://www.python-httpx.org/advanced/transports/) — HIGH confidence (AsyncBaseTransport interface verified)
+- [httpx Async Docs](https://www.python-httpx.org/async/) — HIGH confidence
+- [Cloudflare Workers Secrets Docs](https://developers.cloudflare.com/workers/configuration/secrets/) — HIGH confidence
+- [Cloudflare Workflows Workers API](https://developers.cloudflare.com/workflows/build/workers-api/) — HIGH confidence (binding config verified)
+- [Cloudflare Turso Workers Tutorial](https://developers.cloudflare.com/workers/tutorials/connect-to-turso-using-workers/) — HIGH confidence
+- Codebase inspection: `packages/proxy/src/passthrough/forward.ts`, `packages/sdk-python/src/agentgov/_transport.py`, `packages/proxy/wrangler.jsonc`, `packages/proxy/pricing.json`, `packages/dashboard/src/hooks/useDashboard.ts`, `packages/proxy/src/budget/ledger.ts`, `packages/proxy/src/budget/gate.ts`
 
 ---
-*Feature research for: Agent Governance Platform (agentgov)*
-*Researched: 2026-03-13*
+
+*Feature research for: agentgov v1.1 Production Readiness (5 target features)*
+*Researched: 2026-03-15*

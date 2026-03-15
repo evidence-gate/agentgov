@@ -1,565 +1,579 @@
 # Architecture Research
 
-**Domain:** Agent Governance Platform (proxy-based, OSS)
-**Researched:** 2026-03-13
-**Confidence:** HIGH (proxy pattern is well-established; agentgov-specific design principles from PROJECT.md are incorporated as-is)
+**Domain:** Agent Governance Platform — v1.1 Integration Architecture
+**Researched:** 2026-03-15
+**Confidence:** HIGH (existing codebase read directly; Anthropic/Gemini API formats verified via official documentation search)
 
-## Standard Architecture
+## Overview: What Changes vs. What Stays the Same
 
-### System Overview
+v1.1 adds 5 features to an already-complete platform. The core request pipeline (`index.ts` → `budgetGate` → `classifyAction` → `forwardToLlm` → `budgetSettle`) is untouched. All 5 features are surgical additions that integrate at well-defined seams.
+
+### Change Classification
+
+| Feature | Scope | Files Changed | New Files |
+|---------|-------|---------------|-----------|
+| Gemini provider | `forward.ts` only | 1 | 0 |
+| Anthropic streaming settle | `forward.ts` only | 1 | 0 |
+| Python async SDK | `sdk-python/` only | 0 | 1 |
+| Cloudflare deploy | `wrangler.jsonc`, `index.ts` env | 1-2 | 0 |
+| Budget CRUD UI | `dashboard/routes.ts`, `useDashboard.ts`, new page | 1 existing + 2 new | 1 route file |
+
+Zero changes to: `index.ts` main pipeline, `budget/gate.ts`, `budget/ledger.ts`, `db/schema.ts`, `audit/writer.ts`, `hitl/*`, `error/*`, `sdk-typescript/*`.
+
+---
+
+## Feature 1: Gemini Provider (forward.ts)
+
+### Current State
+
+`forward.ts` line 94-104: Gemini hits a 503 stub. The routing logic (`resolveProvider`) already returns `'google'` for `gemini-*` models. `pricing.json` already has entries for `gemini-1.5-pro`, `gemini-1.5-flash`, and `gemini-2.0-flash`.
+
+### Integration Point
+
+The Gemini API offers an OpenAI-compatible endpoint at `https://generativelanguage.googleapis.com/v1beta/openai/`. This endpoint accepts the standard `/chat/completions` request format with `Authorization: Bearer $GEMINI_API_KEY`. No request body conversion is needed — the Gemini OpenAI-compat layer handles it server-side.
+
+**What changes in `forward.ts`:**
+1. Add `GEMINI_API_KEY` to `ForwardEnv` interface
+2. Replace the 503 stub block for `provider === 'google'` with a `forwardToGemini()` function
+3. `forwardToGemini()` is structurally identical to `forwardToOpenAI()` — same streaming path, same `stream_options: { include_usage: true }` injection, same `processStreamAndSettle()` reuse
+
+**Streaming settle:** Gemini's OpenAI-compat layer returns SSE in OpenAI format, including the final usage chunk when `stream_options.include_usage: true` is set. The existing `processStreamAndSettle()` function used for OpenAI can be reused without modification.
+
+**Authentication difference:** OpenAI uses `Authorization: Bearer $KEY`. Gemini OpenAI-compat also uses `Authorization: Bearer $GEMINI_API_KEY`. No header change required.
+
+**What does NOT change:** `budgetGate`, `pricing.ts`, `resolveProvider()`. The `gemini-*` prefix routing is already in place.
+
+### Data Flow Delta
+
+```
+Before: resolveProvider('gemini-*') → 'google' → 503 stub
+After:  resolveProvider('gemini-*') → 'google' → forwardToGemini()
+                                                   → fetch generativelanguage.googleapis.com
+                                                   → processStreamAndSettle() [reused]
+                                                   → budgetSettle()
+```
+
+### wrangler.jsonc addition
+
+```jsonc
+"GEMINI_API_KEY": ""   // Add to vars block; set real value in .dev.vars / wrangler secrets
+```
+
+---
+
+## Feature 2: Anthropic Streaming Settle (forward.ts)
+
+### Current State
+
+`forward.ts` lines 360-375: Anthropic streaming uses `pipeAndSettle()`, which pipes the stream through without parsing, then calls `budgetSettle(0, 0)`. The code comment says "TODO: parse Anthropic SSE usage events in a later plan."
+
+### Anthropic SSE Format
+
+Anthropic's streaming SSE event sequence (verified from official docs):
+1. `event: message_start` — contains `usage: { input_tokens: N }` (prompt token count)
+2. `event: content_block_start`, `content_block_delta`, `content_block_stop` — content chunks
+3. `event: message_delta` — contains `usage: { output_tokens: N }` (completion token count, cumulative)
+4. `event: message_stop` — no usage data
+
+The two events to parse: `message_start` (for `input_tokens`) and `message_delta` (for `output_tokens`).
+
+### Integration Point
+
+Replace `pipeAndSettle()` with a new `processAnthropicStreamAndSettle()` function in `forward.ts`. The function mirrors `processStreamAndSettle()` but parses Anthropic SSE event names.
+
+**What changes in `forward.ts`:**
+1. Replace the call to `pipeAndSettle()` in `forwardToAnthropic()` streaming branch with `processAnthropicStreamAndSettle()`
+2. Add `processAnthropicStreamAndSettle()` function that:
+   - Reads chunks, forwards each to writer (same pipe logic)
+   - Decodes text, splits on `\n`
+   - Tracks `event:` lines to know which event type the next `data:` line belongs to
+   - On `event: message_start`, extracts `data.message.usage.input_tokens`
+   - On `event: message_delta`, extracts `data.usage.output_tokens`
+   - After stream ends, calls `budgetSettle(db, holdId, { promptTokens, completionTokens }, model, agentId)`
+
+**SSE parsing note:** Anthropic SSE uses named events (`event: message_start\ndata: {...}\n\n`), unlike OpenAI which uses only `data:` lines. The parser must track the most recently seen `event:` line before parsing the `data:` line.
+
+**What does NOT change:** `forwardToAnthropic()` non-streaming path (already correct — extracts `input_tokens`/`output_tokens` from the response JSON). `budgetSettle()` signature is unchanged.
+
+### Data Flow Delta
+
+```
+Before: Anthropic stream → pipeAndSettle() → budgetSettle(0, 0)
+After:  Anthropic stream → processAnthropicStreamAndSettle()
+                           → parse message_start → input_tokens
+                           → parse message_delta → output_tokens
+                           → budgetSettle(promptTokens, completionTokens)
+```
+
+---
+
+## Feature 3: Python Async SDK (sdk-python)
+
+### Current State
+
+`packages/sdk-python/src/agentgov/_transport.py`: `AgentgovTransport` subclasses `httpx.BaseTransport` (sync) and implements `handle_request()`. The file comment says "Phase 4 MVP: SYNC only. AsyncBaseTransport is deferred."
+
+### Integration Point
+
+Add `AgentgovAsyncTransport` as a parallel class in a new file `_async_transport.py` (or inline in `_transport.py`). The class subclasses `httpx.AsyncBaseTransport` and implements `async def handle_async_request(request: httpx.Request) -> httpx.Response`.
+
+**Interface contract (from httpx docs, HIGH confidence):**
+- Subclass `httpx.AsyncBaseTransport`
+- Implement `async def handle_async_request(self, request: httpx.Request) -> httpx.Response`
+- Implement `async def aclose(self) -> None`
+- Inner transport: use `httpx.AsyncHTTPTransport` as the default inner transport
+
+**What changes:**
+- New file: `packages/sdk-python/src/agentgov/_async_transport.py` (or new class in `_transport.py`)
+- Update `packages/sdk-python/src/agentgov/__init__.py` to export `AgentgovAsyncTransport`
+
+**Logic is identical to sync version, just awaited:**
+- URL rewrite: same logic (synchronous URL manipulation, no await needed)
+- Header injection: same logic
+- Forward: `await self._inner.handle_async_request(rewritten)` instead of `self._inner.handle_request(rewritten)`
+- Response reading: `await response.aread()` instead of `response.read()`
+- Exception raising: same logic (synchronous inspection of already-read content)
+
+**Usage pattern:**
+```python
+async with httpx.AsyncClient(transport=AgentgovAsyncTransport(proxy_url=..., agent_id=...)) as client:
+    response = await client.post(...)
+```
+
+**What does NOT change:** `AgentgovTransport` (sync class unchanged), `__init__.py` exports (add, don't remove), `_exceptions.py` (shared between sync and async).
+
+---
+
+## Feature 4: Cloudflare Workers Deploy (wrangler.jsonc + env mapping)
+
+### Current State
+
+`wrangler.jsonc` exists but uses `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` as empty vars. The `createDbClient()` in `db/client.ts` already uses `@libsql/client/web` (the Workers-compatible import). `index.ts` already checks for `c.env.TURSO_DATABASE_URL` and `c.env.TURSO_AUTH_TOKEN` before initializing the DB.
+
+`index.ts` line 192: `forwardToLlm` receives only `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` from env. Gemini key is not yet passed through.
+
+### Integration Points
+
+**wrangler.jsonc additions:**
+1. Add `GEMINI_API_KEY: ""` to vars block
+2. No new bindings needed — `HITL_WORKFLOW` binding already exists
+
+**`index.ts` changes (minimal):**
+1. Pass `GEMINI_API_KEY: c.env?.GEMINI_API_KEY` to `forwardToLlm()` (line ~192)
+
+**`forward.ts` `ForwardEnv` interface:**
+1. Add `GEMINI_API_KEY?: string`
+
+**`index.node.ts` (Docker entry):**
+1. Add `env['GEMINI_API_KEY'] = process.env['GEMINI_API_KEY'] ?? ''` to the env mapping middleware
+
+**Turso cloud setup (operational, not code):**
+The proxy already works with Turso via `@libsql/client/web`. Cloudflare Workers deploy requires:
+- A Turso cloud database (not embedded file — Workers have no persistent filesystem)
+- `wrangler secret put TURSO_DATABASE_URL` and `wrangler secret put TURSO_AUTH_TOKEN`
+- `wrangler secret put OPENAI_API_KEY` (and Anthropic/Gemini keys)
+
+The `@libsql/client/web` import in `db/client.ts` is already the correct Workers-compatible import path. No code change needed there.
+
+**Migrations:** `db/client.node.ts` runs migrations via `runMigrations()`. For Workers deploy, migrations must be run separately against the Turso cloud DB (e.g., via a local `drizzle-kit push` or a one-off migration script). The Workers runtime does not run migrations on startup.
+
+**HITL_WORKFLOW binding:** Already declared in `wrangler.jsonc` and `HitlWorkflow` already exported from `index.ts`. No change needed.
+
+### Data Flow Delta
+
+```
+Before: Deploy only via Docker (index.node.ts + embedded libSQL)
+After:  Also deploy via: wrangler deploy → index.ts → Turso cloud libSQL
+                         Same pipeline, same DB schema, same code
+                         Env vars from wrangler secrets instead of process.env
+```
+
+---
+
+## Feature 5: Budget CRUD UI (dashboard + proxy)
+
+### Current State
+
+`dashboard/routes.ts`: Three read-only `GET` endpoints (`/budgets`, `/audit`, `/approvals`). The file comment says "SELECT-only. No POST/PUT/DELETE — hard constraint."
+
+`budget/ledger.ts`: Has `ensureAgent()` (INSERT OR IGNORE with hardcoded `$10` default), `getBudget()`, `createHold()`, `settleHold()`. No update-limit function exists.
+
+`budget/gate.ts` line 66: `await ensureAgent(db, agentId, DEFAULT_BUDGET_LIMIT_USD)` with `DEFAULT_BUDGET_LIMIT_USD = 10.0` hardcoded.
+
+`dashboard/src/pages/costs.tsx`: Renders budget table read-only. No mutation UI.
+
+### Integration Points
+
+**New proxy route: `PATCH /api/v1/dashboard/budgets/:agentId`**
+
+Add to `dashboard/routes.ts` (or a new `dashboard/budget-crud.ts` mounted alongside):
+- Body: `{ limitUsd: number }`
+- Validates: `limitUsd > 0`, finite number
+- Operation: `UPDATE budget_ledger SET limit_usd = ?, updated_at = ? WHERE agent_id = ?`
+- Returns: updated row
+
+**New proxy route: `POST /api/v1/dashboard/budgets`**
+
+- Body: `{ agentId: string, limitUsd: number }`
+- Operation: INSERT with `onConflictDoUpdate` — create new agent or update limit
+- Returns: created/updated row
+
+**New proxy route: `DELETE /api/v1/dashboard/budgets/:agentId`** (optional for MVP — can defer)
+
+**`budget/ledger.ts` additions:**
+- `updateBudgetLimit(db, agentId, limitUsd)` — `UPDATE budget_ledger SET limit_usd = ?, updated_at = ? WHERE agent_id = ?`
+- `upsertAgent(db, agentId, limitUsd)` — `INSERT ... ON CONFLICT DO UPDATE SET limit_usd = ?` (replaces hardcoded `ensureAgent` for dashboard use)
+
+**`index.node.ts` change (Docker):**
+The `createDashboardRoutes(db)` call already mounts dashboard routes. The CRUD routes use the same `DockerDbClient` type.
+
+**`index.ts` change (Workers):**
+Dashboard routes are Node.js only (mounted in `index.node.ts`). For Workers deploy, dashboard CRUD endpoints need to be mounted in `index.ts` using the Workers DB client. This creates a structural question: currently the dashboard routes are in a separate file that accepts `DockerDbClient`. They need to accept the abstract `DbClient` type.
+
+**Correct approach:** Refactor `createDashboardRoutes()` to accept `DbClient` (abstract type from `db/client.ts`) instead of `DockerDbClient`. The `DrizzleORM` operations used (`select`, `update`, `insert`) are identical between both client types.
+
+**Dashboard SPA additions:**
+- `useDashboard.ts`: Add `useMutation` hooks for `patchBudgetLimit` (TanStack Query `useMutation` with `onSuccess: () => queryClient.invalidateQueries(['budgets'])`)
+- New `pages/budget-edit.tsx` or inline edit in `costs.tsx`: Input field + Save button per row
+
+### Data Flow Delta
+
+```
+Before: Dashboard → GET /api/v1/dashboard/budgets → read-only display
+After:  Dashboard → GET /api/v1/dashboard/budgets → display
+        User edits limit → PATCH /api/v1/dashboard/budgets/:agentId
+                         → updateBudgetLimit(db, agentId, newLimit)
+                         → invalidate ['budgets'] query → re-fetch
+```
+
+---
+
+## Revised System Overview (v1.1)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          AGENT PROCESS                              │
-│  ┌──────────────┐    ┌──────────────────────────────────────────┐   │
-│  │  Agent Code  │───▶│  agentgov SDK  (TypeScript / Python)     │   │
-│  │  (user app)  │    │  agentgov.wrap(client)                   │   │
-│  └──────────────┘    │  - Rewrites base_url → Proxy             │   │
-│                      │  - Injects agent-id header               │   │
-│                      │  - Surfaces budget errors as exceptions  │   │
-│                      └──────────────┬───────────────────────────┘   │
-└─────────────────────────────────────│───────────────────────────────┘
-                                      │ HTTPS (OpenAI-compat. format)
-┌─────────────────────────────────────▼───────────────────────────────┐
-│                        PROXY LAYER (control plane)                  │
+│  SDK-TS: createAgentgovFetch() / wrap()  [unchanged]                │
+│  SDK-Python sync: AgentgovTransport      [unchanged]                │
+│  SDK-Python async: AgentgovAsyncTransport [NEW]                     │
+└─────────────────────────────┬───────────────────────────────────────┘
+                              │ HTTPS
+┌─────────────────────────────▼───────────────────────────────────────┐
+│                PROXY (index.ts / index.node.ts)                     │
 │                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  Request Ingress  (Hono router, OpenAI-compatible endpoint)  │    │
-│  └────────────────────────┬────────────────────────────────────┘    │
-│                           │                                         │
-│  ┌────────────────────────▼────────────────────────────────────┐    │
-│  │  Auth & Agent Identity  (API key → agent-id mapping)        │    │
-│  └────────────────────────┬────────────────────────────────────┘    │
-│                           │                                         │
-│  ┌────────────────────────▼────────────────────────────────────┐    │
-│  │  Budget Gate  (deterministic, pre-request)                   │    │
-│  │  Hold/Settle pattern: pessimistic reservation               │    │
-│  │  global → provider → model hierarchy                        │    │
-│  │  Graceful degradation: expensive → cheaper model            │    │
-│  └──────────┬─────────────────────────┬───────────────────────┘    │
-│   PASS       │                 BLOCK   │                            │
-│  ┌───────────▼─────────┐  ┌──────────▼──────────────────────┐      │
-│  │  Action Classifier  │  │  Budget Exceeded Response       │      │
-│  │  Reversible /       │  │  (deterministic 429 / graceful  │      │
-│  │  Semi-Reversible /  │  │   fallback to cheaper model)    │      │
-│  │  Irreversible /     │  └─────────────────────────────────┘      │
-│  │  External           │                                            │
-│  └──────────┬──────────┘                                            │
-│  AUTO-PASS  │   HITL-REQUIRED                                       │
-│  ┌──────────▼──────┐  ┌──────────────────────────────────────┐      │
-│  │  LLM Passthrough│  │  HITL Queue  (async suspend/resume)  │      │
-│  │  (forward req)  │  │  pending_approval state persisted    │      │
-│  └──────────┬──────┘  └─────────────┬────────────────────────┘      │
-│             │                       │                               │
-│  ┌──────────▼───────────────────────▼────────────────────────┐      │
-│  │  Error Classifier + Timeout Watchdog                       │      │
-│  │  3-tier: soft-warn → idle-detect → hard-stop              │      │
-│  │  Stuck detection: bounded retry (2 failures → halt)       │      │
-│  └──────────────────────────┬───────────────────────────────┘      │
-│                              │                                      │
-│  ┌───────────────────────────▼──────────────────────────────┐       │
-│  │  Audit Log Writer  (append-only, tamper-evident)          │       │
-│  │  Writes: budget decision, action class, HITL outcome,    │       │
-│  │          error type, timeout events                       │       │
-│  └──────────────────────────────────────────────────────────┘       │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              │               │               │
-┌─────────────▼──┐  ┌─────────▼───────┐  ┌───▼───────────────────┐
-│  LLM Provider  │  │  Approval        │  │  Dashboard            │
-│  (OpenAI,      │  │  Channels        │  │  (read-only)          │
-│   Anthropic,   │  │  Slack / Webhook │  │  Cost, budget,        │
-│   etc.)        │  │  ── notify →     │  │  approval queue       │
-│                │  │  ← approve/deny  │  │  Real-time from DB    │
-└────────────────┘  └─────────────────┘  └───────────────────────┘
+│  Request Pipeline [unchanged]:                                      │
+│  Auth → budgetGate → classifyAction → HITL check → loopDetect       │
+│                                                                     │
+│  forwardToLlm() [forward.ts — 2 changes]:                          │
+│  ├── OpenAI  → processStreamAndSettle()  [unchanged]               │
+│  ├── Anthropic non-stream → extract input/output_tokens [unchanged] │
+│  ├── Anthropic stream → processAnthropicStreamAndSettle() [NEW]    │
+│  └── Gemini  → forwardToGemini() → processStreamAndSettle() [NEW]  │
+│                                                                     │
+│  Dashboard Routes [dashboard/routes.ts — expanded]:                 │
+│  ├── GET  /api/v1/dashboard/budgets       [unchanged]               │
+│  ├── PATCH /api/v1/dashboard/budgets/:id  [NEW]                    │
+│  ├── POST  /api/v1/dashboard/budgets      [NEW]                    │
+│  ├── GET  /api/v1/dashboard/audit         [unchanged]               │
+│  └── GET  /api/v1/dashboard/approvals     [unchanged]               │
+└──────────────┬──────────────────────────────────┬───────────────────┘
+               │                                  │
+┌──────────────▼──────┐                ┌──────────▼─────────────────┐
+│  LLM Providers      │                │  Turso / libSQL             │
+│  OpenAI [exists]    │                │  budget_ledger              │
+│  Anthropic [exists] │                │  holds                      │
+│  Gemini API [NEW]   │                │  audit_log                  │
+│                     │                │  hitl_queue                 │
+└─────────────────────┘                └────────────────────────────┘
+
+Deploy targets:
+- Docker (index.node.ts + embedded libSQL) [exists]
+- Cloudflare Workers (index.ts + Turso cloud) [v1.1 NEW: fully wire env + wrangler secrets]
 ```
 
-### Component Responsibilities
+---
 
-| Component | Responsibility | Owns |
-|-----------|----------------|------|
-| **SDK (TS/Python)** | Intercept LLM client at construction time; rewrite `base_url`; inject `agent-id`; surface `BudgetExceeded` / `HitlPending` exceptions | Zero persistent state |
-| **Proxy / Request Ingress** | OpenAI-compatible HTTP endpoint; validate inbound format; route to internal pipeline | Request lifetime |
-| **Auth & Agent Identity** | Map API key → agent-id; enforce key validity; capability scope (what budgets/models this agent may use) | Agent credential store |
-| **Budget Gate** | Pre-request hold (pessimistic reservation); post-response settle (actual token cost); hierarchy enforcement (global > provider > model); graceful fallback logic | Budget ledger (Turso/libSQL) |
-| **Action Classifier** | Static, deterministic mapping of requested action → risk tier (Reversible / Semi-Reversible / Irreversible / External); HITL trigger decision is code, not LLM | Static rule table |
-| **HITL Queue** | Async suspend: persist pending request; notify approval channels; expose resume endpoint; timeout the pending approval | Approval state store |
-| **Error Classifier + Timeout Watchdog** | Categorize errors by type; route to typed handler; track retry count per agent/session; enforce 3-tier timeout (soft → idle → hard); detect stuck loops | Per-session error state |
-| **Audit Log Writer** | Append-only writes (never update/delete); timestamp + hash chain for tamper evidence; EU AI Act Article 12/14 traceability | Append-only log table |
-| **Approval Channels** | Slack bot (interactive messages) + generic Webhook; async notify → receive approve/deny callback; correlate back to HITL Queue | External integrations |
-| **Dashboard** | Read-only query of audit log + budget ledger; cost summary, budget remaining, approval queue, error rates | No write path |
+## Component Responsibilities (v1.1 delta)
 
-## Recommended Project Structure
+| Component | v1.0 State | v1.1 Change |
+|-----------|-----------|-------------|
+| `forward.ts` | OpenAI stream, Anthropic non-stream, Anthropic stream (0-token settle), Gemini 503 stub | Add `forwardToGemini()`, add `processAnthropicStreamAndSettle()` |
+| `dashboard/routes.ts` | 3 GET endpoints, accepts `DockerDbClient` | Add PATCH + POST endpoints, accept abstract `DbClient` |
+| `budget/ledger.ts` | `ensureAgent` (hardcoded $10), `getBudget`, `createHold`, `settleHold` | Add `updateBudgetLimit()`, `upsertAgent()` |
+| `sdk-python/_transport.py` | Sync `AgentgovTransport` only | Unchanged |
+| `sdk-python/_async_transport.py` | Does not exist | New file: `AgentgovAsyncTransport(httpx.AsyncBaseTransport)` |
+| `sdk-python/__init__.py` | Exports sync transport | Add export for async transport |
+| `wrangler.jsonc` | Missing `GEMINI_API_KEY` | Add `GEMINI_API_KEY: ""` var |
+| `index.ts` | Passes `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` to `forwardToLlm` | Add `GEMINI_API_KEY` passthrough |
+| `index.node.ts` | Maps 9 env vars | Add `GEMINI_API_KEY` mapping |
+| `dashboard/src/hooks/useDashboard.ts` | 3 `useQuery` hooks, read-only | Add `useMutation` hooks for budget CRUD |
+| `dashboard/src/pages/costs.tsx` | Read-only table | Add inline edit controls |
+
+---
+
+## Recommended Project Structure (v1.1 additions only)
 
 ```
-agentgov/
-├── packages/
-│   ├── sdk-typescript/          # npm: @agentgov/sdk
-│   │   ├── src/
-│   │   │   ├── wrap.ts          # agentgov.wrap(client) entry point
-│   │   │   ├── interceptor.ts   # base_url rewrite + header injection
-│   │   │   ├── errors.ts        # BudgetExceeded, HitlPending, AgentError
-│   │   │   └── index.ts
-│   │   └── package.json
-│   │
-│   ├── sdk-python/              # PyPI: agentgov
-│   │   ├── agentgov/
-│   │   │   ├── wrap.py          # agentgov.wrap(client)
-│   │   │   ├── interceptor.py   # httpx transport override
-│   │   │   ├── errors.py        # BudgetExceeded, HitlPending
-│   │   │   └── __init__.py
-│   │   └── pyproject.toml
-│   │
-│   └── proxy/                   # Cloudflare Worker (primary) + Docker (self-host)
-│       ├── src/
-│       │   ├── index.ts         # Hono app entry; route /v1/chat/completions
-│       │   ├── auth/
-│       │   │   └── agent-identity.ts   # API key → agent-id resolution
-│       │   ├── budget/
-│       │   │   ├── gate.ts      # hold/settle logic (deterministic)
-│       │   │   ├── ledger.ts    # Turso DB read/write for budget state
-│       │   │   ├── hierarchy.ts # global > provider > model enforcement
-│       │   │   └── fallback.ts  # graceful degradation (cheaper model)
-│       │   ├── hitl/
-│       │   │   ├── classifier.ts  # static risk-tier mapping
-│       │   │   ├── queue.ts       # suspend / persist / resume
-│       │   │   └── channels/
-│       │   │       ├── slack.ts   # Slack interactive message + callback
-│       │   │       └── webhook.ts # generic outbound + inbound callback
-│       │   ├── errors/
-│       │   │   ├── classifier.ts  # error type → handler routing
-│       │   │   ├── timeout.ts     # 3-tier timeout watchdog
-│       │   │   └── stuck.ts       # bounded retry + loop detection
-│       │   ├── audit/
-│       │   │   └── writer.ts      # append-only log writes
-│       │   ├── passthrough/
-│       │   │   └── forward.ts     # proxy approved request to LLM provider
-│       │   └── types.ts           # shared TypeScript types
-│       ├── wrangler.toml          # Cloudflare Workers config
-│       └── docker-compose.yml     # Self-hosted deployment
-│
-├── dashboard/                     # Read-only web UI
+packages/
+├── proxy/
 │   ├── src/
-│   │   ├── pages/
-│   │   │   ├── costs.tsx          # Cost summary + budget remaining
-│   │   │   ├── approvals.tsx      # Pending HITL queue
-│   │   │   └── audit.tsx          # Audit log viewer
-│   │   └── api/                   # Read-only query endpoints
-│   └── package.json
+│   │   ├── passthrough/
+│   │   │   └── forward.ts              # MODIFY: add forwardToGemini(), processAnthropicStreamAndSettle()
+│   │   ├── budget/
+│   │   │   └── ledger.ts               # MODIFY: add updateBudgetLimit(), upsertAgent()
+│   │   ├── dashboard/
+│   │   │   └── routes.ts               # MODIFY: add PATCH/POST endpoints, change DbClient type
+│   │   ├── index.ts                    # MODIFY: add GEMINI_API_KEY passthrough
+│   │   └── index.node.ts               # MODIFY: add GEMINI_API_KEY env mapping
+│   └── wrangler.jsonc                  # MODIFY: add GEMINI_API_KEY var
 │
-├── docker/
-│   ├── docker-compose.yml         # Full self-hosted stack
-│   ├── proxy/Dockerfile
-│   └── dashboard/Dockerfile
+├── sdk-python/
+│   └── src/agentgov/
+│       ├── _async_transport.py         # NEW: AgentgovAsyncTransport
+│       ├── _transport.py               # unchanged
+│       └── __init__.py                 # MODIFY: export AgentgovAsyncTransport
 │
-└── docs/                          # OSS documentation
+└── dashboard/
+    └── src/
+        ├── hooks/
+        │   └── useDashboard.ts         # MODIFY: add useMutation hooks
+        └── pages/
+            └── costs.tsx               # MODIFY: add inline edit controls
 ```
 
-### Structure Rationale
+---
 
-- **packages/sdk-typescript/ and sdk-python/:** Separate npm + PyPI packages. SDK has zero server dependencies — it only rewrites the `base_url` and injects headers. This keeps the SDK trivially small and auditable.
-- **packages/proxy/src/budget/:** Budget logic is isolated from routing logic. The `gate.ts` module is deterministic code with no LLM calls — consistent with the "LLM does judgment, code does deterministic" principle.
-- **packages/proxy/src/hitl/:** HITL queue is separate from the action classifier. Classifier is a pure function (action → risk tier). Queue handles the stateful suspend/resume lifecycle.
-- **packages/proxy/src/audit/:** Writer-only module. Dashboard reads directly from DB. No write path in dashboard prevents accidental mutation.
-- **dashboard/:** Separate deployable. Can be omitted in minimal deployments. Reads only — no write path into budget or audit tables.
+## Architectural Patterns (v1.1)
 
-## Architectural Patterns
+### Pattern 1: Provider Router Extension (Gemini)
 
-### Pattern 1: Hold/Settle Budget Reservation
+**What:** `resolveProvider()` already returns `'google'` for `gemini-*` models. The extension point is already designed — adding Gemini is filling in the stub, not adding a new routing layer.
 
-**What:** Before forwarding a request to the LLM provider, the Budget Gate reserves (holds) the estimated token cost pessimistically. After the response arrives, it settles to the actual token cost and releases the over-estimate.
+**When to use:** Each new LLM provider follows this pattern: add model prefix to `resolveProvider()`, add API key check, add `forwardToProvider()` function.
 
-**When to use:** All LLM requests. This is the core budget enforcement mechanism. Non-negotiable — without the hold, a budget check at request time is a race condition under concurrent agents.
+**Trade-offs:** No abstraction layer between providers. Each provider function is ~40-60 lines of straightforward fetch logic. This is intentional — provider APIs differ enough that a "generic provider" abstraction adds complexity without reducing code.
 
-**Trade-offs:** Slightly over-blocks near budget limits (hold is pessimistic). Tradeoff is correct: under-blocking causes cost overruns, which is the primary user problem to solve.
+**Critical note:** Gemini's OpenAI-compat endpoint (`generativelanguage.googleapis.com/v1beta/openai/`) accepts the same body as OpenAI and returns the same SSE format. The existing `processStreamAndSettle()` can be reused directly. This is the key insight that makes Gemini a trivial addition.
+
+### Pattern 2: SSE Event-Type Tracking (Anthropic Streaming)
+
+**What:** Anthropic SSE uses named events (`event: message_start\ndata: {...}`). The parser must track the last seen `event:` line to know how to interpret the following `data:` line.
+
+**When to use:** Only for Anthropic streaming. OpenAI SSE uses only `data:` lines (no named events).
 
 **Example:**
 ```typescript
-// budget/gate.ts
-async function budgetGate(ctx: RequestContext): Promise<GateResult> {
-  const estimated = estimateInputTokens(ctx.request); // deterministic, tiktoken
-  const hold = await ledger.hold(ctx.agentId, estimated, ctx.model);
-
-  if (!hold.approved) {
-    // Budget exceeded — check if graceful fallback applies
-    const fallback = hierarchy.findCheaperModel(ctx.model, hold.remaining);
-    if (fallback) return { action: 'fallback', model: fallback, holdId: null };
-    return { action: 'block', reason: 'budget_exceeded' };
+let currentEvent = '';
+for (const line of lines) {
+  if (line.startsWith('event: ')) {
+    currentEvent = line.slice(7).trim();
+  } else if (line.startsWith('data: ')) {
+    const data = line.slice(6).trim();
+    if (currentEvent === 'message_start') {
+      // data contains: { type, message: { usage: { input_tokens } } }
+    } else if (currentEvent === 'message_delta') {
+      // data contains: { type, delta, usage: { output_tokens } }
+    }
   }
-
-  return { action: 'pass', holdId: hold.id };
-}
-
-async function budgetSettle(holdId: string, actualUsage: TokenUsage): Promise<void> {
-  // Called after LLM response received. Settles to actual cost.
-  await ledger.settle(holdId, actualUsage);
-  // Writes to audit log automatically
 }
 ```
 
-### Pattern 2: Static Action Classification (Risk-Graded)
+### Pattern 3: Async Transport Mirror (Python SDK)
 
-**What:** A lookup table maps requested tool/action names (or inferred from request content) to a risk tier. The tier determines whether the request auto-passes or enters the HITL queue. No LLM inference involved in this decision.
+**What:** `AgentgovAsyncTransport` mirrors `AgentgovTransport` exactly, with `async def handle_async_request` instead of `def handle_request`, and `await response.aread()` instead of `response.read()`.
 
-**When to use:** Every request that invokes a tool action. For pure text completion with no tool calls, classification is Reversible and auto-passes.
+**When to use:** When the caller uses `httpx.AsyncClient` with `await client.post(...)`.
 
-**Trade-offs:** Static table requires upfront configuration and periodic review. Avoids the instability of LLM-based HITL triggering (non-deterministic, prompt-injection vulnerable). Correct tradeoff given the security model (agent as untrusted contractor).
+**Trade-offs:** Code duplication between sync and async classes. The alternative (single class with dual mode) is more complex. For ~60 lines of logic, duplication is the correct tradeoff. Exception classes are shared.
+
+### Pattern 4: DbClient Abstraction for Dashboard Routes
+
+**What:** Refactor `createDashboardRoutes()` to accept `DbClient` (the Drizzle/libSQL abstract type) instead of `DockerDbClient`. Both are the return type of `drizzle(client, { schema })` — they have the same API.
+
+**When to use:** Whenever a route module needs to work in both Workers (Turso cloud) and Docker (embedded libSQL) contexts.
 
 **Example:**
 ```typescript
-// hitl/classifier.ts
-const RISK_TABLE: Record<string, RiskTier> = {
-  'read_file':        RiskTier.Reversible,
-  'write_file':       RiskTier.SemiReversible,
-  'delete_file':      RiskTier.Irreversible,
-  'send_email':       RiskTier.External,
-  'call_payment_api': RiskTier.External,
-  // default for unknown actions:
-  '*':                RiskTier.Irreversible,
-};
+// Before: accepts DockerDbClient (Docker-only)
+export function createDashboardRoutes(db: DockerDbClient): Hono
 
-function classifyAction(action: string): RiskTier {
-  return RISK_TABLE[action] ?? RISK_TABLE['*'];
-}
-
-function requiresHitl(tier: RiskTier, policy: HitlPolicy): boolean {
-  // policy is per-agent config (e.g., "require HITL for Irreversible+")
-  return tier >= policy.minimumTierForHitl;
-}
+// After: accepts DbClient (works in both Workers and Docker)
+export function createDashboardRoutes(db: DbClient): Hono
 ```
 
-### Pattern 3: Async HITL Suspend/Resume
+---
 
-**What:** When an action requires human approval, the proxy persists the full request context (serialized), responds to the SDK with `HitlPending` (202 status + approval-id), notifies approval channels (Slack/Webhook), and waits. When the approver responds, a callback endpoint resumes the pending request.
+## Data Flow Changes
 
-**When to use:** Whenever `classifyAction()` + `requiresHitl()` returns true. The resume can happen seconds or hours later — the pending state survives proxy restarts because it is stored in the DB.
-
-**Trade-offs:** Increases latency for HITL-gated actions (by design). Adds complexity in the SDK (caller must handle 202 + poll or receive callback). Resume endpoint must be idempotent (Slack retries webhooks).
-
-**Example:**
-```typescript
-// hitl/queue.ts
-async function suspendForHitl(ctx: RequestContext): Promise<HitlTicket> {
-  const ticket = await db.insert('hitl_queue', {
-    id: crypto.randomUUID(),
-    agentId: ctx.agentId,
-    requestPayload: JSON.stringify(ctx.request),
-    status: 'pending',
-    expiresAt: Date.now() + HITL_TIMEOUT_MS,
-    createdAt: Date.now(),
-  });
-
-  await channels.notify(ticket);  // Slack + Webhook, non-blocking
-  auditLog.write({ event: 'hitl_suspended', ticketId: ticket.id, ...ctx });
-
-  return ticket;
-}
-
-// POST /v1/hitl/:ticketId/approve  (called by Slack callback or webhook)
-async function resumeApproved(ticketId: string, approver: string): Promise<void> {
-  const ticket = await db.get('hitl_queue', ticketId);
-  if (ticket.status !== 'pending') return; // idempotent
-
-  await db.update('hitl_queue', ticketId, { status: 'approved', approver });
-  auditLog.write({ event: 'hitl_approved', ticketId, approver });
-  await forward.resume(ticket); // forward original request to LLM provider
-}
-```
-
-### Pattern 4: Append-Only Audit Log with Hash Chain
-
-**What:** Every budget decision, action classification, HITL event, error, and timeout is written as an immutable row. No UPDATE or DELETE on the audit table. Each row includes a hash of the previous row's hash + current content, creating a tamper-evident chain detectable by sequential verification.
-
-**When to use:** All governance events. Not optional — this is the EU AI Act Article 12/14 compliance backbone and the primary value artifact for enterprise buyers.
-
-**Trade-offs:** Slightly more complex writes (must read previous hash to compute chain). No correction path for erroneous entries — append a correction record instead. Storage grows indefinitely (partition by month for archival).
-
-**Example:**
-```typescript
-// audit/writer.ts
-async function appendAuditEvent(event: AuditEvent): Promise<void> {
-  const prev = await db.queryOne('SELECT hash FROM audit_log ORDER BY seq DESC LIMIT 1');
-  const prevHash = prev?.hash ?? GENESIS_HASH;
-  const payload = JSON.stringify({ ...event, prevHash });
-  const hash = await crypto.subtle.digest('SHA-256', encoder.encode(payload));
-
-  await db.insert('audit_log', {
-    seq: await nextSeq(),
-    event_type: event.type,
-    agent_id: event.agentId,
-    payload,
-    hash: bufferToHex(hash),
-    ts: Date.now(),
-  });
-  // Never UPDATE or DELETE this table
-}
-```
-
-### Pattern 5: 3-Tier Timeout Watchdog
-
-**What:** Three escalating timeout signals per agent session. Soft warning at T1 (log + notify). Idle detection at T2 (if no progress since last check). Hard stop at T3 (terminate session, release all holds, write audit event).
-
-**When to use:** All long-running agent sessions. Prevents runaway agents from holding budget reservations open indefinitely and causing false budget exhaustion.
-
-**Trade-offs:** Requires per-session state tracking. T1/T2/T3 thresholds must be configurable per agent (batch jobs vs. interactive agents have very different profiles).
+### Anthropic Streaming Settle Flow (v1.1)
 
 ```
-T1 (soft warning):  30s of no LLM calls → log + optional Slack ping
-T2 (idle detect):   60s of no LLM calls → mark session idle, alert
-T3 (hard stop):    120s of no LLM calls → terminate, settle all holds at $0
+Anthropic SSE stream
+    ↓
+processAnthropicStreamAndSettle()
+    ├── chunk → decode → split lines
+    ├── line "event: message_start"     → set currentEvent
+    │   next line "data: {...}"         → extract input_tokens
+    ├── line "event: content_block_*"   → forward, ignore for tokens
+    ├── line "event: message_delta"     → set currentEvent
+    │   next line "data: {...}"         → extract output_tokens (cumulative)
+    └── stream done → budgetSettle(promptTokens, completionTokens)
 ```
 
-## Data Flow
-
-### Request Flow (Auto-Pass Path)
+### Budget CRUD Flow (v1.1)
 
 ```
-Agent Code
-  │  openai.chat.completions.create(...)
-  ▼
-SDK (wrap)
-  │  rewrites base_url → proxy URL
-  │  injects X-Agent-Id header
-  ▼
-Proxy: Ingress (Hono /v1/chat/completions)
-  │  validates request format
-  ▼
-Auth & Agent Identity
-  │  resolves API key → agent-id + capability scope
-  ▼
-Budget Gate
-  │  holds estimated input tokens
-  │  checks: global budget ≥ hold? provider budget ≥ hold? model budget ≥ hold?
-  │  YES → hold placed, returns hold-id
-  ▼
-Action Classifier
-  │  maps action/tool → RiskTier
-  │  checks policy: requiresHitl? → NO (auto-pass path)
-  ▼
-LLM Passthrough (forward to provider)
-  │  forwards original request headers + body with real API key
-  │  streams response back to SDK
-  ▼
-Budget Settle (post-response)
-  │  extracts actual token usage from response
-  │  settles hold → actual cost
-  ▼
-Audit Log Write
-  │  appends: budget_decision, action_class, response_tokens, latency_ms
-  ▼
-SDK
-  │  returns response to agent code
-  ▼
-Agent Code
+Dashboard UI: user changes limit field → clicks Save
+    ↓
+useMutation: PATCH /api/v1/dashboard/budgets/:agentId { limitUsd }
+    ↓
+dashboard/routes.ts: PATCH handler
+    ↓
+updateBudgetLimit(db, agentId, limitUsd) [new ledger function]
+    ↓ UPDATE budget_ledger SET limit_usd = ? WHERE agent_id = ?
+    ↓
+onSuccess: queryClient.invalidateQueries(['budgets'])
+    ↓
+useBudgets() re-fetches → table updates
 ```
 
-### Request Flow (HITL Path)
+### Gemini Provider Flow (v1.1)
 
 ```
-[... Auth & Agent Identity ... Budget Gate ...] (same as above)
-  ▼
-Action Classifier → RiskTier.Irreversible → requiresHitl? YES
-  ▼
-HITL Queue: suspendForHitl()
-  │  persists full request context to DB (status: pending)
-  │  notifies Slack / Webhook channels (async, non-blocking)
-  │  returns 202 + { approvalId } to SDK
-  ▼
-SDK: raises HitlPending exception to agent code
-  │  agent code can poll GET /v1/hitl/:id/status
-  │  or register a callback URL for push notification
-
-[Human receives Slack message / webhook]
-  │  clicks Approve or Deny
-  ▼
-Slack callback → POST /v1/hitl/:id/approve or /deny
-  ▼
-HITL Queue: resumeApproved() or resumeDenied()
-  │  updates DB status
-  │  audit log write: hitl_approved / hitl_denied
-  │  if approved: forward original request to LLM provider → settle budget
-  │  if denied:   release hold, audit write, return error to SDK
+Request: model = "gemini-2.0-flash"
+    ↓ (resolveProvider already returns 'google')
+budgetGate: pricing.json has gemini entries → hold created [unchanged]
+    ↓
+forwardToGemini() [NEW]
+    → fetch https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+      headers: Authorization: Bearer $GEMINI_API_KEY
+      body: same OpenAI-format body (Gemini compat layer handles translation)
+    ↓
+processStreamAndSettle() [REUSED — Gemini returns OpenAI SSE format]
+    → extract usage.prompt_tokens / usage.completion_tokens from final chunk
+    → budgetSettle()
 ```
 
-### Request Flow (Budget Blocked Path)
-
-```
-[... Auth & Agent Identity ...]
-  ▼
-Budget Gate: hold fails (budget exhausted)
-  │  checks graceful fallback: cheaper model available within remaining budget?
-  │  YES → rewrite model in request, retry hold → proceed as auto-pass
-  │  NO  → return 429 with BudgetExceeded error body
-  ▼
-Audit Log Write: budget_blocked event
-  ▼
-SDK: raises BudgetExceeded exception
-  ▼
-Agent Code: handles exception (terminate / alert / escalate)
-```
-
-### State Management
-
-```
-Budget Ledger (Turso/libSQL)
-  ├── agent_budgets: global/provider/model limits per agent
-  ├── holds: active pessimistic reservations (holdId, agentId, amount, expiresAt)
-  └── usage_log: settled actual costs (append-friendly, drives dashboard)
-
-HITL State (Turso/libSQL)
-  ├── hitl_queue: pending / approved / denied / expired tickets
-  └── approver_config: who gets notified for which agent / risk tier
-
-Audit Log (Turso/libSQL — append-only table)
-  └── audit_log: seq, event_type, agent_id, payload, hash, ts
-
-Session State (Durable Objects / in-memory for self-host)
-  └── timeout_watchdog: last_activity_ts, retry_counts per session
-```
-
-## Component Boundaries and Build Order
-
-Build order is constrained by dependencies between components. Each layer depends only on what is listed below it.
-
-```
-Layer 0 (foundation, no dependencies):
-  ├── Audit Log Writer (append-only DB writes)
-  ├── Budget Ledger (DB schema + hold/settle)
-  └── Shared Types (TypeScript types package)
-
-Layer 1 (depends on Layer 0):
-  ├── Auth & Agent Identity (reads agent_budgets)
-  ├── Budget Gate (reads/writes holds + ledger)
-  └── Error Classifier + Timeout Watchdog (writes audit log)
-
-Layer 2 (depends on Layer 1):
-  ├── Action Classifier (pure function, no DB dependency)
-  ├── HITL Queue (reads budget state, writes HITL state, writes audit log)
-  └── LLM Passthrough (depends on Budget Gate settle)
-
-Layer 3 (depends on Layer 2):
-  ├── Approval Channels — Slack, Webhook (depends on HITL Queue)
-  ├── Proxy Ingress / Hono Router (orchestrates Layers 0-2)
-  └── SDK TypeScript + Python (depends on Proxy contract only)
-
-Layer 4 (depends on Layer 0, read-only):
-  └── Dashboard (queries audit log + budget ledger)
-```
-
-**Recommended build sequence for phases:**
-1. Budget Gate + Audit Log (core value, prove hold/settle works)
-2. Proxy Ingress + SDK (wire it together, `agentgov.wrap(client)` works end-to-end)
-3. Action Classifier + HITL Queue + Slack channel (HITL path operational)
-4. Error Classifier + Timeout Watchdog (production hardening)
-5. Dashboard (observability layer)
-6. Webhook channel + Python SDK (ecosystem coverage)
-7. Docker Compose self-host packaging (OSS distribution)
-8. Cloudflare Workers deployment (edge/cloud distribution)
-
-## Scaling Considerations
-
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 0-1k agents | Single Cloudflare Worker instance; Turso free tier; no Redis. Durable Objects for session state. |
-| 1k-10k agents | Turso read replicas (embedded replica on each Worker); hold table indexed by (agentId, status). Monitor hold table size — expired holds must be reaped. |
-| 10k-100k agents | Shard budget ledger by agentId prefix. Separate Durable Object per high-throughput agent for session state isolation. Audit log partitioned by month. HITL queue on dedicated table with TTL cleanup job. |
-| 100k+ agents | Budget ledger becomes the bottleneck (high-write, strongly-consistent holds). At this scale: evaluate replacing Turso holds with a Redis-backed counter with Lua scripting for atomic hold/check/deduct. Audit log → object storage (R2) with SQLite index. |
-
-### Scaling Priorities
-
-1. **First bottleneck: hold table write contention.** Every LLM request needs an atomic hold. At scale, concurrent holds from the same agent (parallel tool calls) must be serialized. Solution: Durable Object per agent acts as a single-writer lock for that agent's budget state.
-2. **Second bottleneck: audit log table size.** Audit log is append-only and grows without bound. Solution: monthly partitioning + archival to R2/S3, keeping only the last 90 days in hot storage.
-3. **Third bottleneck: HITL queue polling.** If many approvals are pending, the approver dashboard must paginate efficiently. Solution: indexed query on (status='pending', createdAt DESC).
-
-## Anti-Patterns
-
-### Anti-Pattern 1: LLM-Based HITL Triggering
-
-**What people do:** Use an LLM to decide whether an action "seems risky" and should require human approval.
-
-**Why it's wrong:** LLM judgment is non-deterministic, prompt-injectable, and adds latency + cost to every request. An adversarial agent can craft a prompt that convinces the LLM the action is safe. The HITL trigger is a security control — it must not be LLM-mediated.
-
-**Do this instead:** Static action classification table (Pattern 2 above). Risk tier is a property of the action type, not the content. If content-based classification is needed, require it to be explicitly whitelisted and audited by humans, not auto-decided by LLM.
-
-### Anti-Pattern 2: Post-Request Budget Checking
-
-**What people do:** Forward the LLM request first, then check if the cost exceeded the budget after the response arrives.
-
-**Why it's wrong:** The cost has already been incurred. Post-request checking is accounting, not enforcement. An agent can exhaust $1000 in budget with a single parallel burst before any check fires.
-
-**Do this instead:** Pre-request hold (pessimistic reservation) before forwarding. Post-request settle to actual cost. The hold is the enforcement; the settle is the accounting.
-
-### Anti-Pattern 3: Mutable Audit Log
-
-**What people do:** Update or delete audit log rows to correct errors or remove PII.
-
-**Why it's wrong:** Any mutation breaks the hash chain, making tamper-evidence unverifiable. EU AI Act Article 12 requires tamper-resistant logging. Legal defensibility of audit trails depends on immutability.
-
-**Do this instead:** Append a correction record ("This row corrects row #X. Corrected value: Y. Reason: Z."). For PII, pseudonymize at write time (store agent-id, not PII). If GDPR erasure is required, store PII in a separate table that can be deleted, referenced by agent-id in the audit log.
-
-### Anti-Pattern 4: SDK-Embedded Budget Logic
-
-**What people do:** Put budget enforcement in the SDK client library (client-side checks).
-
-**Why it's wrong:** The agent process is "untrusted contractor" — it could be compromised, patched, or simply use a different SDK. Client-side enforcement is trivially bypassed.
-
-**Do this instead:** All enforcement at the proxy layer (server-side). SDK is a convenience layer only — it rewrites URLs and surfaces errors. It cannot and should not be the enforcement boundary.
-
-### Anti-Pattern 5: Synchronous HITL (Blocking Wait)
-
-**What people do:** Block the HTTP request thread while waiting for human approval (synchronous wait with long timeout).
-
-**Why it's wrong:** Human approvals can take minutes or hours. Holding an HTTP connection open wastes resources, hits gateway timeouts (Cloudflare Workers has a 30s CPU limit, 30min wall-clock limit per Durable Object), and provides no recovery path if the connection drops.
-
-**Do this instead:** Async suspend/resume pattern (Pattern 3 above). Return 202 immediately, store pending state in DB, resume on callback. The agent SDK polls status or receives a push notification.
+---
 
 ## Integration Points
 
-### External Services
+### External Services (v1.1 additions)
 
 | Service | Integration Pattern | Notes |
 |---------|---------------------|-------|
-| OpenAI | Reverse proxy: forward request, stream response back. Use `X-Request-Id` for correlation. | Extract token usage from `stream_options: {include_usage: true}` in streaming responses. |
-| Anthropic | Same reverse proxy pattern. Different auth header (`x-api-key` vs `Authorization: Bearer`). | Token counting: use Anthropic's token count endpoint for pre-request estimation, or tiktoken approximation. |
-| Slack | Outbound: POST to `chat.postMessage` with interactive button. Inbound: `interactivity_request_url` callback to proxy. | Slack enforces 3-second acknowledgment — return 200 immediately, process async. Verify `X-Slack-Signature` HMAC. |
-| Generic Webhook | Outbound: POST approval request. Inbound: callback endpoint with approve/deny decision. | Caller provides callback URL at agent registration time. Idempotency key on all webhook events. |
-| Turso (libSQL) | libSQL HTTP client from Cloudflare Workers (no native SQLite driver in Workers). Embedded replica for self-hosted Docker. | Use `@libsql/client` npm package. In Cloudflare Workers, use HTTP mode (not embedded). |
-| Cloudflare Durable Objects | Per-agent session state (timeout watchdog, retry counters). One DO per active agent session. | DO enforces single-writer concurrency per agent — eliminates hold table race condition. |
+| Gemini API (new) | `POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` with `Authorization: Bearer $GEMINI_API_KEY` | OpenAI-compat endpoint. Returns OpenAI SSE format. `processStreamAndSettle()` reused unchanged. |
+| Anthropic streaming (fix) | Same endpoint as v1.0 (`api.anthropic.com/v1/messages`) | Parse named SSE events: `message_start` for `input_tokens`, `message_delta` for `output_tokens`. |
 
-### Internal Boundaries
+### Internal Boundaries (v1.1 changes)
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| SDK ↔ Proxy | HTTPS, OpenAI-compatible JSON. Extra headers: `X-Agent-Id`, `X-Agentgov-Version`. Responses: standard OpenAI format + `X-Hold-Id` header for traceability. | SDK must not know proxy internals. Contract is the HTTP interface only. |
-| Proxy ↔ Budget Gate | In-process function call (same Worker). No network hop. | Budget Gate is a module, not a service. Keeps latency under 5ms for the budget decision. |
-| Budget Gate ↔ Turso | HTTP (libSQL HTTP client). Atomic hold operation must be a single SQL transaction: `SELECT remaining; INSERT hold; UPDATE remaining`. | In Cloudflare: use DO to serialize concurrent holds from the same agent. |
-| Proxy ↔ HITL Queue | In-process. HITL Queue writes to Turso and invokes Approval Channels async. | Approval Channels are fire-and-forget from the proxy's perspective — audit log captures the notification event. |
-| HITL Queue ↔ Approval Channels | Outbound HTTP (Slack API, arbitrary webhook URL). Inbound: callback endpoint on proxy (`POST /v1/hitl/:id/approve`). | Callback endpoint must verify caller authenticity (Slack HMAC, webhook secret). |
-| Proxy ↔ Audit Log Writer | In-process function call. Every pipeline step calls `auditLog.write()` before returning. | Writer is synchronous within the request — audit write failure is a fatal error (do not silently drop). |
-| Dashboard ↔ Turso | Read-only HTTP queries. No write path from Dashboard to governance tables. | Dashboard uses a separate DB user/token with SELECT-only permissions on audit_log, usage_log, hitl_queue. |
+| Boundary | v1.0 | v1.1 Change |
+|----------|------|-------------|
+| `forwardToLlm()` env | Accepts `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | Add `GEMINI_API_KEY` to `ForwardEnv` interface |
+| `dashboard/routes.ts` DB type | `DockerDbClient` (Docker-only) | Change to `DbClient` (abstract, works in Workers) |
+| Dashboard API contract | GET-only | Add PATCH + POST for budget mutations |
+| Python SDK public API | `AgentgovTransport` | Add `AgentgovAsyncTransport` |
+
+---
+
+## Build Order
+
+Dependencies between the 5 features are minimal. The suggested order optimizes for: (1) independent work first, (2) shared dependency (DbClient refactor) before features that use it.
+
+```
+Step 1 [no dependencies, highest value]:
+  ├── Anthropic streaming settle (forward.ts only — zero risk change)
+  └── Gemini provider (forward.ts only — depends only on pricing.json already having gemini entries)
+
+Step 2 [no dependencies on Step 1]:
+  └── Python async SDK (sdk-python only — fully isolated from proxy)
+
+Step 3 [depends on: budget/ledger.ts changes, DbClient type change]:
+  └── Budget CRUD UI
+      ├── 3a: Add updateBudgetLimit() + upsertAgent() to ledger.ts
+      ├── 3b: Refactor createDashboardRoutes() to accept DbClient
+      ├── 3c: Add PATCH/POST endpoints to dashboard/routes.ts
+      └── 3d: Add useMutation hooks + edit UI to dashboard
+
+Step 4 [depends on Steps 1 + 3b]:
+  └── Cloudflare Workers deploy
+      ├── Add GEMINI_API_KEY to wrangler.jsonc + index.ts + index.node.ts
+      ├── Run migrations against Turso cloud DB
+      └── wrangler deploy + set secrets
+```
+
+Steps 1 and 2 can be done in parallel. Step 3 can begin in parallel with Steps 1-2 since it touches different files. Step 4 must come last (validates that everything works on Workers).
+
+### Rationale for This Order
+
+- Steps 1+2 are pure additions to isolated files — no shared state, no risk of breaking existing behavior
+- Step 3 includes the one slightly risky refactor (DbClient type change in `createDashboardRoutes`) — do this before attempting Workers deploy to validate the abstraction works
+- Step 4 (Workers deploy) is integration validation: it exercises the full prod path and will surface any env/binding issues. Do it last when all features are in.
+
+---
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Adding a Provider Abstraction Layer
+
+**What people do:** Create a `providers/` module with a `LlmProvider` interface and implementations for each provider, replacing the function-per-provider pattern.
+
+**Why it's wrong:** The three providers have meaningfully different auth headers, request formats (OpenAI vs Anthropic), and SSE formats (OpenAI/Gemini vs Anthropic named events). A generic interface requires enough escape hatches that the abstraction provides no actual simplification. For 3 providers at ~60 lines each, functions are correct.
+
+**Do this instead:** Keep `forwardToOpenAI`, `forwardToAnthropic`, `forwardToGemini` as separate functions. Share `processStreamAndSettle()` for providers that return OpenAI SSE format (OpenAI + Gemini). Use a separate parser function for Anthropic.
+
+### Anti-Pattern 2: Migrating to Drizzle Transactions for Budget CRUD
+
+**What people do:** Wrap the `updateBudgetLimit` UPDATE in a DB transaction to be "safe."
+
+**Why it's wrong:** The Turso HTTP client does not support interactive transactions (documented in `ledger.ts` comments). Attempting to use transactions will fail at runtime on the Turso cloud client. The single UPDATE for `limit_usd` is already atomic at the SQL level — no transaction needed.
+
+**Do this instead:** Single `UPDATE budget_ledger SET limit_usd = ?, updated_at = ?` statement. If the update fails, return an error. No transaction wrapping.
+
+### Anti-Pattern 3: Putting Dashboard CRUD Routes in index.ts Main Pipeline
+
+**What people do:** Add the budget PATCH/POST endpoints directly to `index.ts` alongside `/v1/chat/completions`.
+
+**Why it's wrong:** Dashboard routes are observability/management endpoints, not the governance pipeline. Mixing them in `index.ts` makes the main pipeline file harder to read and creates a risk of accidentally applying governance middleware (budget gate, HITL check) to management endpoints.
+
+**Do this instead:** Keep dashboard routes in `dashboard/routes.ts`, mounted via `app.route('/')` in both `index.ts` (Workers) and `index.node.ts` (Docker). The dashboard router is self-contained.
+
+### Anti-Pattern 4: Duplicating Exception Logic in Async Python Transport
+
+**What people do:** Copy the exception-raising logic from `_transport.py` into `_async_transport.py`.
+
+**Why it's wrong (sort of):** The exceptions themselves (`BudgetExceeded`, `HitlPending`, `AgentError`) live in `_exceptions.py` and are shared. The inspection logic (read content, check status code, check error.code) is ~20 lines. Acceptable to duplicate since the alternative (shared helper function) requires careful design for the different sync vs async response types.
+
+**Do this instead:** Import exceptions from `_exceptions.py` in both transport files. Duplicate only the ~20 lines of inspection logic. Keep it readable.
+
+---
+
+## Scaling Considerations
+
+These 5 features do not change the scaling profile of the system. The existing bottlenecks (hold table write contention, audit log growth) are unchanged. Specific notes:
+
+| Feature | Scaling Impact |
+|---------|---------------|
+| Gemini provider | Same as other providers — one hold + one settle per request |
+| Anthropic streaming settle | No impact — replaces 0-cost settle with accurate settle (reduces over-reservation edge cases) |
+| Python async SDK | Client-side only — no server load change |
+| Cloudflare Workers deploy | Enables edge deployment with global latency reduction — improves not degrades scale |
+| Budget CRUD | PATCH/POST on `budget_ledger` are low-frequency admin operations — negligible |
+
+---
 
 ## Sources
 
-- [LiteLLM Proxy Architecture — Life of a Request](https://docs.litellm.ai/docs/proxy/architecture) — reference for proxy pipeline stage ordering
-- [LiteLLM Budget Routing](https://docs.litellm.ai/docs/proxy/provider_budget_routing) — provider-level budget patterns
-- [Cloudflare Durable Objects — What Are Durable Objects?](https://developers.cloudflare.com/durable-objects/concepts/what-are-durable-objects/) — stateful session management
-- [Cloudflare Workflows GA](https://blog.cloudflare.com/workflows-ga-production-ready-durable-execution/) — durable execution patterns
-- [Cloudflare Human-in-the-Loop (Agents SDK)](https://developers.cloudflare.com/agents/concepts/human-in-the-loop/) — HITL suspend/resume pattern
-- [Microsoft Agent Framework — Human-in-the-Loop Workflows](https://learn.microsoft.com/en-us/agent-framework/workflows/human-in-the-loop) — async approval pattern
-- [Human-in-the-Loop Architecture — Agent Patterns](https://www.agentpatterns.tech/en/architecture/human-in-the-loop-architecture) — async HITL architectural patterns
-- [EU AI Act Article 14 — Human Oversight](https://artificialintelligenceact.eu/article/14/) — compliance requirements for HITL
-- [EU AI Act Article 12 — Logging](https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-14) — tamper-resistant audit log requirements
-- [Turso / libSQL — Change Data Capture](https://turso.tech/blog/introducing-change-data-capture-in-turso-sqlite-rewrite) — append-only audit pattern
-- [Distributed SQLite: libSQL and Turso in 2026](https://dev.to/dataformathub/distributed-sqlite-why-libsql-and-turso-are-the-new-standard-in-2026-58fk) — stack validation
-- [AI Agent Governance Architecture Paper (arxiv 2603.07191)](https://arxiv.org/html/2603.07191) — governance framework academic reference
-- [Hardening Best Practices: Sandboxing, Least Privilege](https://skywork.ai/blog/ai-agent/hardening-best-practices-sandboxing-least-privilege-data-exfiltration/) — capability-based security patterns
-- [SHIELDA: Structured Exception Handling in LLM Agents](https://arxiv.org/html/2508.07935v1) — error taxonomy reference
-- [Partnership on AI — Real-Time Failure Detection in AI Agents](https://partnershiponai.org/wp-content/uploads/2025/09/agents-real-time-failure-detection.pdf) — stuck detection and bounded retry patterns
-- [Building an AI Gateway (LLM Proxies/Routers)](https://medium.com/@adnanmasood/primer-on-ai-gateways-llm-proxies-routers-definition-usage-and-purpose-9b714d544f8c) — AI gateway architecture primer
-- [Langfuse / Braintrust observability patterns](https://www.braintrust.dev/articles/best-ai-observability-tools-2026) — dashboard architecture reference
-- [Token Usage with OpenAI Streams](https://openmeter.io/blog/token-usage-with-openai-streams-and-nextjs) — streaming token counting pattern
+- Codebase read directly: `/Users/masa/gsd-workspace/packages/proxy/src/passthrough/forward.ts`, `budget/gate.ts`, `budget/ledger.ts`, `db/schema.ts`, `db/client.ts`, `dashboard/routes.ts`, `index.ts`, `index.node.ts`, `wrangler.jsonc`
+- Codebase read directly: `/Users/masa/gsd-workspace/packages/sdk-python/src/agentgov/_transport.py`
+- Codebase read directly: `/Users/masa/gsd-workspace/packages/dashboard/src/hooks/useDashboard.ts`
+- [Anthropic Streaming Messages API](https://docs.anthropic.com/en/api/messages-streaming) — SSE event sequence: `message_start` (input_tokens), `message_delta` (output_tokens) — MEDIUM confidence (WebSearch verified; official source)
+- [Gemini API OpenAI Compatibility](https://ai.google.dev/gemini-api/docs/openai) — Base URL `https://generativelanguage.googleapis.com/v1beta/openai/`, `Authorization: Bearer $GEMINI_API_KEY` — MEDIUM confidence (WebSearch verified; official source)
+- [HTTPX AsyncBaseTransport](https://www.python-httpx.org/advanced/transports/) — `handle_async_request` method signature for async transports — HIGH confidence (official docs)
+- [Cloudflare Workers + Turso](https://developers.cloudflare.com/workers/databases/third-party-integrations/turso/) — `@libsql/client/web` required import path — HIGH confidence (official Cloudflare docs)
+- [TanStack Query useMutation](https://tanstack.com/query/latest/docs/framework/react/reference/useMutation) — `onSuccess: queryClient.invalidateQueries` pattern — HIGH confidence (official docs)
 
 ---
-*Architecture research for: Agent Governance Platform (agentgov)*
-*Researched: 2026-03-13*
+
+*Architecture research for: agentgov v1.1 integration*
+*Researched: 2026-03-15*

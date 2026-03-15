@@ -1,261 +1,245 @@
 # Project Research Summary
 
-**Project:** agentgov — Agent Governance Platform
-**Domain:** LLM Proxy / Cost Enforcement / Human-in-the-Loop / Error Handling
-**Researched:** 2026-03-13
+**Project:** agentgov v1.1 — Production Readiness
+**Domain:** Agent Governance Platform (LLM proxy, cost enforcement, HITL, audit)
+**Researched:** 2026-03-15
 **Confidence:** HIGH
 
 ## Executive Summary
 
-agentgov is a proxy-layer governance platform for autonomous AI agents, combining three pillars that no competitor currently addresses together: deterministic cost enforcement (pre-request Hold/Settle budget reservation), risk-graded human-in-the-loop approval (static action classification, not LLM-mediated), and structured error handling with loop detection. Experts build products in this space as OpenAI-compatible reverse proxies with a thin SDK that redirects base URLs rather than wrapping business logic client-side. The canonical stack is Hono on Cloudflare Workers for the proxy layer, Turso/libSQL for durable state, and a lightweight TypeScript SDK — with a Docker Compose self-host path using the same Hono code via `@hono/node-server`. The market gap is clear: Portkey handles cost-at-key-level, HumanLayer handles HITL, AgentOps handles observability — but every production team assembles these manually, and none implements Hold/Settle budget reservation, which is the single most important differentiator.
+agentgov v1.1 is a surgical completion sprint on a platform that already works. v1.0 shipped the full governance pipeline — budget hold/settle, HITL risk classification, audit logging, TypeScript SDK, sync Python SDK — but left five explicit gaps: Gemini support returns 503, Anthropic streaming settles at 0 tokens, Python has no async transport, there is no Cloudflare Workers production config, and the per-agent budget limit is hardcoded at $10. These five features are the entire scope of v1.1. Nothing architectural changes; the core request pipeline (`index.ts` → `budgetGate` → `classifyAction` → `forwardToLlm` → `budgetSettle`) is untouched.
 
-The recommended approach is to lead with cost enforcement as the primary hook (cost overruns are felt in developer wallets immediately; HITL value is abstract until something goes wrong), build HITL as a natural second step, and add error handling as the production-hardening layer. The Hold/Settle pattern — pessimistically reserving budget before a request is forwarded, then settling to actual cost — is both the primary technical differentiator and the foundation every other feature depends on. It must be built first and built correctly, because retrofitting atomic budget reservations after other features are layered on top is very high cost.
+The recommended approach for all five features is minimal-diff integration at well-defined seams. Gemini forwarding reuses the existing `processStreamAndSettle()` function by targeting Gemini's OpenAI-compatible endpoint — no format conversion required. Anthropic streaming requires a new SSE parser (`processAnthropicStreamAndSettle`) that tracks named event types (`message_start` for input tokens, `message_delta` for cumulative output tokens) across chunk boundaries; this replaces the existing `pipeAndSettle()` TODO stub. The Python async transport is a parallel class (`AsyncAgentgovTransport`) that mirrors the sync version with awaited method signatures. Production deploy is primarily operational config: `wrangler secret put` for API keys, `[env.production]` section with non-inheritable bindings redeclared, and a `drizzle-kit push` run against Turso cloud before first deploy. The budget CRUD feature adds one `PATCH` endpoint to `dashboard/routes.ts`, one `updateBudgetLimit()` function to `ledger.ts`, and inline edit controls to the Costs page using TanStack Query `useMutation` with optimistic update and `onSettled` invalidation.
 
-The dominant risks are: (1) budget race condition under concurrent requests if Hold/Settle is not atomic from day one, (2) proxy latency creep making the product unusable if audit writes are synchronous and responses are buffered rather than streamed, and (3) pricing data staleness causing silent budget enforcement failure if unknown models default to zero cost instead of failing closed. All three are Phase 1 concerns that cannot be deferred. The EU AI Act Article 14 compliance deadline (August 2026) creates a natural forcing function for the append-only tamper-evident audit log, which should be treated as infrastructure, not a feature.
+The key risk area is not implementation complexity — all five features are LOW to MEDIUM complexity — but integration correctness. The two highest-confidence pitfalls are: (1) Anthropic SSE token splitting across two named events rather than a single final chunk, which silently undercharges if the parser only reads `message_delta`; and (2) the two-entry-point architecture (`index.ts` for Workers, `index.node.ts` for Docker) requiring every new env var to be wired in both places or Docker self-host silently degrades. The production deploy phase also has a non-obvious security trap: Cloudflare Workflows bindings are non-inheritable and must be redeclared in `[env.production]` or HITL approvals crash at runtime with `TypeError: Cannot read properties of undefined (reading 'create')`.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack is unified around the Cloudflare Workers ecosystem for the cloud variant, with Hono as the HTTP framework running identically on Workers and Node.js. This dual-runtime property is critical: the same proxy code runs in Cloudflare for the cloud offering and behind `@hono/node-server` in Docker Compose for enterprise self-host. Turso (libSQL) is the right operational database because it works in both environments — Cloudflare D1 would lock out the self-host path. Cloudflare Durable Objects provide the per-agent single-writer lock needed for atomic budget holds. Cloudflare Workflows (`waitForEvent`) handle HITL pause/resume durably without a custom state machine.
+The v1.0 stack is already installed and validated. v1.1 adds only one new npm package (`@google/genai ^1.45.0`) and two Python dev dependencies (`pytest-asyncio ^1.3.0`, `anyio >=4.0.0`). No other package changes are needed.
 
-See `.planning/research/STACK.md` for full stack details.
+**Core technologies (existing, unchanged):**
+- **Hono ^4.12.7:** HTTP proxy framework — edge-native, runs on Workers and Node.js, zero-overhead middleware chain
+- **Cloudflare Workers + Wrangler ^4:** Production runtime target; Workflows binding (GA April 2025) handles HITL durable state via `step.waitForEvent('approval', { timeout: '24h' })`
+- **Turso / @libsql/client ^0.14.0:** Edge-replicated SQLite; MUST use `/web` subpath import in Workers — default import crashes on deploy
+- **Drizzle ORM ^0.45.1:** Type-safe SQL, Workers-compatible, no connection pool required
+- **React 19 + TanStack Query ^5 + Vite ^6:** Dashboard SPA; `useActionState` built into React 19 replaces deprecated `useFormState`
 
-**Core technologies:**
-- **Hono 4.12.7**: HTTP proxy framework — edge-native, runs on Workers and Node.js, zero-overhead middleware chain maps onto the proxy intercept pattern
-- **Cloudflare Durable Objects**: Per-agent budget ledger — serializes concurrent hold writes from the same agent, eliminates the race condition that all competitors have
-- **Cloudflare Workflows (waitForEvent)**: HITL state machine — durable pause/resume without custom state management, GA April 2025
-- **Turso / libSQL (@libsql/client/web)**: Operational database — SQLite-compatible, works in both Workers and Docker Compose (use `/web` import not `/http` in Workers)
-- **Drizzle ORM 0.45.x**: Type-safe SQL for edge — no connection pool required, drizzle-kit for migrations
-- **Zod 4.3.x**: Request validation + SDK schema — 14x faster than v3, `@zod/mini` at 1.9 KB for SDK bundle
-- **TypeScript SDK (tsup dual CJS+ESM)**: Primary integration surface — `agentgov.wrap(client)` convenience layer, base URL redirect as the production path
-- **React 19 + Vite 6 + @cloudflare/vite-plugin**: Dashboard SPA — keep minimal (cost summary, budget gauges, approval queue)
+**v1.1 additions only:**
+- **@google/genai ^1.45.0:** Official Google SDK; uses Web Fetch API only (no Node.js built-ins, runs in Workers without polyfills); replaces deprecated `@google/generative-ai`
+- **pytest-asyncio ^1.3.0:** Required for async Python SDK tests; `asyncio_mode = "auto"` in `pyproject.toml` is mandatory — without it, async tests silently pass without running
+- **httpx >=0.28.0 (bump from >=0.24.0):** Removes deprecated kwargs; `AsyncBaseTransport.handle_async_request()` API stable from 0.28
 
-**Critical version notes:**
-- Use `wrangler types` for Workers types — do NOT use `@cloudflare/workers-types` npm package (stale)
-- Use `@libsql/client/web` not `@libsql/client` in Workers — the web-specific import is mandatory
-- Verify `@hono/zod-validator` supports Zod v4 at install time
+**What NOT to add:**
+- `@anthropic-ai/sdk` in the proxy (Node.js targeted; breaks Workers bundle)
+- `react-hook-form` or `zod` for the budget form (single numeric input; React 19 `useActionState` suffices)
+- `@google/generative-ai` (deprecated; Gemini 2.0+ features only in `@google/genai`)
+- `@libsql/client` without the `/web` subpath in any Workers-deployed file (crashes at runtime)
 
 ### Expected Features
 
-The MVP thesis is: "1-line governance wrapping an existing client enforces cost budgets deterministically." Everything in v1 must prove this thesis. HITL and error handling are v1.x additions after cost control has traction.
+**Must have for v1.1 (P1 — all must ship):**
+- Gemini provider forwarding (non-streaming + streaming with accurate settle) — top-3 LLM provider; 503 stub is blocking for Gemini users
+- Anthropic streaming settle (replace 0-token settle with SSE parse) — silent financial accuracy bug affecting all streaming Claude calls
+- `GEMINI_API_KEY` wrangler secret binding — prerequisite for Gemini in production
+- `PATCH /api/v1/dashboard/budgets/:agentId` API endpoint — $10 hardcoded limit is a table-stakes blocker
+- Inline budget edit in dashboard Costs page — dashboard is the primary user-facing surface for operators
 
-See `.planning/research/FEATURES.md` for full feature analysis and competitor matrix.
+**Should have (P2 — add when P1 core is complete):**
+- Python async SDK (`AsyncAgentgovTransport`) — affects async Python users; no proxy dependency; can be developed independently
+- Cloudflare Workers production deploy config — Docker Compose continues to work for self-host; cloud deploy is a distribution improvement not a functionality gap
+- Deploy documentation (`DEPLOY.md`) — self-host users need step-by-step
 
-**Must have for v1 (table stakes + core differentiators):**
-- Per-request cost calculation with pricing table (OpenAI, Anthropic, Google) — the atomic primitive
-- Budget definition at global + per-agent-session scope — multi-scope hypothesis validation
-- Hard enforcement (block on exceeded budget) — the differentiator vs Portkey/LiteLLM which alert-only
-- Hold/Settle budget pattern — unique proof point; no competitor implements this
-- SDK TypeScript `agentgov.wrap(client)` + base URL redirect path — adoption requires frictionless integration
-- Append-only audit log for budget decisions — compliance starting point; EU AI Act Article 12
-- Self-host via Docker Compose — enterprise prerequisite
-- Basic dashboard (budget status, session cost, enforcement events) — minimum observability
-
-**Should have after v1 traction (v1.x):**
-- Risk-graded HITL routing (Slack + webhook) — once cost control has users, HITL is the natural second step
-- Python SDK — second major ecosystem
-- Error classification + finite retry
-- Stuck/loop detection (2-failure-stop rule)
-- Graceful degradation to cheaper model on budget soft limit
-
-**Defer to v2+ (after PMF):**
-- 3-tier timeout (soft warning + idle detection full implementation)
-- EU AI Act Article 14 compliance mode with cryptographic audit log integrity
-- Cloudflare Workers cloud deployment (validate self-host adoption first)
-- Multi-channel approval (SMS, WhatsApp, email) — Slack + webhook sufficient for early adopters
-- Per-session budget inheritance for multi-agent hierarchies
-
-**Anti-features to avoid explicitly:**
-- LLM routing/load balancing — commoditized, no differentiation possible
-- Guardrails/content filtering — different buyer, different domain
-- Agent orchestration/memory — destroys "wrap any client" positioning
-- Billing and invoicing — financial-grade infrastructure not justified pre-PMF
+**Defer to v1.2:**
+- Budget limit change audit log events
+- Budget utilization bar visualization
+- Anthropic prompt caching token awareness (`cache_read_input_tokens` at 90% discount)
+- Vertex AI / service account auth for Gemini enterprise users
+- Extended thinking token settle for Anthropic
+- Per-model budget limits within an agent (known over-engineering trap from prior art)
+- Budget templates / inheritance (proven overly complex in comparable systems)
+- Automatic budget top-up (requires cron + payment integration; out of scope)
 
 ### Architecture Approach
 
-The architecture is a linear pipeline: SDK (base URL rewrite) → Proxy Ingress (Hono, OpenAI-compatible endpoint) → Auth & Agent Identity → Budget Gate (Hold/Settle) → Action Classifier (static risk table) → LLM Passthrough or HITL Queue → Error Classifier + Timeout Watchdog → Audit Log Writer. All enforcement is server-side in the proxy; the SDK is a convenience layer only and must not be the enforcement boundary. Build order is constrained by this dependency chain: Audit Log and Budget Ledger must exist before Budget Gate, which must exist before HITL Queue, which must exist before Approval Channels.
+All five v1.1 features are surgical additions at well-defined seams. The core request pipeline is untouched. The complete change scope: `forward.ts` (2 new functions), `dashboard/routes.ts` (2 new endpoints + DbClient type abstraction), `budget/ledger.ts` (2 new functions), `wrangler.jsonc` (1 new var), `index.ts` + `index.node.ts` (1-line env passthrough each), and a new `_async_transport.py` in the Python SDK. Zero changes to `budget/gate.ts`, `db/schema.ts`, `audit/writer.ts`, `hitl/*`, or the TypeScript SDK.
 
-See `.planning/research/ARCHITECTURE.md` for full component breakdown, data flow diagrams, and code patterns.
+**Major components changed in v1.1:**
+1. **`forward.ts` (proxy)** — Add `forwardToGemini()` (fills existing 503 stub; reuses `processStreamAndSettle` since Gemini compat layer returns OpenAI SSE format) and `processAnthropicStreamAndSettle()` (buffered SSE parser tracking named event types; replaces `pipeAndSettle()` TODO stub at 0 tokens)
+2. **`dashboard/routes.ts` + `budget/ledger.ts`** — Refactor `createDashboardRoutes()` to accept abstract `DbClient` (enables both Workers and Docker entry points); add `PATCH` + `POST` budget endpoints; add `updateBudgetLimit()` to ledger (only updates `limit_usd` — NEVER touches `spent_usd` to avoid race conditions with concurrent hold settlements)
+3. **`sdk-python/_async_transport.py`** — New file: `AsyncAgentgovTransport(httpx.AsyncBaseTransport)` mirrors sync class with `async def handle_async_request` and `await response.aread()`; exception logic shared via `_exceptions.py`
 
-**Major components:**
-1. **SDK (TS/Python)** — rewrites `base_url` to proxy URL, injects `X-Agent-Id` header, surfaces `BudgetExceeded` / `HitlPending` exceptions; zero persistent state
-2. **Budget Gate** — pre-request hold (pessimistic reservation via Durable Object per agent), post-response settle; hierarchy: global > provider > model; graceful fallback to cheaper model
-3. **Action Classifier** — static lookup table (action name → RiskTier); never LLM-mediated; Reversible / Semi-Reversible / Irreversible / External
-4. **HITL Queue** — async suspend/resume; persists ticket to Turso before any notification; TTL-based expiry to DENIED; callback endpoint for Slack/webhook resume
-5. **Error Classifier + Timeout Watchdog** — 3-tier timeout (T1 soft warn at 30s / T2 idle detect at 60s / T3 hard stop at 120s); bounded retry (2-failure-stop rule); loop detection
-6. **Audit Log Writer** — append-only, hash-chained SHA-256, DB-level UPDATE/DELETE disabled; every governance event; EU AI Act Article 12/14 backbone
-7. **Dashboard** — read-only queries on audit log + budget ledger; separate DB connection with SELECT-only permissions
+**Key patterns to follow:**
+- **Provider Router Extension:** `resolveProvider()` already returns `'google'` for `gemini-*`; Gemini fills the existing stub — no new routing layer needed
+- **SSE Event-Type Tracking:** Anthropic SSE uses named events requiring stateful buffered parsing; split on `\n\n` for event boundaries, maintain `currentEventType` across lines within each event block
+- **DbClient Abstraction:** `createDashboardRoutes(db: DbClient)` (abstract type) replaces `DockerDbClient` — use same pattern for any future route module needing dual-runtime support
+- **Two-Entry-Point Discipline:** Every new env var in `ForwardEnv` must be wired in both `index.ts` and `index.node.ts` — grep `ForwardEnv` construction sites after each change
 
 ### Critical Pitfalls
 
-1. **Budget race condition under concurrent requests** — Use Hold/Settle from day one (atomic pessimistic reservation before forwarding, settle to actual cost after response). Never use read-then-write check. All enforcement writes must go to Turso primary, not replicas. One Durable Object per agent serializes concurrent holds. This is a Phase 1 requirement; retrofitting is very high cost.
+1. **Anthropic SSE token split across two named events** — `message_start` contains `input_tokens`; `message_delta` contains cumulative `output_tokens`. A parser that only reads the last `usage` field gets 0 input tokens and undercharges by the full prompt cost. Additionally, chunks may split across `event:` / `data:` lines, so the parser must buffer across chunks and track `currentEventType` as state. Use `\n\n` to identify complete event boundaries. Validated by real-world bugs in Cline and LangChain.
 
-2. **Proxy latency creep above 15ms p50** — Keep the synchronous hot path to only: (1) budget hold, (2) stream passthrough, (3) async settle. Audit log writes are fire-and-forget from the hot path. Never buffer the full response body before forwarding. Never do synchronous DB writes per token. Measure p50/p95/p99 overhead in CI; fail if p50 exceeds 15ms.
+2. **Gemini safety blocks return HTTP 200, not 4xx** — `candidates[0].finishReason: "SAFETY"` arrives with status 200. Passing this through as success causes agent retry loops. After any Gemini 200, inspect `finishReason`; if safety-blocked, settle hold at 0 tokens and return `AgentError`. Do NOT retry — safety blocks are permanent for that content.
 
-3. **Pricing data staleness causing silent enforcement failure** — Unknown model names must fail CLOSED (block + warn), never pass through with zero cost. Emit a warning if `pricing.json` is older than 30 days. Provide `agentgov pricing sync` CLI. This is a Phase 1 requirement — unknown-model behavior must be specified before enforcement logic is written.
+3. **Cloudflare Workers bindings are non-inheritable** — Adding `[env.production]` to `wrangler.jsonc` does NOT inherit `[[workflows]]` binding from the top-level config. `c.env.HITL_WORKFLOW` will be `undefined` at runtime, crashing HITL approval triggers with a TypeError. Redeclare all bindings (workflows, vars) in each `[env.X]` block. Verify with `wrangler types --env production`.
 
-4. **Approval state orphaning after crashes** — All approval requests must have an explicit TTL (default 24h). Expired approvals transition to DENIED deterministically. Budget holds have the same TTL as their approval request. Approval state must be persisted to Turso before any notification is sent (not after). This is a Phase 2 requirement that must be in the initial schema.
+4. **Two-entry-point env var gap** — `GEMINI_API_KEY` added to `ForwardEnv` and `wrangler.jsonc` must also be extracted from `process.env` in `index.node.ts`. Missing this means Docker self-host Gemini returns 503 while Workers works. After every env var addition, grep for all `ForwardEnv` construction sites.
 
-5. **HITL-first positioning failure** — Lead all marketing, README, and onboarding with cost control as the primary hook. HITL is opt-in via action classification. HumanLayer pivoted away from standalone HITL positioning — this validates the cost-first approach. Monetization attaches to cost savings, not HITL seats.
+5. **Budget CRUD must only update `limit_usd`** — A full-row `UPDATE ... SET limit_usd = $new, spent_usd = $spent` races with concurrent hold settlements. Turso HTTP does not support interactive transactions. The dashboard `PATCH` endpoint must only set `limit_usd` and `updated_at` — `spent_usd` and `reserved_usd` are exclusively owned by the Hold/Settle machinery.
+
+6. **Python async transport must not inject sync into async client** — `agentgov.wrap(AsyncOpenAI())` with the current sync `AgentgovTransport` causes `RuntimeError: This event loop is already running` on first await. `AsyncAgentgovTransport` must subclass `httpx.AsyncBaseTransport` (not `BaseTransport`). Never use `asyncio.run()` inside `handle_async_request`.
+
+7. **API keys in wrangler.jsonc committed to source control** — `wrangler.jsonc vars` must only contain `""` (empty string placeholder) for secret values. Real secrets are set via `wrangler secret put GEMINI_API_KEY`. Local dev uses `.dev.vars` (never committed). Verify `.gitignore` includes `.dev.vars` before adding Gemini key.
 
 ## Implications for Roadmap
 
-Based on the dependency chain in ARCHITECTURE.md (Layer 0 → Layer 4) and the pitfall-to-phase mapping in PITFALLS.md, the natural phase structure is:
+Features group naturally into 3 phases based on the build-order analysis in ARCHITECTURE.md. The single critical constraint: the DbClient abstraction (Phase 2 prerequisite) must be validated locally before the Workers production deploy (Phase 3 validation). Steps 1 and 2 can be parallelized across developers (different files, no conflicts). Step 3 is serial — depends on both 1 and 2 being complete and tested.
 
-### Phase 1: Budget Engine + Proxy Foundation
+### Phase 1: Core Provider Fixes (forward.ts only)
 
-**Rationale:** Durable state (audit log schema, budget ledger) is the foundation everything else depends on. The Hold/Settle atomicity contract must be established before any other feature layer exists. This phase proves the core thesis.
+**Rationale:** The two proxy-layer bug fixes touch only `forward.ts` — zero risk to other components, no shared state, no dependencies on other v1.1 work. Gemini unblocks an entire category of users immediately. Anthropic streaming settle fixes a silent financial accuracy bug. These are the highest value / lowest risk changes in the entire v1.1 scope.
 
-**Delivers:** Working `agentgov.wrap(client)` TypeScript SDK that enforces cost budgets deterministically. Unknown model fails closed. Streaming-aware hold/settle. Append-only audit log with hash chain.
+**Delivers:** Accurate budget enforcement for all three major LLM providers (OpenAI existing, Anthropic streaming fixed, Gemini new); Gemini provider fully functional end-to-end.
 
-**Addresses (from FEATURES.md):** Per-request cost calculation, budget definition (global + session), hard enforcement (block), Hold/Settle pattern, SDK TypeScript, append-only audit log.
+**Features from FEATURES.md (all P1):**
+- Gemini provider forwarding — non-streaming and streaming with accurate settle
+- Anthropic streaming settle — replace `pipeAndSettle()` TODO with `processAnthropicStreamAndSettle()`
+- `GEMINI_API_KEY` added to `ForwardEnv`, `wrangler.jsonc`, `index.ts`, and `index.node.ts`
 
-**Avoids (from PITFALLS.md):** Budget race condition (Pitfall 1), proxy latency creep (Pitfall 2), pricing staleness (Pitfall 3), streaming token count late enforcement (Pitfall 6), Turso eventual consistency (Pitfall 8), non-append-only audit log (Pitfall 9).
+**Pitfalls to avoid:**
+- Pitfall 11: Gemini field name mismatch — use OpenAI-compat endpoint (Gemini returns OpenAI field names; `processStreamAndSettle` reuses without changes)
+- Pitfall 12: Gemini safety block 200 — inspect `finishReason` after HTTP 200; settle at 0 and return `AgentError`
+- Pitfall 13: Gemini function calling format — use OpenAI-compat endpoint; no format conversion code; HITL classifier already handles OpenAI-format tool_calls
+- Pitfall 14: Anthropic two-event token split — parse `message_start` for `input_tokens` AND `message_delta` for `output_tokens`; do not sum `message_delta` values (they are cumulative)
+- Pitfall 15: Anthropic chunk boundary — buffer text across reads, split on `\n\n` for event boundaries, maintain `currentEventType` state across lines
+- Pitfall 23: Two-entry-point gap — after adding `GEMINI_API_KEY` to `ForwardEnv`, verify both `index.ts` and `index.node.ts` pass it through
 
-**Stack used:** Hono, Cloudflare Durable Objects (hold serialization), Turso/libSQL, Drizzle ORM, Zod 4, Wrangler 4, Vitest + @cloudflare/vitest-pool-workers.
-
-**Must include:** Base URL redirect as the documented primary integration path (not `wrap()` convenience layer) from day one.
-
-**Research flag:** STANDARD PATTERNS — proxy architecture well-documented; Hold/Settle pattern well-understood from banto project.
-
----
-
-### Phase 2: HITL Core + Approval Channels
-
-**Rationale:** HITL requires Phase 1's durable state (HITL queue writes to Turso; budget holds are held during approval). Risk classification schema must be finalized before approval channels are wired. Action Classifier is a pure function (no DB dependency) so it can be built first in this phase, followed by HITL Queue, followed by Slack channel.
-
-**Delivers:** Risk-graded HITL routing with Slack notifications and webhook callback. Approval state survives proxy restarts. TTL expiry to DENIED. Denial reasons returned to agent context.
-
-**Addresses (from FEATURES.md):** Risk-graded HITL routing, async approval with state persistence, approval history/audit trail, approval request routing (Slack + webhook).
-
-**Avoids (from PITFALLS.md):** HITL as a bottleneck (Pitfall 4) — static classification, 10-15% escalation target; approval state orphaning (Pitfall 5) — TTL + Turso persistence before notification; HITL-first positioning failure (Pitfall 10) — cost control already validated in Phase 1 before HITL is exposed.
-
-**Stack used:** Cloudflare Workflows (`waitForEvent` for HITL pause/resume), workers-slack, Hono callback endpoints.
-
-**Research flag:** NEEDS RESEARCH — Slack interactive message format, Cloudflare Workflows `waitForEvent` integration with HITL TTL, idempotency handling for Slack webhook retries.
+**Research flag:** STANDARD PATTERNS — Anthropic SSE format and Gemini OpenAI-compat endpoint are HIGH confidence from official docs. Implementation patterns documented in full in STACK.md.
 
 ---
 
-### Phase 3: Error Handling + Production Hardening
+### Phase 2: Budget CRUD + Python Async SDK
 
-**Rationale:** Error classification and loop detection require per-session state (built in Phase 1) and benefit from the HITL queue (Phase 2) for escalation paths. This phase makes the product production-ready for high-volume autonomous agents.
+**Rationale:** These two features are independent of Phase 1 and of each other, but should land together before Phase 3. The budget CRUD feature includes the one mildly risky refactor (`createDashboardRoutes` DbClient type change) which must be validated in Docker Compose before the Workers deploy. The Python async SDK is entirely isolated in `packages/sdk-python` and can be developed in parallel with budget CRUD.
 
-**Delivers:** Error classification (transient vs permanent), finite retry with backoff, stuck/loop detection (2-failure-stop rule), 3-tier timeout watchdog (T1/T2/T3 configurable per agent).
+**Delivers:** Dashboard operators can set per-agent budget limits without redeploying; Python async agent developers (using `AsyncOpenAI` / `AsyncAnthropic`) get governance enforcement.
 
-**Addresses (from FEATURES.md):** Error classification + finite retry, stuck/loop detection, structured error reporting, partial result return on hard stop.
+**Features from FEATURES.md (P1 + P2):**
+- `PATCH /api/v1/dashboard/budgets/:agentId` endpoint + `updateBudgetLimit()` in ledger (only sets `limit_usd`)
+- `POST /api/v1/dashboard/budgets` explicit agent create endpoint
+- Inline budget edit in dashboard Costs page — TanStack Query `useMutation` with optimistic update + `onSettled` invalidation
+- `AsyncAgentgovTransport(httpx.AsyncBaseTransport)` in new `_async_transport.py`
+- Export `AsyncAgentgovTransport` from `__init__.py`; add `wrap_async()` or async-capable `wrap()`
+- `asyncio_mode = "auto"` in `pyproject.toml` and `pytest-asyncio ^1.3.0` in dev deps
 
-**Avoids (from PITFALLS.md):** Runaway agents consuming budget without progress; agents holding budget reservations open indefinitely via the timeout watchdog releasing all holds at T3.
+**Architecture sub-steps (budget CRUD):**
+- 2a: Add `updateBudgetLimit()` + `upsertAgent()` to `budget/ledger.ts`
+- 2b: Refactor `createDashboardRoutes(db: DbClient)` — abstract type, prerequisite for Phase 3
+- 2c: Add `PATCH` + `POST` endpoints to `dashboard/routes.ts`
+- 2d: Add `useMutation` hooks + inline edit UI to dashboard
+- 2e (parallel): Python async transport — new file `_async_transport.py`
 
-**Stack used:** Cloudflare Durable Objects (per-session timeout state), existing audit log writer.
+**Pitfalls to avoid:**
+- Pitfall 16: Sync transport in async client — `AsyncAgentgovTransport` subclasses `httpx.AsyncBaseTransport`; never inject `httpx.Client` into `AsyncOpenAI`
+- Pitfall 17: pytest-asyncio silent pass — configure `asyncio_mode = "auto"` before writing any async tests; verify with a deliberately failing async canary test
+- Pitfall 21: Budget CRUD clobbers `spent_usd` — dashboard `PATCH` only updates `limit_usd` and `updated_at`; `spent_usd` is exclusively owned by Hold/Settle
+- Pitfall 22: Stale cache after save — use `onSettled` (not `onSuccess`) for `queryClient.invalidateQueries`; use `onMutate` for optimistic update; disable Save button while `mutation.isPending`
 
-**Research flag:** STANDARD PATTERNS — error taxonomy and retry/backoff are well-documented distributed systems patterns; loop detection is defined in GSD-2 design principles.
-
----
-
-### Phase 4: Dashboard + Python SDK
-
-**Rationale:** Dashboard is read-only and depends only on the audit log and budget ledger (Layer 0, already built). It adds no risk to core governance behavior. Python SDK expands ecosystem coverage and follows the same base URL redirect pattern as the TypeScript SDK.
-
-**Delivers:** Read-only dashboard (cost summary, budget gauges, approval queue, audit log viewer). Python SDK (`agentgov.wrap(client)` via httpx transport override).
-
-**Addresses (from FEATURES.md):** Cost dashboard, Python SDK for second major ecosystem.
-
-**Stack used:** React 19 + Vite 6 + @cloudflare/vite-plugin for dashboard; Python pyproject.toml with httpx for Python SDK.
-
-**Research flag:** STANDARD PATTERNS for dashboard. Python SDK transport override is well-documented via Anthropic/OpenAI SDK custom httpx patterns.
-
----
-
-### Phase 5: Self-Host Packaging + Docker Compose
-
-**Rationale:** Defer until v1 core features are proven with early adopters. Self-host is an enterprise prerequisite but not a Day 1 requirement. The Hono + `@hono/node-server` pattern means the proxy code is already Node.js-compatible — packaging is primarily Docker Compose authoring and embedded libSQL configuration.
-
-**Delivers:** Full self-hosted stack via Docker Compose. Same Hono proxy via Node.js adapter. Embedded libSQL for database. Static dashboard bundle.
-
-**Addresses (from FEATURES.md):** Self-hostable deployment (enterprise prerequisite).
-
-**Stack used:** @hono/node-server, libSQL embedded mode, Docker Compose 2.x.
-
-**Research flag:** STANDARD PATTERNS — Docker Compose self-host and @hono/node-server are well-documented. Verify libSQL embedded mode WAL behavior under concurrent writes.
+**Research flag:** STANDARD PATTERNS. TanStack Query mutation + optimistic update pattern is HIGH confidence. Python `AsyncBaseTransport` is HIGH confidence from httpx official docs.
 
 ---
 
-### Phase 6: Cloudflare Workers Cloud Deployment (Optional)
+### Phase 3: Cloudflare Workers Production Deploy
 
-**Rationale:** Defer until self-host adoption is validated. Higher operational complexity (Durable Objects, Cloudflare Workflows binding configuration, R2 for audit log at scale) is not justified before PMF. This is explicitly listed as v2+ in FEATURES.md.
+**Rationale:** Production deploy is integration validation of all v1.1 features running on the Workers runtime with Turso cloud. It must come last. The DbClient abstraction from Phase 2 must be in place so dashboard CRUD routes work in both entry points. All env vars from Phase 1 must be wired. This phase is primarily operational (config + secrets + migration documentation) with minimal code changes.
 
-**Delivers:** Cloud-hosted agentgov endpoint with global edge distribution, R2 audit log for high-volume retention.
+**Delivers:** agentgov proxy deployable to Cloudflare Workers edge (300+ PoPs, <1ms cold start) as an alternative to Docker Compose self-host; Turso cloud DB replaces embedded file DB for the cloud variant.
 
-**Research flag:** NEEDS RESEARCH — Cloudflare Workflows billing at scale, Durable Object costs at 10k+ agents, R2 lifecycle rules for EU AI Act 18-month retention.
+**Features from FEATURES.md (P2):**
+- `[env.production]` section in `wrangler.jsonc` with ALL bindings redeclared (non-inheritable)
+- All secrets via `wrangler secret put` — never in config file; `.dev.vars` for local only
+- Turso cloud schema migration — `drizzle-kit push` against Turso cloud DB before first `wrangler deploy`
+- Dashboard deploy target decision (Cloudflare Pages vs static assets bundled in Worker)
+- Deploy documentation (`DEPLOY.md`) — exact command sequence for secrets, migration, deploy
+- GitHub Actions `wrangler deploy` workflow (P3, optional)
+
+**Pitfalls to avoid:**
+- Pitfall 18: `GEMINI_API_KEY` in `vars` committed — use `wrangler secret put GEMINI_API_KEY`; verify with `git log --all -S "AIza"` before first deploy
+- Pitfall 19: Workflow binding non-inheritable — redeclare `[[workflows]]` and all vars in `[env.production]`; verify with `wrangler types --env production`
+- Pitfall 20: `@libsql/client` without `/web` — enforce with CI grep: `grep -r "@libsql/client'" packages/proxy/src/` must return 0 results
+- Pitfall 23: Two-entry-point verification — run full test suite against both `wrangler dev` and Docker Compose before declaring Phase 3 complete
+
+**Research flag:** NEEDS VERIFICATION — confirm `@libsql/client/web` compat flag behavior with current `compatibility_date` under Wrangler 4.73.0; test `wrangler dev --env production` before writing the deploy runbook. Also confirm dashboard deploy target (Pages vs bundled) before beginning Phase 3 work.
 
 ---
 
 ### Phase Ordering Rationale
 
-- **Phases 1-3 form an unbreakable dependency chain:** Budget ledger must exist before HITL queue, which must exist before error handler escalation paths. The architecture's Layer 0 → Layer 4 build order maps directly onto this phase sequence.
-- **Phase 4 (Dashboard + Python SDK) can start in parallel after Phase 1** because the dashboard is read-only from Layer 0 state, and the Python SDK follows the same pattern as the TypeScript SDK. It is placed at Phase 4 to keep early phases focused.
-- **Phases 5-6 are deliberately late:** Self-host and cloud deployment are distribution strategies, not core product. Validate the governance logic first.
-- **The pitfall-to-phase mapping confirms this ordering:** 6 of 10 pitfalls must be addressed in Phase 1. Attempting to build HITL before Hold/Settle is proven would carry Phase 1 debt into Phase 2.
+- **Phase 1 first:** Highest user value, lowest risk, zero dependencies. Single-file changes with no shared state.
+- **Phase 2 before Phase 3:** DbClient abstraction must be validated in Docker Compose before being tested on Workers. Budget CRUD endpoints need to work in both runtimes before production deploy exercises them.
+- **Phase 3 last:** Workers deploy is the integration validation step — all code must work in Docker Compose first, then the deploy confirms they work in Workers with Turso cloud.
+- **Phases 1 and 2 can be parallelized** — different file ownership, no edit conflicts. Recommended if multiple developers are available.
 
 ### Research Flags
 
-Phases needing `/gsd:research-phase` during planning:
-- **Phase 2 (HITL):** Cloudflare Workflows `waitForEvent` TTL interaction, Slack interactive message idempotency, webhook HMAC verification patterns for Hono.
-- **Phase 6 (Cloud deployment):** Durable Object billing model at scale, R2 lifecycle rules for compliance retention, Cloudflare Workflows step timeout limits vs long-running approvals.
+Phases needing verification during planning:
+- **Phase 1 (Gemini streaming `stream_options`):** MEDIUM confidence that Gemini's OpenAI-compat endpoint supports `stream_options: { include_usage: true }`. Write an integration test against the real Gemini API before shipping. If not supported, implement non-streaming settle fallback.
+- **Phase 3 (Workers deploy):** Verify `compatibility_date` is sufficient for Workflows binding with Wrangler 4.73.0; confirm `@libsql/client/web` compat flag behavior; decide dashboard deploy target (Pages vs bundled).
 
-Phases with standard patterns (skip research-phase):
-- **Phase 1 (Budget Engine):** Proxy pattern, Hold/Settle, and append-only audit log are well-documented. banto project provides direct prior art.
-- **Phase 3 (Error Handling):** Error taxonomy, retry/backoff, and loop detection are standard distributed systems patterns. GSD-2 design principles provide the 3-tier timeout spec.
-- **Phase 4 (Dashboard + Python SDK):** React dashboard and Python httpx transport override are standard patterns.
-- **Phase 5 (Docker Compose):** Self-host packaging is standard; @hono/node-server is official and documented.
+Phases with standard patterns (no additional research needed):
+- **Phase 1 (Anthropic SSE):** Event sequence documented in STACK.md with full implementation example; HIGH confidence from official Anthropic docs.
+- **Phase 2 (Python async transport):** `AsyncBaseTransport` interface is HIGH confidence from httpx official docs; mirrors existing sync class exactly.
+- **Phase 2 (TanStack Query mutation):** Optimistic update + `onSettled` invalidation pattern is HIGH confidence and documented in full in STACK.md.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Core technologies verified via official Cloudflare docs, Hono releases, Drizzle docs. Version numbers confirmed as of March 2026. One medium-confidence item: @hono/zod-validator Zod v4 compatibility — verify at install time. |
-| Features | HIGH | Competitor analysis is thorough with 7 competitors analyzed. Feature gaps well-documented. MVP definition is clear and opinionated. Pricing matrix sourced from official docs. |
-| Architecture | HIGH | Proxy pattern is well-established. agentgov-specific patterns (Hold/Settle, static classification, append-only audit log) are derived from banto project experience and GSD-2 design principles, confirmed by academic references. |
-| Pitfalls | HIGH | 10 pitfalls with verified sources. 6 have prior art from banto or GSD-2. LiteLLM performance degradation and Turso eventual consistency sourced from official documentation and real-world issue reports. |
+| Stack | HIGH | All v1.1 additions verified via official docs and npm/PyPI. One new package (`@google/genai`). Existing stack fully validated via direct codebase inspection. |
+| Features | HIGH | Five features derived from explicit v1.0 gaps and TODO comments in the codebase. Scope is well-bounded. P1 vs P2/P3 prioritization is unambiguous. |
+| Architecture | HIGH | Based on direct codebase inspection of all affected files. Change scope is precisely defined at the file level. Build order has clear dependency rationale from ARCHITECTURE.md. |
+| Pitfalls | HIGH (23 pitfalls documented); MEDIUM (Gemini `stream_options` streaming usage) | v1.0 pitfalls verified via load testing evidence and real-world issue reports (Cline, LangChain). Gemini `stream_options` support is MEDIUM — community-reported, not official docs. All other v1.1 pitfalls verified against official docs and codebase. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Pricing sync source:** `agentgov pricing sync` CLI needs a specific upstream data source. Research candidates: pricepertoken.com API, tokencost Python library, or maintaining a community-managed JSON in a separate repo. Validate availability before Phase 1 is complete.
-- **Cloudflare Workflows step timeout limits:** HITL approvals could take hours. Workflows default step timeout needs verification against the real-world approval latency requirement. If timeout < expected approval time, fall back to Turso state table polling pattern instead of Workflows.
-- **EU AI Act Article 14 enforcement date:** Enforcement begins August 2026 for some high-risk AI systems, with extensions to 2027 for others. Validate which use cases agentgov users are likely to fall into to determine when Phase 6 compliance mode becomes a hard requirement vs. a nice-to-have.
-- **@hono/zod-validator Zod v4 support:** Listed as "verify at install time" in STACK.md. This should be the first thing validated when starting Phase 1 to avoid discovering late that the validator must be replaced.
+- **Gemini `stream_options` streaming usage support:** MEDIUM confidence that Gemini's OpenAI-compat endpoint supports `stream_options: { include_usage: true }`. If not supported, the streaming settle will produce 0 tokens (reproducing the Anthropic bug). Mitigation: integration test against real Gemini API in Phase 1 before shipping; if `stream_options` is unsupported, implement detection and non-streaming settle fallback.
+
+- **`AsyncOpenAI` internal attribute name:** FEATURES.md flags that `AsyncOpenAI` may store its httpx client as `_async_http_client` (not `_client`). The exact attribute name must be verified at implementation time by inspecting the installed SDK version. Getting this wrong causes `wrap_async()` to silently not inject the transport.
+
+- **Turso cloud migration workflow:** Workers runtime does not run `runMigrations()` on startup (only `index.node.ts` does). Phase 3 must document the exact `drizzle-kit push` or `turso db shell` commands for the Turso cloud DB before first deploy. This is an operational gap, not a code gap.
+
+- **Dashboard deploy target:** Cloudflare Pages vs static assets bundled in Worker. Either works; the decision affects `VITE_API_URL` injection timing (Pages: build-time env var; bundled: runtime configuration endpoint). Must be decided before starting Phase 3 implementation.
+
+- **Gemini 2.5 Flash Lite token underreporting:** A documented 2025 bug in `candidatesTokenCount` underreports output tokens by ~8.5x vs actual billing. This is a Gemini-side bug that cannot be fixed in agentgov but should be noted in `pricing.json` comments so operators understand why Gemini cost estimates may be lower than the Gemini invoice.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [Cloudflare Workers docs — Hono](https://developers.cloudflare.com/workers/framework-guides/web-apps/more-web-frameworks/hono/) — official integration guide
-- [Cloudflare Durable Objects — Rules](https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/) — `transaction()` over `blockConcurrencyWhile()`
-- [Cloudflare Workflows GA](https://developers.cloudflare.com/changelog/post/2025-04-07-workflows-ga/) — `waitForEvent` HITL pattern, GA April 2025
-- [Cloudflare Human-in-the-Loop (Agents SDK)](https://developers.cloudflare.com/agents/concepts/human-in-the-loop/) — official HITL patterns
-- [Cloudflare Vite Plugin GA](https://developers.cloudflare.com/changelog/post/2025-04-08-vite-plugin/) — GA April 2025
-- [Drizzle ORM: Turso Cloud](https://orm.drizzle.team/docs/connect-turso) — drizzle-orm + @libsql/client integration
-- [Zod v4 release](https://zod.dev/v4) — v4.3.x, 14x faster, @zod/mini 1.9 KB
-- [Anthropic SDK TypeScript](https://github.com/anthropics/anthropic-sdk-typescript) — custom fetch parameter for proxy
-- [EU AI Act Article 14](https://artificialintelligenceact.eu/article/14/) — human oversight requirements
-- [hono/releases (GitHub)](https://github.com/honojs/hono/releases) — v4.12.7 confirmed March 10, 2026
+- Direct codebase inspection: `packages/proxy/src/passthrough/forward.ts`, `budget/gate.ts`, `budget/ledger.ts`, `db/schema.ts`, `db/client.ts`, `dashboard/routes.ts`, `index.ts`, `index.node.ts`, `wrangler.jsonc`
+- Direct codebase inspection: `packages/sdk-python/src/agentgov/_transport.py`, `packages/dashboard/src/hooks/useDashboard.ts`
+- [Anthropic Messages Streaming API](https://docs.anthropic.com/en/api/messages-streaming) — SSE event sequence, `message_start`/`message_delta` field structure verified
+- [httpx AsyncBaseTransport docs](https://www.python-httpx.org/advanced/transports/) — `handle_async_request` method signature
+- [Cloudflare Workflows Workers API](https://developers.cloudflare.com/workflows/build/workers-api/) — `[[workflows]]` binding syntax, GA April 2025
+- [Cloudflare Workers + Turso integration](https://developers.cloudflare.com/workers/databases/third-party-integrations/turso/) — `/web` import requirement
+- [Cloudflare Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/) — secrets vs vars distinction; non-inheritable bindings
+- [TanStack Query v5 Mutations](https://tanstack.com/query/v5/docs/framework/react/guides/mutations) — `onMutate`/`onError`/`onSettled` pattern
+- [@google/genai npm](https://www.npmjs.com/package/@google/genai) + [googleapis/js-genai](https://github.com/googleapis/js-genai) — Web Fetch API usage, Workers compatibility, v1.45.0 confirmed
+- [pytest-asyncio docs](https://pytest-asyncio.readthedocs.io/) — `asyncio_mode = "auto"` configuration; strict mode default since 0.21
+- [Wrangler v4 changelog](https://developers.cloudflare.com/changelog/post/2025-03-13-wrangler-v4/) — current latest 4.73.0 confirmed
 
 ### Secondary (MEDIUM confidence)
-- [LiteLLM performance: 2-4.5x response time increase](https://github.com/BerriAI/litellm/discussions/4298) — real-world proxy overhead benchmark
-- [HITL fatigue: 43% stop verifying under load](https://onereach.ai/blog/human-in-the-loop-agentic-ai-systems/) — escalation rate research
-- [Turso eventual consistency model](https://betterstack.com/community/guides/databases/turso-explained/) — primary-follower replication
-- [Portkey Budget Limits](https://portkey.ai/docs/product/ai-gateway-streamline-llm-integrations/virtual-keys/budget-limits-enterprise-feature) — competitor feature scope
-- [LiteLLM Budgets, Rate Limits](https://docs.litellm.ai/docs/proxy/users) — competitor budget enforcement
-- [AgentBudget.dev](https://agentbudget.dev) — closest competitor to agentgov cost control vision
-- [AI Agent Error Handling: 5 Production Patterns](https://blog.jztan.com/ai-agent-error-handling-patterns/) — circuit breakers, dead letter queues
-- [Immutable Audit Log Pipeline using OpenTelemetry](https://oneuptime.com/blog/post/2026-02-06-immutable-audit-log-pipeline-otel/view) — hash chain pattern
+- [Gemini API OpenAI Compatibility](https://ai.google.dev/gemini-api/docs/openai) — base URL, API key format (WebSearch verified)
+- [Gemini `stream_options` forum discussion](https://discuss.ai.google.dev/t/gemini-openai-compatibility-does-it-support-the-stream-options-parameter/92785) — community-reported streaming usage support; needs integration test verification
+- [httpx 0.28 release notes](https://newreleases.io/project/pypi/httpx/release/0.28.0) — deprecated `proxies=` and `app=` kwargs removed
 
-### Tertiary (LOW confidence)
-- [AI Agent Governance Architecture Paper (arxiv 2603.07191)](https://arxiv.org/html/2603.07191) — academic governance framework reference (needs validation against production use cases)
-- WebSearch: tsup dual CJS+ESM pattern — multiple consistent sources, no single authoritative reference
+### Tertiary (referenced for pitfall validation)
+- [Cline issue #4346](https://github.com/cline/cline/issues/4346) — real-world confirmation of cumulative token counting bug in Anthropic `message_delta`
+- [LangChain issue #10249](https://github.com/langchain-ai/langchainjs/issues/10249) — double-count bug from summing `message_delta` values confirmed in production
+- Gemini 2.5 Flash Lite `candidatesTokenCount` underreporting bug (~8.5x vs billing) — noted as pricing.json comment recommendation
 
 ---
-*Research completed: 2026-03-13*
+*Research completed: 2026-03-15*
 *Ready for roadmap: yes*
