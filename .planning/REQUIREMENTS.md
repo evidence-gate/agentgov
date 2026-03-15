@@ -46,8 +46,8 @@
 
 ### SDK Enhancement
 
-- [ ] **SDK-06**: Python `AsyncOpenAI`/`AsyncAnthropic`クライアントに対して`agentgov.wrap()`が動作し、async httpxトランスポート経由でプロキシにルーティングされる
-- [ ] **SDK-07**: Python async SDKで`BudgetExceeded`/`HitlPending`/`AgentError`例外がsync版と同一の契約で発生する
+- [x] **SDK-06**: Python `AsyncOpenAI`/`AsyncAnthropic`クライアントに対して`agentgov.wrap()`が動作し、async httpxトランスポート経由でプロキシにルーティングされる
+- [x] **SDK-07**: Python async SDKで`BudgetExceeded`/`HitlPending`/`AgentError`例外がsync版と同一の契約で発生する
 
 ### Infrastructure
 
@@ -115,8 +115,8 @@
 | PROV-01 | Phase 5 (v1.1) | Pending |
 | PROV-02 | Phase 5 (v1.1) | Pending |
 | PROV-03 | Phase 5 (v1.1) | Pending |
-| SDK-06 | Phase 6 (v1.1) | Pending |
-| SDK-07 | Phase 6 (v1.1) | Pending |
+| SDK-06 | Phase 6 (v1.1) | Complete |
+| SDK-07 | Phase 6 (v1.1) | Complete |
 | BUDGET-01 | Phase 6 (v1.1) | Pending |
 | BUDGET-02 | Phase 6 (v1.1) | Pending |
 | DEPLOY-01 | Phase 7 (v1.1) | Pending |

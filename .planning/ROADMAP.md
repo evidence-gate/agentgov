@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **v1.1 (current milestone):**
 - [ ] **Phase 5: Provider Completeness** - Gemini full implementation + Anthropic streaming settle — all three LLM providers enforced accurately
-- [ ] **Phase 6: Python Async SDK + Budget CRUD** - Async Python transport and operator-configurable per-agent budget limits
+- [x] **Phase 6: Python Async SDK + Budget CRUD** - Async Python transport and operator-configurable per-agent budget limits (completed 2026-03-15)
 - [ ] **Phase 7: Cloudflare Workers Production Deploy** - Edge deploy integration validation with Turso cloud and all v1.1 features verified
 
 ## Phase Details
@@ -116,7 +116,7 @@ Plans:
   3. A dashboard operator can change an agent's budget limit via an inline edit on the Costs page, and the new limit is reflected immediately in the budget ledger (subsequent requests are enforced against the new limit, not the old one)
   4. Every budget limit change appears in the audit log with the previous value, new value, timestamp, and actor — the change history is traceable
 
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 06-01-PLAN.md — Python async SDK (AsyncAgentgovTransport, wrap_async(), pytest-asyncio tests) (SDK-06, SDK-07)
@@ -145,5 +145,5 @@ v1.0 complete. v1.1: Phases 5 and 6 are independent and can be parallelized. Pha
 | 3. Error Handling + Production Hardening | 2/2 | Complete | 2026-03-14 |
 | 4. Dashboard + Python SDK + Self-Host | 3/3 | Complete | 2026-03-15 |
 | 5. Provider Completeness | 0/2 | Planned | - |
-| 6. Python Async SDK + Budget CRUD | 0/2 | Planned | - |
+| 6. Python Async SDK + Budget CRUD | 2/2 | Complete   | 2026-03-15 |
 | 7. Cloudflare Workers Production Deploy | 0/? | Not started | - |

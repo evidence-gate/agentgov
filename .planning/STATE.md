@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Production Readiness
-status: Roadmap defined — ready to plan Phase 5
-stopped_at: —
-last_updated: "2026-03-15T09:00:00.000Z"
-last_activity: 2026-03-15 — v1.1 roadmap created (Phases 5–7)
+milestone: v1.0
+milestone_name: milestone
+status: planning
+stopped_at: Completed 06-python-async-sdk-budget-crud-02-PLAN.md
+last_updated: "2026-03-15T10:34:58.304Z"
+last_activity: 2026-03-15 — v1.1 roadmap created
 progress:
-  total_phases: 3
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 7
+  completed_phases: 5
+  total_plans: 14
+  completed_plans: 12
   percent: 0
 ---
 
@@ -71,6 +71,10 @@ Recent decisions affecting current work:
 - [v1.1 Roadmap]: AsyncAgentgovTransport subclasses httpx.AsyncBaseTransport — never use asyncio.run() inside handle_async_request
 - [v1.1 Roadmap]: Cloudflare Workers bindings are non-inheritable — [[workflows]] and all vars must be redeclared in [env.production]
 - [v1.1 Roadmap]: Every new env var in ForwardEnv must be wired in both index.ts and index.node.ts
+- [Phase 06-python-async-sdk-budget-crud]: AsyncAgentgovTransport subclasses httpx.AsyncBaseTransport — never use asyncio.run() inside handle_async_request
+- [Phase 06-01]: wrap_async() uses _client attribute (both AsyncOpenAI and AsyncAnthropic store httpx async client as _client)
+- [Phase 06-python-async-sdk-budget-crud]: routes.ts changed from DockerDbClient to DbClient — structurally identical, enables Workers deploy in Phase 7
+- [Phase 06-python-async-sdk-budget-crud]: updateBudgetLimit only sets limitUsd + updatedAt — spentUsd/reservedUsd exclusively owned by Hold/Settle
 
 ### Pending Todos
 
@@ -85,6 +89,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-15T09:00:00.000Z
-Stopped at: —
+Last session: 2026-03-15T10:34:58.301Z
+Stopped at: Completed 06-python-async-sdk-budget-crud-02-PLAN.md
 Resume file: None
