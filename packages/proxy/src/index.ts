@@ -3,7 +3,7 @@ import { createDbClient } from './db/client';
 import { budgetGate, budgetSettle } from './budget/gate';
 import { forwardToLlm } from './passthrough/forward';
 import { checkAndFireAlerts } from './budget/alerts';
-import { classifyAction } from './hitl/classifier';
+import { classifyAction, type RiskTier } from './hitl/classifier';
 import { hitlRoutes } from './hitl/routes';
 import { createLoopDetector, fingerprintAction, recordAction } from './error/loop-detector';
 import { buildAgentErrorResponse } from './error/reporter';
@@ -237,7 +237,7 @@ function extractToolCalls(body: ChatCompletionRequest): string[] {
  */
 function classifyToolCalls(
   toolCallNames: string[],
-): { required: false } | { required: true; tier: string; actionName: string } {
+): { required: false } | { required: true; tier: RiskTier; actionName: string } {
   for (const name of toolCallNames) {
     const result = classifyAction(name);
     if (result.required) {

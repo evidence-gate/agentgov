@@ -37,5 +37,44 @@
     "SLACK_BOT_TOKEN": "",
     "SLACK_CHANNEL_ID": "",
     "SLACK_SIGNING_SECRET": ""
+  },
+
+  // Production environment — bindings are non-inheritable in Cloudflare Workers.
+  // Every workflows entry and every vars key must be redeclared here.
+  // Actual secret values are set via: wrangler secret put <KEY> --env production
+  // NEVER put real secret values in this file.
+  "env": {
+    "production": {
+      // Explicit name avoids accidental dev/production Worker collision
+      "name": "agentgov-proxy-production",
+
+      // Workflows binding redeclared (non-inheritable from top-level)
+      // class_name MUST match the exported class name in src/index.ts
+      "workflows": [
+        {
+          "name": "agentgov-hitl-production",
+          "binding": "HITL_WORKFLOW",
+          "class_name": "HitlWorkflow"
+        }
+      ],
+
+      // All 12 vars redeclared — actual secret values set via wrangler secret put --env production
+      // Non-secret config vars with stable defaults are kept here; all secrets remain empty string
+      "vars": {
+        "TURSO_DATABASE_URL": "",
+        "TURSO_AUTH_TOKEN": "",
+        "OPENAI_API_KEY": "",
+        "ANTHROPIC_API_KEY": "",
+        "GEMINI_API_KEY": "",
+        "AGENTGOV_ALERT_WEBHOOK_URL": "",
+        // Non-secret defaults (safe to commit)
+        "AGENTGOV_ALERT_THRESHOLDS": "0.80,1.00",
+        "AGENTGOV_HITL_TTL_SECONDS": "259200",
+        "AGENTGOV_HITL_WEBHOOK_URL": "",
+        "SLACK_BOT_TOKEN": "",
+        "SLACK_CHANNEL_ID": "",
+        "SLACK_SIGNING_SECRET": ""
+      }
+    }
   }
 }
