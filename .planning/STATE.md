@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Production Readiness
-status: in-progress
-stopped_at: Completed 07-cloudflare-workers-production-deploy-01-PLAN.md (checkpoint:human-action — awaiting deploy)
-last_updated: "2026-03-15T12:02:00Z"
-last_activity: 2026-03-15 — wrangler.jsonc env.production configured, types regenerated (07-01)
+milestone: v1.0
+milestone_name: milestone
+status: wrangler.jsonc env.production configured; awaiting human to set secrets + deploy
+stopped_at: "Completed 07-cloudflare-workers-production-deploy-01-PLAN.md (Task 2 checkpoint:human-action)"
+last_updated: "2026-03-15T12:06:06.575Z"
+last_activity: 2026-03-15 — wrangler.jsonc env.production + regenerated types (07-01)
 progress:
   total_phases: 7
-  completed_phases: 6
-  total_plans: 16
-  completed_plans: 16
+  completed_phases: 7
+  total_plans: 15
+  completed_plans: 15
   percent: 98
 ---
 
