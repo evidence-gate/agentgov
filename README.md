@@ -97,3 +97,141 @@ Three main components:
 | OpenAI    | Yes              | Yes       | Yes (usage chunk)     | Full support                       |
 | Anthropic | Yes              | Yes       | Yes (SSE message_delta) | Via /v1/messages passthrough     |
 | Gemini    | Yes              | Yes       | Yes (usage chunk)     | Via OpenAI-compatible endpoint     |
+
+## SDK Usage
+
+### TypeScript
+
+```typescript
+import { wrap, BudgetExceeded, HitlPending } from '@agentgov/sdk';
+import OpenAI from 'openai';
+
+const client = wrap(new OpenAI(), {
+  proxyUrl: 'http://localhost:8787',
+  agentId: 'research-agent',
+});
+
+try {
+  const res = await client.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: 'Summarize this document' }],
+  });
+  console.log(res.choices[0].message.content);
+} catch (err) {
+  if (err instanceof BudgetExceeded) {
+    console.log(`Budget exhausted: $${err.spent} / $${err.limit}`);
+  }
+  if (err instanceof HitlPending) {
+    console.log(`Awaiting approval: ${err.approvalId}`);
+  }
+}
+```
+
+Production pattern -- no SDK dependency needed:
+
+```typescript
+// Production pattern -- no SDK dependency needed
+const client = new OpenAI({
+  baseURL: 'https://your-agentgov-proxy.example.com/v1',
+  defaultHeaders: { 'X-Agent-Id': 'my-agent' },
+});
+```
+
+### Python
+
+```python
+import agentgov
+from openai import OpenAI
+
+client = agentgov.wrap(OpenAI(), proxy_url="http://localhost:8787", agent_id="research-agent")
+
+try:
+    res = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": "Summarize this document"}],
+    )
+    print(res.choices[0].message.content)
+except agentgov.BudgetExceeded as e:
+    print(f"Budget exhausted: ${e.spent} / ${e.limit}")
+except agentgov.HitlPending as e:
+    print(f"Awaiting approval: {e.approval_id}")
+```
+
+Async client:
+
+```python
+import agentgov
+from openai import AsyncOpenAI
+
+client = agentgov.wrap_async(AsyncOpenAI(), proxy_url="http://localhost:8787", agent_id="async-agent")
+```
+
+Anthropic client:
+
+```python
+import agentgov
+from anthropic import Anthropic
+
+client = agentgov.wrap(Anthropic(), proxy_url="http://localhost:8787", agent_id="claude-agent")
+```
+
+## Deploy
+
+### Docker Compose (Self-Host)
+
+```bash
+# 1. Clone
+git clone https://github.com/evidence-gate/agentgov.git
+cd agentgov
+
+# 2. Configure
+cp docker/.env.example docker/.env
+# Edit docker/.env -- set OPENAI_API_KEY (required), ANTHROPIC_API_KEY (optional)
+
+# 3. Start
+docker compose -f docker/compose.yml up -d
+
+# 4. Verify
+curl http://localhost:8787/health
+# {"status":"ok"}
+```
+
+### Cloudflare Workers
+
+```bash
+# 1. Install dependencies
+pnpm install
+
+# 2. Set secrets
+cd packages/proxy
+wrangler secret put TURSO_DATABASE_URL --env production
+wrangler secret put TURSO_AUTH_TOKEN --env production
+wrangler secret put OPENAI_API_KEY --env production
+# Optional: ANTHROPIC_API_KEY, GEMINI_API_KEY
+
+# 3. Deploy
+wrangler deploy --env production
+
+# 4. Verify
+curl https://agentgov-proxy-production.<your-subdomain>.workers.dev/health
+```
+
+Cloudflare Workers deployment requires a [Turso](https://turso.tech) database. Create one at turso.tech and use the provided URL and auth token.
+
+## Project Structure
+
+```
+agentgov/
+  packages/
+    proxy/           # Hono proxy -- budget gate, HITL, loop detection, audit
+    sdk-typescript/  # TypeScript SDK -- wrap(), BudgetExceeded, HitlPending
+    sdk-python/      # Python SDK -- wrap(), wrap_async()
+    dashboard/       # React 19 SPA -- cost overview, approval queue
+  docker/
+    compose.yml      # Self-host with Docker Compose
+    Dockerfile.proxy # Multi-stage Node.js build
+```
+
+## License
+
+[MIT](LICENSE)
