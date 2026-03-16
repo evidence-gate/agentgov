@@ -233,9 +233,9 @@ describe('forwardWithRetry', () => {
   it('logs error_classified audit event on non-2xx response', async () => {
     const requestFn = makeResponses([429, 200]);
     await forwardWithRetry(requestFn, baseConfig, makeDbMock(), holdId, agentId, model, sleepFn);
-    const calls = mockAppendAuditEvent.mock.calls;
+    const calls = mockAppendAuditEvent.mock.calls as [unknown, { eventType: string }][];
     const errorClassifiedCalls = calls.filter(
-      ([, event]: [unknown, { eventType: string }]) => event.eventType === 'error_classified',
+      ([, event]) => event.eventType === 'error_classified',
     );
     expect(errorClassifiedCalls.length).toBeGreaterThan(0);
   });
@@ -243,9 +243,9 @@ describe('forwardWithRetry', () => {
   it('logs retry_attempt audit event when retrying', async () => {
     const requestFn = makeResponses([500, 200]);
     await forwardWithRetry(requestFn, baseConfig, makeDbMock(), holdId, agentId, model, sleepFn);
-    const calls = mockAppendAuditEvent.mock.calls;
+    const calls = mockAppendAuditEvent.mock.calls as [unknown, { eventType: string }][];
     const retryAttemptCalls = calls.filter(
-      ([, event]: [unknown, { eventType: string }]) => event.eventType === 'retry_attempt',
+      ([, event]) => event.eventType === 'retry_attempt',
     );
     expect(retryAttemptCalls.length).toBeGreaterThan(0);
   });
@@ -253,9 +253,9 @@ describe('forwardWithRetry', () => {
   it('logs permanent_error audit event on permanent halt', async () => {
     const requestFn = makeResponses([401]);
     await forwardWithRetry(requestFn, baseConfig, makeDbMock(), holdId, agentId, model, sleepFn);
-    const calls = mockAppendAuditEvent.mock.calls;
+    const calls = mockAppendAuditEvent.mock.calls as [unknown, { eventType: string }][];
     const permanentCalls = calls.filter(
-      ([, event]: [unknown, { eventType: string }]) => event.eventType === 'permanent_error',
+      ([, event]) => event.eventType === 'permanent_error',
     );
     expect(permanentCalls.length).toBeGreaterThan(0);
   });
@@ -264,9 +264,9 @@ describe('forwardWithRetry', () => {
     const config: RetryConfig = { maxRetries: 2, baseDelayMs: 10, capMs: 100 };
     const requestFn = makeResponses([429, 429, 429]);
     await forwardWithRetry(requestFn, config, makeDbMock(), holdId, agentId, model, sleepFn);
-    const calls = mockAppendAuditEvent.mock.calls;
+    const calls = mockAppendAuditEvent.mock.calls as [unknown, { eventType: string }][];
     const exhaustedCalls = calls.filter(
-      ([, event]: [unknown, { eventType: string }]) => event.eventType === 'retry_exhausted',
+      ([, event]) => event.eventType === 'retry_exhausted',
     );
     expect(exhaustedCalls.length).toBeGreaterThan(0);
   });

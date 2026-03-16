@@ -77,14 +77,14 @@ describe('appendAuditEvent', () => {
     const db = makeFluentMockDb() as unknown as Parameters<typeof appendAuditEvent>[0];
     const event = makeEvent();
     await appendAuditEvent(db, event);
-    const mockDb = db as ReturnType<typeof makeFluentMockDb>;
+    const mockDb = db as unknown as ReturnType<typeof makeFluentMockDb>;
     expect(mockDb.insertedRows).toHaveLength(1);
   });
 
   it('inserts a row with a non-empty hash field', async () => {
     const db = makeFluentMockDb() as unknown as Parameters<typeof appendAuditEvent>[0];
     await appendAuditEvent(db, makeEvent());
-    const mockDb = db as ReturnType<typeof makeFluentMockDb>;
+    const mockDb = db as unknown as ReturnType<typeof makeFluentMockDb>;
     const row = mockDb.insertedRows[0];
     expect(row).toBeDefined();
     expect(typeof row['hash']).toBe('string');
@@ -97,14 +97,14 @@ describe('appendAuditEvent', () => {
     const db = makeFluentMockDb() as unknown as Parameters<typeof appendAuditEvent>[0];
     // setSelectResult([]) simulates no prior rows
     await appendAuditEvent(db, makeEvent());
-    const mockDb = db as ReturnType<typeof makeFluentMockDb>;
+    const mockDb = db as unknown as ReturnType<typeof makeFluentMockDb>;
     const row = mockDb.insertedRows[0];
     expect(row['prevHash']).toBe(GENESIS_HASH);
   });
 
   it("sets prevHash to the previous entry's hash for chaining", async () => {
     const db = makeFluentMockDb() as unknown as Parameters<typeof appendAuditEvent>[0];
-    const mockDb = db as ReturnType<typeof makeFluentMockDb>;
+    const mockDb = db as unknown as ReturnType<typeof makeFluentMockDb>;
 
     // First insert (genesis)
     await appendAuditEvent(db, makeEvent());
@@ -123,7 +123,7 @@ describe('appendAuditEvent', () => {
   it('does NOT throw if insert fails — logs to console.error', async () => {
     // Make insert throw to simulate DB failure
     const db = makeFluentMockDb() as unknown as Parameters<typeof appendAuditEvent>[0];
-    const mockDb = db as ReturnType<typeof makeFluentMockDb>;
+    const mockDb = db as unknown as ReturnType<typeof makeFluentMockDb>;
 
     // Override insert to throw
     (mockDb as unknown as Record<string, unknown>).insert = vi.fn(() => ({
