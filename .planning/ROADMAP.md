@@ -46,11 +46,11 @@
   3. The README contains working code examples for both TypeScript and Python SDK usage
   4. The README contains step-by-step deploy instructions for both Docker Compose and Cloudflare Workers
   5. A LICENSE file (MIT) exists at the repository root, and CHANGELOG.md records v1.0 and v1.1 history in Keep a Changelog format
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 08-01: README.md — Quick Start, architecture, provider table, SDK examples
-- [ ] 08-02: LICENSE (MIT) + CHANGELOG.md (v1.0 + v1.1 history)
+- [ ] 08-01-PLAN.md — README.md: Quick Start, architecture diagram, provider table, SDK examples, deploy instructions
+- [ ] 08-02-PLAN.md — LICENSE (MIT) + CHANGELOG.md (v1.0 + v1.1 history in Keep a Changelog format)
 
 ### Phase 9: GitHub Actions CI
 **Goal**: すべての push と PR で lint と test が自動実行され、コードベースの健全性が継続的に検証される
@@ -76,7 +76,7 @@ Plans:
 | 5. Provider Completeness | v1.1 | 2/2 | Complete | 2026-03-15 |
 | 6. Python Async SDK + Budget CRUD | v1.1 | 2/2 | Complete | 2026-03-15 |
 | 7. Cloudflare Workers Production Deploy | v1.1 | 1/1 | Complete | 2026-03-15 |
-| 8. Documentation + Legal + Changelog | v1.2 | 0/2 | Not started | - |
+| 8. Documentation + Legal + Changelog | v1.2 | 0/2 | Planned | - |
 | 9. GitHub Actions CI | v1.2 | 0/1 | Not started | - |
 
 **Total:** 9 phases, 18 plans, 37 requirements
