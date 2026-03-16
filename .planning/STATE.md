@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Developer Experience
 status: completed
-stopped_at: Completed 08-01-PLAN.md (README.md documentation)
-last_updated: "2026-03-16T20:36:59.334Z"
-last_activity: "2026-03-17 — Phase 8 complete: README.md, LICENSE, CHANGELOG.md"
+stopped_at: Completed 09-01-PLAN.md (GitHub Actions CI)
+last_updated: "2026-03-17T22:10:41Z"
+last_activity: "2026-03-17 — Phase 9 complete: GitHub Actions CI workflow"
 progress:
   total_phases: 2
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 94
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-16)
 
 **Core value:** AIエージェントのコストを「追跡」ではなく「強制」する — 予算超過時にリクエストを決定論的にブロックし、コスト暴走を構造的に防止する
-**Current focus:** v1.2 Developer Experience — Phase 8: Documentation + Legal + Changelog
+**Current focus:** v1.2 Developer Experience — COMPLETE
 
 ## Current Position
 
-Phase: 8 of 9 (Documentation + Legal + Changelog)
-Plan: 2/2 complete
-Status: Phase 8 complete — ready for Phase 9 (GitHub Actions CI)
-Last activity: 2026-03-17 — Phase 8 complete: README.md, LICENSE, CHANGELOG.md
+Phase: 9 of 9 (GitHub Actions CI)
+Plan: 1/1 complete
+Status: v1.2 milestone COMPLETE — all documentation, legal, and CI delivered
+Last activity: 2026-03-17 — Phase 9 complete: GitHub Actions CI (4-job parallel, lint + test-node + test-workers + test-python)
 
-Progress: [█████████░] 94%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **v1.0:** 4 phases, 10 plans — ~80 min total
 **v1.1:** 3 phases, 5 plans — ~45 min total
-**v1.2:** 2 phases, ~3 plans estimated
-**Combined:** 9 phases, 18 plans, 37 requirements, 172 tests
+**v1.2:** 2 phases, 3 plans — ~10 min total
+**Combined:** 9 phases, 21 plans, 39 requirements, 172 tests
 
 ## Accumulated Context
 
@@ -52,10 +52,13 @@ Recent decisions affecting current work:
 - [Phase 08-documentation-legal-changelog]: Copyright holder set to 'evidence-gate contributors' for organization-level MIT attribution
 - [Phase 08-01]: README follows evidence-gate-action tone: problem-first with concrete cost numbers, deterministic solution framing
 - [Phase 08-01]: docker/.env.example created with three vars from compose.yml for cp-based quickstart
+- [Phase 09-01]: corepack enable instead of pnpm/action-setup — built into Node.js 20, reads packageManager field directly
+- [Phase 09-01]: 4 parallel CI jobs (lint, test-node, test-workers, test-python) — Workers pool tests isolated due to workerd runtime requirement
+- [Phase 09-01]: lint = tsc --noEmit only (no ESLint/Biome — strict tsconfig covers correctness)
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
@@ -63,6 +66,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-16T20:33:18.399Z
-Stopped at: Completed 08-01-PLAN.md (README.md documentation)
+Last session: 2026-03-17T22:10:41Z
+Stopped at: Completed 09-01-PLAN.md (GitHub Actions CI)
 Resume file: None

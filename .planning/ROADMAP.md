@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 MVP** — Phases 1-4 (shipped 2026-03-15) — [archive](milestones/v1.0-ROADMAP.md)
 - ✅ **v1.1 Production Readiness** — Phases 5-7 (shipped 2026-03-15) — [archive](milestones/v1.1-ROADMAP.md)
-- 🚧 **v1.2 Developer Experience** — Phases 8-9 (in progress)
+- ✅ **v1.2 Developer Experience** — Phases 8-9 (shipped 2026-03-17)
 
 ## Phases
 
@@ -32,7 +32,7 @@
 **Milestone Goal:** OSS公開に必要なドキュメントとCI/CDを整備し、開発者が発見→理解→導入→貢献できる状態にする
 
 - [x] **Phase 8: Documentation + Legal + Changelog** - README.md全セクション、MIT LICENSE、CHANGELOG.mdを揃えてOSS公開可能な状態にする (completed 2026-03-16)
-- [ ] **Phase 9: GitHub Actions CI** - push/PRで lint + test が自動実行される CI パイプラインを確立する
+- [x] **Phase 9: GitHub Actions CI** - push/PRで lint + test が自動実行される CI パイプラインを確立する (completed 2026-03-17)
 
 ## Phase Details
 
@@ -63,7 +63,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 09-01-PLAN.md — CI workflow: lint (tsc --noEmit) + tests (vitest + pytest) in 4 parallel jobs
+- [x] 09-01-PLAN.md — CI workflow: lint (tsc --noEmit) + tests (vitest + pytest) in 4 parallel jobs
 
 ## Progress
 
@@ -77,6 +77,6 @@ Plans:
 | 6. Python Async SDK + Budget CRUD | v1.1 | 2/2 | Complete | 2026-03-15 |
 | 7. Cloudflare Workers Production Deploy | v1.1 | 1/1 | Complete | 2026-03-15 |
 | 8. Documentation + Legal + Changelog | v1.2 | 2/2 | Complete | 2026-03-16 |
-| 9. GitHub Actions CI | v1.2 | 0/1 | Not started | - |
+| 9. GitHub Actions CI | v1.2 | 1/1 | Complete | 2026-03-17 |
 
-**Total:** 9 phases, 19 plans, 37 requirements
+**Total:** 9 phases, 20 plans, 39 requirements

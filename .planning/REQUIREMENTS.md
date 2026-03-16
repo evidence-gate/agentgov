@@ -25,8 +25,8 @@ Requirements for Developer Experience milestone. Each maps to roadmap phases.
 
 ### CI/CD
 
-- [ ] **CI-01**: GitHub Actionsでpush/PR時にlintが自動実行される
-- [ ] **CI-02**: GitHub Actionsでpush/PR時にテストが自動実行される
+- [x] **CI-01**: GitHub Actionsでpush/PR時にlintが自動実行される
+- [x] **CI-02**: GitHub Actionsでpush/PR時にテストが自動実行される
 
 ## Future Requirements
 
@@ -63,8 +63,8 @@ Deferred to future release.
 | DOC-05 | Phase 8 | Complete |
 | LEGAL-01 | Phase 8 | Complete |
 | CHLOG-01 | Phase 8 | Complete |
-| CI-01 | Phase 9 | Pending |
-| CI-02 | Phase 9 | Pending |
+| CI-01 | Phase 9 | Complete |
+| CI-02 | Phase 9 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 9 total
@@ -73,4 +73,4 @@ Deferred to future release.
 
 ---
 *Requirements defined: 2026-03-16*
-*Last updated: 2026-03-16 — Roadmap created, phases 8-9 assigned*
+*Last updated: 2026-03-17 — CI-01, CI-02 completed (Phase 9)*
