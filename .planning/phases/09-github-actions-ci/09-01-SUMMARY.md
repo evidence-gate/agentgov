@@ -78,7 +78,7 @@ Each task was committed atomically:
 1. **Task 1: Add lint scripts and create CI workflow** - `c6c4507` (feat)
 2. **Task 2: Fix type errors + validate all checks pass** - `17ef3ae` (fix)
 
-**Plan metadata:** TBD (docs: complete plan)
+**Plan metadata:** `b427d72` (docs: complete plan)
 
 ## Files Created/Modified
 - `.github/workflows/ci.yml` - GitHub Actions CI workflow with 4 parallel jobs
@@ -130,6 +130,17 @@ None — CI workflow triggers automatically on push/PR. No secrets or environmen
 - v1.2 Developer Experience milestone is now complete: README.md, LICENSE, CHANGELOG.md (Phase 8), and GitHub Actions CI (Phase 9)
 - All 172 tests (148 Node.js + 24 Workers) pass locally; CI will confirm the same on every push
 - Repository is ready for OSS public launch
+
+## Self-Check: PASSED
+
+- FOUND: `.github/workflows/ci.yml`
+- FOUND: proxy `lint` script (tsc --noEmit)
+- FOUND: sdk `lint` script (tsc --noEmit)
+- FOUND: dashboard `lint` script (tsc --noEmit)
+- FOUND: `.planning/phases/09-github-actions-ci/09-01-SUMMARY.md`
+- FOUND: commit `c6c4507` (feat: lint scripts + CI workflow)
+- FOUND: commit `17ef3ae` (fix: type errors)
+- FOUND: commit `b427d72` (docs: metadata)
 
 ---
 *Phase: 09-github-actions-ci*
