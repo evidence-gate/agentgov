@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (TypeScript type-check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint proxy
+        run: pnpm --filter @agentgov/proxy lint
+
+      - name: Lint SDK (TypeScript)
+        run: pnpm --filter @agentgov/sdk lint
+
+      - name: Lint dashboard
+        run: pnpm --filter @agentgov/dashboard lint
+
+  test-node:
+    name: Test (Node.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test proxy (Node.js)
+        run: pnpm --filter @agentgov/proxy test:node
+
+      - name: Test SDK (TypeScript)
+        run: pnpm --filter @agentgov/sdk test
+
+  test-workers:
+    name: Test (Cloudflare Workers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test proxy (Workers pool)
+        run: pnpm --filter @agentgov/proxy test:workers
+
+  test-python:
+    name: Test (Python SDK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies and run tests
+        working-directory: packages/sdk-python
+        run: |
+          pip install -e ".[dev,openai,anthropic]"
+          pytest tests/ -v
