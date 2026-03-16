@@ -31,7 +31,7 @@
 
 **Milestone Goal:** OSS公開に必要なドキュメントとCI/CDを整備し、開発者が発見→理解→導入→貢献できる状態にする
 
-- [ ] **Phase 8: Documentation + Legal + Changelog** - README.md全セクション、MIT LICENSE、CHANGELOG.mdを揃えてOSS公開可能な状態にする
+- [x] **Phase 8: Documentation + Legal + Changelog** - README.md全セクション、MIT LICENSE、CHANGELOG.mdを揃えてOSS公開可能な状態にする (completed 2026-03-16)
 - [ ] **Phase 9: GitHub Actions CI** - push/PRで lint + test が自動実行される CI パイプラインを確立する
 
 ## Phase Details
@@ -46,7 +46,7 @@
   3. The README contains working code examples for both TypeScript and Python SDK usage
   4. The README contains step-by-step deploy instructions for both Docker Compose and Cloudflare Workers
   5. A LICENSE file (MIT) exists at the repository root, and CHANGELOG.md records v1.0 and v1.1 history in Keep a Changelog format
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 08-01-PLAN.md — README.md: Quick Start, architecture diagram, provider table, SDK examples, deploy instructions
@@ -76,7 +76,7 @@ Plans:
 | 5. Provider Completeness | v1.1 | 2/2 | Complete | 2026-03-15 |
 | 6. Python Async SDK + Budget CRUD | v1.1 | 2/2 | Complete | 2026-03-15 |
 | 7. Cloudflare Workers Production Deploy | v1.1 | 1/1 | Complete | 2026-03-15 |
-| 8. Documentation + Legal + Changelog | 1/2 | In Progress|  | - |
+| 8. Documentation + Legal + Changelog | 2/2 | Complete   | 2026-03-16 | - |
 | 9. GitHub Actions CI | v1.2 | 0/1 | Not started | - |
 
 **Total:** 9 phases, 18 plans, 37 requirements

@@ -9,11 +9,11 @@ Requirements for Developer Experience milestone. Each maps to roadmap phases.
 
 ### Documentation
 
-- [ ] **DOC-01**: README.mdに問題提起→解決策→Quick Startの導線がある
-- [ ] **DOC-02**: README.mdにアーキテクチャ概要（Proxy + SDK + Dashboard構成図）がある
-- [ ] **DOC-03**: README.mdにプロバイダー対応表（OpenAI/Anthropic/Gemini × 機能）がある
-- [ ] **DOC-04**: README.mdにデプロイ方法（Docker Compose + Cloudflare Workers）の手順がある
-- [ ] **DOC-05**: README.mdにSDK使用例（TypeScript + Python）がある
+- [x] **DOC-01**: README.mdに問題提起→解決策→Quick Startの導線がある
+- [x] **DOC-02**: README.mdにアーキテクチャ概要（Proxy + SDK + Dashboard構成図）がある
+- [x] **DOC-03**: README.mdにプロバイダー対応表（OpenAI/Anthropic/Gemini × 機能）がある
+- [x] **DOC-04**: README.mdにデプロイ方法（Docker Compose + Cloudflare Workers）の手順がある
+- [x] **DOC-05**: README.mdにSDK使用例（TypeScript + Python）がある
 
 ### Legal
 
@@ -56,11 +56,11 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DOC-01 | Phase 8 | Pending |
-| DOC-02 | Phase 8 | Pending |
-| DOC-03 | Phase 8 | Pending |
-| DOC-04 | Phase 8 | Pending |
-| DOC-05 | Phase 8 | Pending |
+| DOC-01 | Phase 8 | Complete |
+| DOC-02 | Phase 8 | Complete |
+| DOC-03 | Phase 8 | Complete |
+| DOC-04 | Phase 8 | Complete |
+| DOC-05 | Phase 8 | Complete |
 | LEGAL-01 | Phase 8 | Complete |
 | CHLOG-01 | Phase 8 | Complete |
 | CI-01 | Phase 9 | Pending |

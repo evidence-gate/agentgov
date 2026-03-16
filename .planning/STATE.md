@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Developer Experience
-status: planning
-stopped_at: Completed 08-02-PLAN.md — LICENSE and CHANGELOG.md created
-last_updated: "2026-03-16T20:32:04.547Z"
-last_activity: 2026-03-16 — Roadmap created, Phase 8 ready for planning
+status: completed
+stopped_at: Completed 08-01-PLAN.md (README.md documentation)
+last_updated: "2026-03-16T20:33:18.402Z"
+last_activity: "2026-03-17 — Phase 8 complete: README.md, LICENSE, CHANGELOG.md"
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 94
 ---
 
 # Project State
@@ -50,6 +50,8 @@ Recent decisions affecting current work:
 - [v1.2]: Documentation siteは不要（README.mdで十分）— トラフィック増加後に検討
 - [v1.2]: GitHub Releases自動化は対象外 — CHANGELOG.md手動管理で十分
 - [Phase 08-documentation-legal-changelog]: Copyright holder set to 'evidence-gate contributors' for organization-level MIT attribution
+- [Phase 08-01]: README follows evidence-gate-action tone: problem-first with concrete cost numbers, deterministic solution framing
+- [Phase 08-01]: docker/.env.example created with three vars from compose.yml for cp-based quickstart
 
 ### Pending Todos
 
@@ -61,6 +63,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-16T20:32:04.544Z
-Stopped at: Completed 08-02-PLAN.md — LICENSE and CHANGELOG.md created
+Last session: 2026-03-16T20:33:18.399Z
+Stopped at: Completed 08-01-PLAN.md (README.md documentation)
 Resume file: None
