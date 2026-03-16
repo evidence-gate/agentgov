@@ -27,7 +27,7 @@
 
 </details>
 
-### 🚧 v1.2 Developer Experience (In Progress)
+### v1.2 Developer Experience (In Progress)
 
 **Milestone Goal:** OSS公開に必要なドキュメントとCI/CDを整備し、開発者が発見→理解→導入→貢献できる状態にする
 
@@ -49,8 +49,8 @@
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 08-01-PLAN.md — README.md: Quick Start, architecture diagram, provider table, SDK examples, deploy instructions
-- [ ] 08-02-PLAN.md — LICENSE (MIT) + CHANGELOG.md (v1.0 + v1.1 history in Keep a Changelog format)
+- [x] 08-01-PLAN.md — README.md: Quick Start, architecture diagram, provider table, SDK examples, deploy instructions
+- [x] 08-02-PLAN.md — LICENSE (MIT) + CHANGELOG.md (v1.0 + v1.1 history in Keep a Changelog format)
 
 ### Phase 9: GitHub Actions CI
 **Goal**: すべての push と PR で lint と test が自動実行され、コードベースの健全性が継続的に検証される
@@ -60,10 +60,10 @@ Plans:
   1. Opening a pull request or pushing to any branch triggers a CI run that executes lint checks automatically
   2. Opening a pull request or pushing to any branch triggers a CI run that executes the full test suite (172+ tests) automatically
   3. A failing lint or test causes the CI check to report failure, visible on the GitHub PR status
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 09-01: GitHub Actions workflows — lint + test automation
+- [ ] 09-01-PLAN.md — CI workflow: lint (tsc --noEmit) + tests (vitest + pytest) in 4 parallel jobs
 
 ## Progress
 
@@ -76,7 +76,7 @@ Plans:
 | 5. Provider Completeness | v1.1 | 2/2 | Complete | 2026-03-15 |
 | 6. Python Async SDK + Budget CRUD | v1.1 | 2/2 | Complete | 2026-03-15 |
 | 7. Cloudflare Workers Production Deploy | v1.1 | 1/1 | Complete | 2026-03-15 |
-| 8. Documentation + Legal + Changelog | 2/2 | Complete    | 2026-03-16 | - |
+| 8. Documentation + Legal + Changelog | v1.2 | 2/2 | Complete | 2026-03-16 |
 | 9. GitHub Actions CI | v1.2 | 0/1 | Not started | - |
 
-**Total:** 9 phases, 18 plans, 37 requirements
+**Total:** 9 phases, 19 plans, 37 requirements
