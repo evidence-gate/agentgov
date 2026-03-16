@@ -33,7 +33,12 @@ AIエージェントのコストを「追跡」ではなく「強制」する --
 
 ### Active
 
-(Next milestone で定義)
+<!-- v1.2 Developer Experience -->
+
+- [ ] README.md — Quick Start、アーキテクチャ、プロバイダー対応表、デプロイ手順
+- [ ] LICENSE (MIT) — OSS公開の法的基盤
+- [ ] CHANGELOG.md — バージョン履歴の追跡（Keep a Changelog形式）
+- [ ] .github/workflows/ — CI自動化（lint + test）
 
 ### Out of Scope
 
@@ -44,6 +49,16 @@ AIエージェントのコストを「追跡」ではなく「強制」する --
 - ガードレール/コンテンツフィルタリング — 競合過密、別領域
 - Vertex AI / サービスアカウント認証 — GCP IAM複雑性回避; API keyで十分
 - Anthropic cache/thinking token settle — 高複雑性; v1.2で検討
+
+## Current Milestone: v1.2 Developer Experience
+
+**Goal:** OSS公開に必要なドキュメントとCI/CDを整備し、開発者が発見→理解→導入→貢献できる状態にする
+
+**Target features:**
+- README.md（evidence-gate-actionのトーンを踏襲、プラットフォーム構成に適応）
+- MIT LICENSE
+- CHANGELOG.md（v1.0 + v1.1の履歴）
+- GitHub Actions CI（lint + test自動化）
 
 ## Current State
 
@@ -97,5 +112,7 @@ EU AI Act Article 14が高リスクAIシステムに人間の監視を義務付�
 | PATCH only limit_usd | spent/reserved は Hold/Settle が排他所有 | ✓ Good |
 | Workers env.production non-inheritable | 全bindings再宣言必須、明示的Worker名で衝突回避 | ✓ Good |
 
+| GitHub: evidence-gate/agentgov | CI/CD(開発時)+ランタイム(実行時)で包括的AIガバナンスブランド | ✓ Good |
+
 ---
-*Last updated: 2026-03-15 after v1.1 milestone complete*
+*Last updated: 2026-03-16 after v1.2 milestone started*

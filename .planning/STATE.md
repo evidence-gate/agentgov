@@ -1,34 +1,36 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Production Readiness
-status: complete
-stopped_at: v1.1 milestone archived
-last_updated: "2026-03-15T12:30:00Z"
-last_activity: 2026-03-15 — v1.1 milestone complete and archived
+milestone: v1.2
+milestone_name: Developer Experience
+status: defining_requirements
+stopped_at: null
+last_updated: "2026-03-16T00:00:00Z"
+last_activity: 2026-03-16 — Milestone v1.2 started
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 15
-  completed_plans: 15
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-15)
+See: .planning/PROJECT.md (updated 2026-03-16)
 
 **Core value:** AIエージェントのコストを「追跡」ではなく「強制」する — 予算超過時にリクエストを決定論的にブロックし、コスト暴走を構造的に防止する
-**Current focus:** v1.1 shipped. Planning next milestone.
+**Current focus:** v1.2 Developer Experience — ドキュメント + CI整備
 
 ## Current Position
 
-All milestones complete (v1.0 + v1.1).
-Next: `/gsd:new-milestone` to define next version.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-16 — Milestone v1.2 started
 
-Progress: [██████████] 100%
+Progress: ░░░░░░░░░░ 0%
 
 ## Performance Metrics
 
@@ -38,6 +40,6 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-Last session: 2026-03-15T12:30:00Z
-Stopped at: v1.1 milestone archived
+Last session: 2026-03-16T00:00:00Z
+Stopped at: Milestone v1.2 definition in progress
 Resume file: None
