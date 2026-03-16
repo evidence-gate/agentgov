@@ -31,14 +31,16 @@ AIエージェントのコストを「追跡」ではなく「強制」する --
 - ✓ Cloudflare Workersクラウドデプロイ（env.production + Turso cloud + Workflows） — v1.1
 - ✓ per-agent予算設定UI（ダッシュボードからPATCH + inline edit + audit trail） — v1.1
 
+<!-- v1.2 shipped and verified (2026-03-17) -->
+
+- ✓ README.md — Quick Start、アーキテクチャ図、プロバイダー対応表、SDK例、デプロイ手順 — v1.2
+- ✓ MIT LICENSE — OSS公開の法的基盤 — v1.2
+- ✓ CHANGELOG.md — v1.0 + v1.1の全機能履歴（Keep a Changelog形式） — v1.2
+- ✓ GitHub Actions CI — 4並列ジョブ（lint, test-node, test-workers, test-python） — v1.2
+
 ### Active
 
-<!-- v1.2 Developer Experience -->
-
-- [ ] README.md — Quick Start、アーキテクチャ、プロバイダー対応表、デプロイ手順
-- [ ] LICENSE (MIT) — OSS公開の法的基盤
-- [ ] CHANGELOG.md — バージョン履歴の追跡（Keep a Changelog形式）
-- [ ] .github/workflows/ — CI自動化（lint + test）
+(Next milestone で定義)
 
 ### Out of Scope
 
@@ -48,21 +50,12 @@ AIエージェントのコストを「追跡」ではなく「強制」する --
 - LLMゲートウェイ/ルーティング機能 — コモディティ化済み、差別化不可
 - ガードレール/コンテンツフィルタリング — 競合過密、別領域
 - Vertex AI / サービスアカウント認証 — GCP IAM複雑性回避; API keyで十分
-- Anthropic cache/thinking token settle — 高複雑性; v1.2で検討
-
-## Current Milestone: v1.2 Developer Experience
-
-**Goal:** OSS公開に必要なドキュメントとCI/CDを整備し、開発者が発見→理解→導入→貢献できる状態にする
-
-**Target features:**
-- README.md（evidence-gate-actionのトーンを踏襲、プラットフォーム構成に適応）
-- MIT LICENSE
-- CHANGELOG.md（v1.0 + v1.1の履歴）
-- GitHub Actions CI（lint + test自動化）
+- Anthropic cache/thinking token settle — 高複雑性; 将来検討
 
 ## Current State
 
-**Shipped:** v1.1 Production Readiness (2026-03-15)
+**Shipped:** v1.2 Developer Experience (2026-03-17)
+**Repository:** https://github.com/evidence-gate/agentgov
 **Codebase:** ~20,000 LOC TypeScript/Python, 172 tests (24 Workers pool + 148 Node.js)
 **Tech stack:** Hono + Cloudflare Workers + Turso/libSQL + React 19 + Python httpx
 
@@ -113,6 +106,8 @@ EU AI Act Article 14が高リスクAIシステムに人間の監視を義務付�
 | Workers env.production non-inheritable | 全bindings再宣言必須、明示的Worker名で衝突回避 | ✓ Good |
 
 | GitHub: evidence-gate/agentgov | CI/CD(開発時)+ランタイム(実行時)で包括的AIガバナンスブランド | ✓ Good |
+| tsc --noEmit as lint | ESLint/Biome不要、型チェックが最も価値の高いlint | ✓ Good |
+| 4並列CIジョブ | lint/test-node/test-workers/test-pythonで最速フィードバック | ✓ Good |
 
 ---
-*Last updated: 2026-03-16 after v1.2 milestone started*
+*Last updated: 2026-03-17 after v1.2 milestone complete*

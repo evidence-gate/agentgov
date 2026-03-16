@@ -1,5 +1,33 @@
 # Milestones
 
+## v1.2 — Developer Experience (Shipped: 2026-03-17)
+
+**Goal:** OSS公開に必要なドキュメントとCI/CDを整備し、開発者が発見→理解→導入→貢献できる状態にする
+
+**Phases:** 2 phases (8-9), 3 plans
+
+| Phase | Name | Plans | Completed |
+|-------|------|-------|-----------|
+| 8 | Documentation + Legal + Changelog | 2 | 2026-03-17 |
+| 9 | GitHub Actions CI | 1 | 2026-03-17 |
+
+**Requirements completed:** 9/9 (DOC-01~05, LEGAL-01, CHLOG-01, CI-01~02)
+
+**Key accomplishments:**
+- README.md (237 lines) — 問題提起→Quick Start→アーキテクチャ図→プロバイダー表→SDK例→デプロイ手順
+- MIT LICENSE + CHANGELOG.md (v1.0 12機能 + v1.1 6機能、Keep a Changelog形式)
+- GitHub Actions CI — 4並列ジョブ（lint, test-node, test-workers, test-python）
+- tsc --noEmit lint導入 + テストファイル型エラー修正
+
+**Key artifacts:**
+- `README.md` — 10セクション構成の完全なプロジェクトドキュメント
+- `LICENSE` — MIT (evidence-gate contributors)
+- `CHANGELOG.md` — Keep a Changelog 1.1.0形式
+- `.github/workflows/ci.yml` — 4並列CIパイプライン
+- `docker/.env.example` — セルフホスト用環境変数テンプレート
+
+---
+
 ## v1.1 — Production Readiness (Shipped: 2026-03-15)
 
 **Goal:** v1.0で残った5つのギャップを解消し、Cloudflare Workersエッジデプロイに対応
