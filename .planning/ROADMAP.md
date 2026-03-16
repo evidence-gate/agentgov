@@ -60,7 +60,7 @@ Plans:
   1. Opening a pull request or pushing to any branch triggers a CI run that executes lint checks automatically
   2. Opening a pull request or pushing to any branch triggers a CI run that executes the full test suite (172+ tests) automatically
   3. A failing lint or test causes the CI check to report failure, visible on the GitHub PR status
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 09-01-PLAN.md — CI workflow: lint (tsc --noEmit) + tests (vitest + pytest) in 4 parallel jobs
@@ -77,6 +77,6 @@ Plans:
 | 6. Python Async SDK + Budget CRUD | v1.1 | 2/2 | Complete | 2026-03-15 |
 | 7. Cloudflare Workers Production Deploy | v1.1 | 1/1 | Complete | 2026-03-15 |
 | 8. Documentation + Legal + Changelog | v1.2 | 2/2 | Complete | 2026-03-16 |
-| 9. GitHub Actions CI | v1.2 | 1/1 | Complete | 2026-03-17 |
+| 9. GitHub Actions CI | v1.2 | Complete    | 2026-03-16 | 2026-03-17 |
 
 **Total:** 9 phases, 20 plans, 39 requirements
