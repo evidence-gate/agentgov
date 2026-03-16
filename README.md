@@ -2,7 +2,7 @@
 
 Governance layer for AI agents -- enforce budgets, require human approval, catch stuck loops.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 ---
 
@@ -234,4 +234,4 @@ agentgov/
 
 ## License
 
-[MIT](LICENSE)
+[Apache 2.0](LICENSE)

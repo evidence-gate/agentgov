@@ -86,7 +86,7 @@ EU AI Act Article 14が高リスクAIシステムに人間の監視を義務付�
 
 - **チーム**: 個人/小規模チーム（日本拠点）— ソロファウンダーの実行速度に最適化
 - **技術スタック**: TypeScript + Cloudflare Workers + Hono + Turso — 月$5の低コスト、グローバルエッジ
-- **ライセンス**: MIT — 最大採用を保証（Langfuseモデル）
+- **ライセンス**: Apache 2.0 — evidence-gate org統一、特許保護、エンタープライズ対応
 - **予算**: 月$75-294（M1-3）→ $600-1,300（M10-12）— 12ヶ月ランウェイ$17K-24K
 - **タイムライン**: EU AI Act施行（2026年8月2日）まで5ヶ月 — SDK-Firstで4-8週最速投入
 - **SDK配布**: npm（TypeScript）+ PyPI（Python）— 2大エコシステムをカバー
@@ -95,7 +95,7 @@ EU AI Act Article 14が高リスクAIシステムに人間の監視を義務付�
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| MIT License | Langfuseの成功パターン: MIT→コミュニティ→買収 | ✓ Good |
+| Apache 2.0 License | evidence-gate org統一 + 特許保護 + エンタープライズ法務対応 | ✓ Good |
 | プロキシアーキテクチャ | `agentgov.wrap(client)`の1行統合を実現 | ✓ Good |
 | TypeScript-First | フロント/バックエンド統一、Cloudflare Workers互換 | ✓ Good |
 | Hold/Settle予算パターン | 悲観的予約によるクラッシュ安全性。bantoで実証済み | ✓ Good |
