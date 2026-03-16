@@ -58,22 +58,13 @@
         }
       ],
 
-      // All 12 vars redeclared — actual secret values set via wrangler secret put --env production
-      // Non-secret config vars with stable defaults are kept here; all secrets remain empty string
+      // Non-secret config vars with stable defaults.
+      // Secret values (API keys, DB credentials, tokens) are set via:
+      //   wrangler secret put <KEY> --env production
+      // They must NOT appear in vars — Cloudflare rejects secret put if the name is already a var.
       "vars": {
-        "TURSO_DATABASE_URL": "",
-        "TURSO_AUTH_TOKEN": "",
-        "OPENAI_API_KEY": "",
-        "ANTHROPIC_API_KEY": "",
-        "GEMINI_API_KEY": "",
-        "AGENTGOV_ALERT_WEBHOOK_URL": "",
-        // Non-secret defaults (safe to commit)
         "AGENTGOV_ALERT_THRESHOLDS": "0.80,1.00",
-        "AGENTGOV_HITL_TTL_SECONDS": "259200",
-        "AGENTGOV_HITL_WEBHOOK_URL": "",
-        "SLACK_BOT_TOKEN": "",
-        "SLACK_CHANNEL_ID": "",
-        "SLACK_SIGNING_SECRET": ""
+        "AGENTGOV_HITL_TTL_SECONDS": "259200"
       }
     }
   }
