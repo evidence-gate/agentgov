@@ -76,7 +76,7 @@ Plans:
 | 5. Provider Completeness | v1.1 | 2/2 | Complete | 2026-03-15 |
 | 6. Python Async SDK + Budget CRUD | v1.1 | 2/2 | Complete | 2026-03-15 |
 | 7. Cloudflare Workers Production Deploy | v1.1 | 1/1 | Complete | 2026-03-15 |
-| 8. Documentation + Legal + Changelog | 2/2 | Complete   | 2026-03-16 | - |
+| 8. Documentation + Legal + Changelog | 2/2 | Complete    | 2026-03-16 | - |
 | 9. GitHub Actions CI | v1.2 | 0/1 | Not started | - |
 
 **Total:** 9 phases, 18 plans, 37 requirements
