@@ -17,11 +17,11 @@ Requirements for Developer Experience milestone. Each maps to roadmap phases.
 
 ### Legal
 
-- [ ] **LEGAL-01**: MIT LICENSEファイルがリポジトリルートに存在する
+- [x] **LEGAL-01**: MIT LICENSEファイルがリポジトリルートに存在する
 
 ### Changelog
 
-- [ ] **CHLOG-01**: CHANGELOG.mdにv1.0 + v1.1の主要変更が記録されている（Keep a Changelog形式）
+- [x] **CHLOG-01**: CHANGELOG.mdにv1.0 + v1.1の主要変更が記録されている（Keep a Changelog形式）
 
 ### CI/CD
 
@@ -61,8 +61,8 @@ Deferred to future release.
 | DOC-03 | Phase 8 | Pending |
 | DOC-04 | Phase 8 | Pending |
 | DOC-05 | Phase 8 | Pending |
-| LEGAL-01 | Phase 8 | Pending |
-| CHLOG-01 | Phase 8 | Pending |
+| LEGAL-01 | Phase 8 | Complete |
+| CHLOG-01 | Phase 8 | Complete |
 | CI-01 | Phase 9 | Pending |
 | CI-02 | Phase 9 | Pending |
 
