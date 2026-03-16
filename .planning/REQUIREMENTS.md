@@ -1,0 +1,76 @@
+# Requirements: Agent Governance Platform (agentgov)
+
+**Defined:** 2026-03-16
+**Core Value:** AIエージェントのコストを「追跡」ではなく「強制」する
+
+## v1.2 Requirements
+
+Requirements for Developer Experience milestone. Each maps to roadmap phases.
+
+### Documentation
+
+- [ ] **DOC-01**: README.mdに問題提起→解決策→Quick Startの導線がある
+- [ ] **DOC-02**: README.mdにアーキテクチャ概要（Proxy + SDK + Dashboard構成図）がある
+- [ ] **DOC-03**: README.mdにプロバイダー対応表（OpenAI/Anthropic/Gemini × 機能）がある
+- [ ] **DOC-04**: README.mdにデプロイ方法（Docker Compose + Cloudflare Workers）の手順がある
+- [ ] **DOC-05**: README.mdにSDK使用例（TypeScript + Python）がある
+
+### Legal
+
+- [ ] **LEGAL-01**: MIT LICENSEファイルがリポジトリルートに存在する
+
+### Changelog
+
+- [ ] **CHLOG-01**: CHANGELOG.mdにv1.0 + v1.1の主要変更が記録されている（Keep a Changelog形式）
+
+### CI/CD
+
+- [ ] **CI-01**: GitHub Actionsでpush/PR時にlintが自動実行される
+- [ ] **CI-02**: GitHub Actionsでpush/PR時にテストが自動実行される
+
+## Future Requirements
+
+Deferred to future release.
+
+### SDK Distribution
+
+- **DIST-01**: npm publishによるTypeScript SDKの公開
+- **DIST-02**: PyPI publishによるPython SDKの公開
+
+### Advanced Documentation
+
+- **ADOC-01**: Contributing guide (CONTRIBUTING.md)
+- **ADOC-02**: Security policy (SECURITY.md)
+- **ADOC-03**: API reference documentation
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Documentation site (Docusaurus等) | README.mdで十分。トラフィック増加後に検討 |
+| GitHub Releases自動化 | v1.2ではCHANGELOG.md手動管理で十分 |
+| Code coverage reporting | CIの基本（lint + test）を先に確立 |
+| Docker Hub publish | セルフホストユーザーはgit clone前提 |
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DOC-01 | Phase 8 | Pending |
+| DOC-02 | Phase 8 | Pending |
+| DOC-03 | Phase 8 | Pending |
+| DOC-04 | Phase 8 | Pending |
+| DOC-05 | Phase 8 | Pending |
+| LEGAL-01 | Phase 8 | Pending |
+| CHLOG-01 | Phase 8 | Pending |
+| CI-01 | Phase 9 | Pending |
+| CI-02 | Phase 9 | Pending |
+
+**Coverage:**
+- v1.2 requirements: 9 total
+- Mapped to phases: 9
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-03-16*
+*Last updated: 2026-03-16 after initial definition*
