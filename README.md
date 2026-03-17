@@ -1,3 +1,5 @@
+**English** | [日本語](README.ja.md)
+
 # agentgov
 
 Governance layer for AI agents -- enforce budgets, require human approval, catch stuck loops.
