@@ -10,17 +10,17 @@ Governance layer for AI agents -- enforce budgets, require human approval, catch
 
 ## The Problem
 
-AI agents make autonomous LLM API calls. Without guardrails, a stuck agent can burn through hundreds of dollars in minutes.
+AI agents make autonomous LLM API calls. Without guardrails, a stuck agent can accumulate significant costs quickly.
 
 Existing observability tools track costs after the fact. By the time you see the dashboard spike, the money is already spent.
 
-A single GPT-4 agent loop can consume $50+ in under 10 minutes. At scale, a misconfigured agent or an infinite retry loop becomes a financial incident before anyone notices.
+At scale, a misconfigured agent or an infinite retry loop can become a financial incident before anyone notices.
 
 ## How agentgov Works
 
 agentgov is a transparent proxy that sits between your agent and the LLM provider.
 
-Three enforcement mechanisms -- each deterministic, no LLM-based guardrails:
+Three enforcement mechanisms -- each rule-based, no LLM-based guardrails:
 
 1. **Budget Enforcement** -- Hold/Settle pattern. Every request reserves estimated cost before forwarding. Budget exceeded = request blocked before it reaches the provider.
 2. **Human-in-the-Loop (HITL)** -- Risk-graded action classification. High-risk tool calls (e.g., `send_email`, `delete_file`) pause for human approval via Slack or webhook.
