@@ -68,22 +68,9 @@ const client = wrap(new OpenAI(), {
 
 ## Architecture
 
-```
-Agent (your code)
-  |
-  v
-SDK (wrap)  -- injects X-Agent-Id, rewrites base URL
-  |
-  v
-agentgov Proxy (Hono)
-  |-- Budget Gate (Hold/Settle)
-  |-- HITL Classifier (Risk-Graded)
-  |-- Loop Detector (Fingerprint)
-  |-- Audit Log (SHA-256 chain)
-  |
-  v
-LLM Provider (OpenAI / Anthropic / Gemini)
-```
+<p align="center">
+  <img src="docs/architecture.svg" alt="agentgov architecture diagram" width="800">
+</p>
 
 Three main components:
 

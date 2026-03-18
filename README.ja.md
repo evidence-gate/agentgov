@@ -68,22 +68,9 @@ const client = wrap(new OpenAI(), {
 
 ## アーキテクチャ
 
-```
-Agent (あなたのコード)
-  |
-  v
-SDK (wrap)  -- X-Agent-Idの注入、ベースURLの書き換え
-  |
-  v
-agentgov プロキシ (Hono)
-  |-- Budget Gate (ホールド/決済)
-  |-- HITL Classifier (リスク分類)
-  |-- Loop Detector (フィンガープリント)
-  |-- Audit Log (SHA-256チェーン)
-  |
-  v
-LLMプロバイダー (OpenAI / Anthropic / Gemini)
-```
+<p align="center">
+  <img src="docs/architecture.svg" alt="agentgov アーキテクチャ図" width="800">
+</p>
 
 主要コンポーネント：
 
