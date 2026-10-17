@@ -25,6 +25,6 @@
     "openai": "^4.0.0",
     "tsup": "latest",
     "typescript": "^5",
-    "vitest": "^2"
+    "vitest": "~3.2.6"
   }
 }
