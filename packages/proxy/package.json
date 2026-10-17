@@ -22,7 +22,7 @@
     "drizzle-kit": "^0.31.9",
     "tsx": "^4.21.0",
     "typescript": "^5",
-    "vitest": "^2",
+    "vitest": "~3.2.6",
     "wrangler": "^4"
   },
   "dependencies": {
