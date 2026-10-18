@@ -56,6 +56,10 @@ async function main() {
   const app = new Hono<AppEnvironment>();
   app.use('*', async (c, next) => {
     c.set('db', db);
+    c.set('hitlUnavailable', true);
+    if (c.req.path.startsWith('/v1/hitl/') || c.req.path === '/v1/slack/callback') {
+      return c.json({ error: { code: 'HITL_NOT_AVAILABLE', message: 'HITL requires Cloudflare Workflows deployment.' } }, 501);
+    }
     await next();
   });
   app.route('/', sharedApp);
@@ -64,6 +68,10 @@ async function main() {
   const env: Record<string, unknown> = {};
   env['TURSO_DATABASE_URL'] = process.env['DATABASE_URL'] ?? 'file:agentgov.db';
   env['TURSO_AUTH_TOKEN'] = 'local';
+  env['AGENTGOV_PROVIDER_TIMEOUT_MS'] = process.env['AGENTGOV_PROVIDER_TIMEOUT_MS'];
+  env['AGENTGOV_BUDGET_ADMIN_TOKEN'] = process.env['AGENTGOV_BUDGET_ADMIN_TOKEN'];
+  env['AGENTGOV_MAX_RETRIES'] = process.env['AGENTGOV_MAX_RETRIES'];
+  env['AGENTGOV_RETRY_BASE_MS'] = process.env['AGENTGOV_RETRY_BASE_MS'];
   env['OPENAI_API_KEY'] = process.env['OPENAI_API_KEY'] ?? '';
   env['ANTHROPIC_API_KEY'] = process.env['ANTHROPIC_API_KEY'] ?? '';
   env['GEMINI_API_KEY'] = process.env['GEMINI_API_KEY'] ?? '';

@@ -22,7 +22,21 @@ import { createDbClient } from '../db/client';
 import { getTicket } from './queue';
 import { verifySlackSignature } from './slack';
 
-export const hitlRoutes = new Hono<{ Bindings: Env }>();
+export const hitlRoutes = new Hono<{ Bindings: Env & { AGENTGOV_HITL_APPROVAL_TOKEN?: string } }>();
+
+// Direct decisions require a separately provisioned operator secret. Never trust actor alone.
+hitlRoutes.use('/v1/hitl/:id/:action', async (c, next) => {
+  if (c.req.method !== 'POST' || !['approve', 'deny'].includes(c.req.param('action') ?? '')) return next();
+  const secret = c.env.AGENTGOV_HITL_APPROVAL_TOKEN;
+  if (!secret) return c.json({ error: 'approval authentication is not configured' }, 503);
+  const supplied = c.req.header('Authorization') ?? '';
+  const digest = async (s: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
+  const [actual, expected] = await Promise.all([digest(supplied), digest(`Bearer ${secret}`)]);
+  let difference = 0;
+  for (let i = 0; i < expected.length; i++) difference |= actual[i] ^ expected[i];
+  if (difference !== 0) return c.json({ error: 'unauthorized' }, 401);
+  return next();
+});
 
 // ---------------------------------------------------------------------------
 // POST /v1/hitl/:id/approve

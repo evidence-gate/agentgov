@@ -11,17 +11,14 @@
  *   - Settles the hold to actual token cost
  *   - Writes 'budget_settle' audit event
  *
- * Default budget limit: $10.00 USD per agent.
- * TODO: replace with config lookup in a later plan (per-agent configurable limits via API).
+ * Only operator-provisioned agents may consume budget; request IDs never create grants.
  */
 
 import { estimateCost, estimateInputTokens, settleCost } from './calculator';
-import { ensureAgent, createHold, settleHold, getBudget } from './ledger';
+import { createHold, settleHold, getBudget } from './ledger';
 import { appendAuditEvent } from '../audit/writer';
 import type { DbClient } from '../db/client';
 import type { AgentId, HoldId, ChatCompletionRequest, GateResult } from '../types';
-
-const DEFAULT_BUDGET_LIMIT_USD = 10.0;
 
 export interface GateContext {
   db: DbClient;
@@ -37,6 +34,13 @@ export interface GateContext {
 export async function budgetGate(ctx: GateContext): Promise<GateResult> {
   const { db, agentId, request } = ctx;
   const model = request.model;
+
+  // Request-controlled agent IDs must never create a fresh budget grant.
+  if (!await getBudget(db, agentId)) {
+    await appendAuditEvent(db, { eventType: 'budget_blocked', agentId, model,
+      costDelta: 0, runningBalance: 0, meta: { reason: 'unknown_agent' } });
+    return { action: 'block', reason: 'unknown_agent' };
+  }
 
   // Step 1: Estimate cost — throws on unknown model (fails closed)
   let estimatedCost: number;
@@ -62,34 +66,17 @@ export async function budgetGate(ctx: GateContext): Promise<GateResult> {
     return { action: 'block', reason: 'unknown_model' };
   }
 
-  // Step 2: Ensure agent has a ledger row (idempotent — does nothing if exists)
-  await ensureAgent(db, agentId, DEFAULT_BUDGET_LIMIT_USD);
-
   // Step 3: Attempt to create hold
   const holdResult = await createHold(db, agentId, model, estimatedCost);
 
   if (holdResult.approved) {
-    // Pass — write 'budget_hold' audit event
-    const budget = await getBudget(db, agentId);
-    const runningBalance = budget
-      ? budget.limitUsd - budget.spentUsd - budget.reservedUsd
-      : 0;
-
-    await appendAuditEvent(db, {
-      eventType: 'budget_hold',
-      agentId,
-      model,
-      costDelta: estimatedCost,
-      runningBalance,
-      meta: { holdId: holdResult.holdId, estimatedCost },
-    });
-
+    // The reservation and budget_hold audit committed together.
     return { action: 'pass', holdId: holdResult.holdId };
   } else {
     // Block — budget exceeded
     const budget = await getBudget(db, agentId);
     const spent = budget ? budget.spentUsd : 0;
-    const limit = budget ? budget.limitUsd : DEFAULT_BUDGET_LIMIT_USD;
+    const limit = budget ? budget.limitUsd : 0;
 
     await appendAuditEvent(db, {
       eventType: 'budget_blocked',
@@ -113,25 +100,13 @@ export async function budgetGate(ctx: GateContext): Promise<GateResult> {
 export async function budgetSettle(
   db: DbClient,
   holdId: HoldId,
-  actualUsage: { promptTokens: number; completionTokens: number },
+  actualUsage: { promptTokens: number; completionTokens: number } | null,
   model: string,
   agentId: AgentId
 ): Promise<void> {
-  const actualCost = settleCost(model, actualUsage);
-
-  await settleHold(db, holdId, actualCost);
-
-  const budget = await getBudget(db, agentId);
-  const runningBalance = budget
-    ? budget.limitUsd - budget.spentUsd - budget.reservedUsd
-    : 0;
-
-  await appendAuditEvent(db, {
-    eventType: 'budget_settle',
-    agentId,
-    model,
-    costDelta: actualCost,
-    runningBalance,
-    meta: { holdId, actualUsage, actualCost },
-  });
+  if (actualUsage && (![actualUsage.promptTokens, actualUsage.completionTokens].every(n => Number.isSafeInteger(n) && n >= 0))) {
+    throw new Error('Invalid settlement usage');
+  }
+  const actualCost = actualUsage === null ? null : settleCost(model, actualUsage);
+  await settleHold(db, holdId, actualCost, { model, agentId, actualUsage });
 }

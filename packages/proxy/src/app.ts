@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
+import { validateChatRequest } from './request-validation';
 import { createDbClient, type DbClient } from './db/client';
 import { budgetGate, budgetSettle } from './budget/gate';
 import { forwardToLlm } from './passthrough/forward';
@@ -11,11 +13,13 @@ import { appendAuditEvent } from './audit/writer';
 import type { ChatCompletionRequest, BudgetExceededErrorBody } from './types';
 
 export type AppEnvironment = {
-  Bindings: Env;
-  Variables: { db?: DbClient };
+  Bindings: Env & { AGENTGOV_PROVIDER_TIMEOUT_MS?: string; AGENTGOV_MAX_RETRIES?: string; AGENTGOV_RETRY_BASE_MS?: string };
+  Variables: { db?: DbClient; hitlUnavailable?: boolean };
 };
 
 const app = new Hono<AppEnvironment>();
+
+app.use('/v1/chat/completions', bodyLimit({ maxSize: 1_048_576 }));
 
 // Health check endpoint
 app.get('/health', (c) => {
@@ -42,28 +46,32 @@ app.post('/v1/chat/completions', async (c) => {
     return c.json({ error: 'invalid JSON' }, 400);
   }
 
+  try {
+    body = validateChatRequest(body);
+  } catch {
+    return c.json({ error: { code: 'INVALID_REQUEST', message: 'Unsupported or invalid text chat request.' } }, 400);
+  }
+
   // Step 3: Budget enforcement — initialize DB client
-  // If bindings are missing (local dev without .dev.vars), skip enforcement and allow all.
-  // This keeps local dev usable without a Turso database.
   const dbUrl = c.env?.TURSO_DATABASE_URL;
   const dbToken = c.env?.TURSO_AUTH_TOKEN;
-
-  if (!dbUrl || !dbToken) {
-    console.warn(
-      'agentgov: TURSO_DATABASE_URL or TURSO_AUTH_TOKEN not configured — ' +
-      'budget enforcement DISABLED (local dev mode). Set .dev.vars for local enforcement.'
-    );
-    // Passthrough stub (enforcement disabled for local dev)
-    return c.json(makeStubResponse(body.model), 200);
+  if ((!dbUrl || !dbToken) && !c.get('db')) {
+    return c.json({ error: { code: 'GOVERNANCE_UNAVAILABLE', message: 'Budget database is not configured.' } }, 503);
+  }
+  // Self-hosted Node does not provide durable approval workflows. Reject before
+  // reserving funds, instead of creating an unreleasable hold and a generic 500.
+  if (c.get('hitlUnavailable') && classifyToolCalls(extractToolCalls(body)).required) {
+    return c.json({ error: { code: 'HITL_NOT_AVAILABLE', message: 'HITL requires Cloudflare Workflows deployment.' } }, 501);
   }
 
   // Node injects its migrated native SQLite client; Workers uses the web client.
-  const db = c.get('db') ?? createDbClient(dbUrl, dbToken);
+  const db = c.get('db') ?? createDbClient(dbUrl!, dbToken!);
 
   // Step 4: Run budget gate (Hold/Settle pattern)
   const gateResult = await budgetGate({ db, agentId, request: body });
 
   if (gateResult.action === 'block') {
+    if (gateResult.reason === 'unknown_agent') return c.json({ error: { code: 'BUDGET_NOT_PROVISIONED' } }, 403);
     if (gateResult.reason === 'unknown_model') {
       // 422 Unprocessable Entity — model not in pricing table
       return c.json(
@@ -107,7 +115,8 @@ app.post('/v1/chat/completions', async (c) => {
       const callbackBaseUrl = new URL(c.req.url).origin;
 
       // Create Workflow instance (uses ticketId as instance ID per research Pitfall 1)
-      await c.env.HITL_WORKFLOW.create({
+      try {
+        await c.env.HITL_WORKFLOW.create({
         id: ticketId,
         params: {
           ticketId,
@@ -122,7 +131,11 @@ app.post('/v1/chat/completions', async (c) => {
           slackBotToken: c.env?.SLACK_BOT_TOKEN || undefined,
           slackChannelId: c.env?.SLACK_CHANNEL_ID || undefined,
         },
-      });
+        });
+      } catch {
+        await budgetSettle(db, holdId, { promptTokens: 0, completionTokens: 0 }, body.model, agentId);
+        return c.json({ error: { code: 'HITL_UNAVAILABLE', message: 'Approval workflow could not be created.' } }, 503);
+      }
 
       // Return 202 Accepted — agent should pause and poll for approval
       return c.json(
@@ -152,7 +165,7 @@ app.post('/v1/chat/completions', async (c) => {
       const stuckResult = recordAction(loopState, fp, tc.function.name, Date.now());
       if (stuckResult.stuck) {
         // Log stuck_detected audit event (never-throw)
-        appendAuditEvent(db, {
+        await appendAuditEvent(db, {
           eventType: 'stuck_detected',
           agentId,
           model: body.model,
@@ -198,7 +211,10 @@ app.post('/v1/chat/completions', async (c) => {
     OPENAI_API_KEY: c.env?.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: c.env?.ANTHROPIC_API_KEY,
     GEMINI_API_KEY: c.env?.GEMINI_API_KEY,
-  });
+    AGENTGOV_PROVIDER_TIMEOUT_MS: c.env?.AGENTGOV_PROVIDER_TIMEOUT_MS,
+    AGENTGOV_MAX_RETRIES: c.env?.AGENTGOV_MAX_RETRIES,
+    AGENTGOV_RETRY_BASE_MS: c.env?.AGENTGOV_RETRY_BASE_MS,
+  }, c.req.raw.signal);
 
   // Fire budget alerts fire-and-forget (not on the hot path)
   // Use executionCtx.waitUntil if available (Cloudflare Workers), else background promise
@@ -251,34 +267,6 @@ function classifyToolCalls(
     }
   }
   return { required: false };
-}
-
-/**
- * Creates a stub OpenAI-compatible response.
- * Used only in local dev mode when DB credentials are not configured.
- */
-function makeStubResponse(model: string) {
-  return {
-    id: `stub-${crypto.randomUUID()}`,
-    object: 'chat.completion',
-    created: Math.floor(Date.now() / 1000),
-    model,
-    choices: [
-      {
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: 'stub',
-        },
-        finish_reason: 'stop',
-      },
-    ],
-    usage: {
-      prompt_tokens: 0,
-      completion_tokens: 0,
-      total_tokens: 0,
-    },
-  };
 }
 
 // Shared Hono app; platform-specific exports belong in the entry points.

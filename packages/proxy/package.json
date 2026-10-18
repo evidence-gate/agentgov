@@ -2,7 +2,7 @@
   "name": "@agentgov/proxy",
   "version": "0.0.1",
   "private": true,
-  "description": "agentgov Hono proxy — OpenAI-compatible endpoint with budget enforcement",
+  "description": "agentgov Hono proxy \u2014 OpenAI-compatible endpoint with budget enforcement",
   "module": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
@@ -18,7 +18,9 @@
     "start:node": "tsx src/index.node.ts",
     "build": "wrangler deploy --dry-run --env=\"\" --outdir dist",
     "test:startup": "node --test scripts/node-startup.test.mjs",
-    "test:chat": "node --test scripts/node-chat.test.mjs"
+    "test:chat": "node --test scripts/node-chat.test.mjs",
+    "test:adversarial": "node --test scripts/node-adversarial.test.mjs",
+    "test:hitl": "node --import tsx --test scripts/hitl-lifecycle.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "~1.4.4",

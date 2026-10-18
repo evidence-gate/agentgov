@@ -3,7 +3,7 @@
  *
  * Mirrors the fetch+POST pattern established by checkAndFireAlerts in budget/alerts.ts.
  * CRITICAL: persist-before-notify — always write hitl_queue row BEFORE calling notifyChannels.
- * This function never throws — catches and console.error's any failure.
+ * Configured-channel failures propagate so the workflow can deny and release its hold.
  */
 
 import type { RiskTier } from './classifier';
@@ -36,7 +36,7 @@ interface WebhookPayload {
  * - Webhook: POST JSON payload with ticket details and callback URL
  * - Slack: POST Block Kit message with Approve/Deny buttons (if token+channel configured)
  *
- * Neither channel throws on failure — errors are logged to console.error.
+ * Transport failures, HTTP errors and Slack API errors throw sanitized errors.
  * Missing webhookUrl or Slack credentials silently skip that channel.
  */
 export async function notifyChannels(params: NotifyChannelsParams): Promise<void> {
@@ -55,13 +55,16 @@ export async function notifyChannels(params: NotifyChannelsParams): Promise<void
     };
 
     try {
-      await fetch(webhookUrl, {
+      const response = await fetch(webhookUrl, {
         method: 'POST',
+        signal: AbortSignal.timeout(10_000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-    } catch (err) {
-      console.error(`notifyChannels: webhook POST failed for ticket ${ticketId}:`, err);
+      if (!response.ok) throw new Error('Webhook HTTP failure');
+      await response.body?.cancel();
+    } catch {
+      throw new Error('HITL webhook notification failed');
     }
   }
 
@@ -101,16 +104,20 @@ export async function notifyChannels(params: NotifyChannelsParams): Promise<void
     };
 
     try {
-      await fetch('https://slack.com/api/chat.postMessage', {
+      const response = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
+        signal: AbortSignal.timeout(10_000),
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${slackBotToken}`,
         },
         body: JSON.stringify(slackMessage),
       });
-    } catch (err) {
-      console.error(`notifyChannels: Slack POST failed for ticket ${ticketId}:`, err);
+      if (!response.ok) throw new Error('Slack HTTP failure');
+      const result = await response.json() as { ok?: boolean };
+      if (result.ok !== true) throw new Error('Slack API failure');
+    } catch {
+      throw new Error('HITL Slack notification failed');
     }
   }
 }

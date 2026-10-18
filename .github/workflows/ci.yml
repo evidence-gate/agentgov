@@ -64,6 +64,11 @@ jobs:
       - name: Test proxy chat pipeline (Node.js, local provider)
         run: pnpm --filter @agentgov/proxy test:chat
 
+      - name: Test adversarial HTTP and HITL lifecycle (local fixtures)
+        run: |
+          pnpm --filter @agentgov/proxy test:adversarial
+          pnpm --filter @agentgov/proxy test:hitl
+
       - name: Test SDK (TypeScript)
         run: pnpm --filter @agentgov/sdk test
 

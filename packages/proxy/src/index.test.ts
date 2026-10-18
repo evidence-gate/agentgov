@@ -25,59 +25,18 @@ describe('POST /v1/chat/completions', () => {
     expect(body['error']).toBe('X-Agent-Id header required');
   });
 
-  it('returns 200 with stub response for valid request (no DB bindings = dev passthrough)', async () => {
-    // Without TURSO bindings (no env in test), budget enforcement is skipped (dev mode passthrough)
-    const res = await app.request('/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Agent-Id': 'test-agent-01',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: 'Hello' }],
-      }),
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
-    expect(typeof body['id']).toBe('string');
-    expect((body['id'] as string).startsWith('stub-')).toBe(true);
-    expect(body['object']).toBe('chat.completion');
-    const choices = body['choices'] as Array<{ message: { role: string; content: string } }>;
-    expect(Array.isArray(choices)).toBe(true);
-    expect(choices[0].message.role).toBe('assistant');
-    expect(choices[0].message.content).toBe('stub');
-  });
-
-  it('returns 200 stub when request has reversible tool_calls (no TURSO = dev passthrough)', async () => {
-    // Reversible tool_calls with dev passthrough (no TURSO) — no HITL triggered
-    const res = await app.request('/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Agent-Id': 'test-agent-safe',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'assistant',
-            content: null,
-            tool_calls: [
-              {
-                id: 'call_safe',
-                type: 'function',
-                function: { name: 'read_file', arguments: '{}' },
-              },
-            ],
-          },
-        ],
-      }),
-    });
-    // Dev passthrough — no TURSO = stub response (no HITL gate without DB)
-    expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
-    expect((body['id'] as string).startsWith('stub-')).toBe(true);
+  it('fails closed when DB bindings are missing, including risky tool requests', async () => {
+    for (const messages of [
+      [{ role: 'user', content: 'Hello' }],
+      [{ role: 'assistant', content: null, tool_calls: [{ id: 't', type: 'function', function: { name: 'send_email', arguments: '{}' } }] }],
+    ]) {
+      const res = await app.request('/v1/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Id': 'test-agent' },
+        body: JSON.stringify({ model: 'gpt-4o', messages }),
+      });
+      expect(res.status).toBe(503);
+      expect(await res.json()).toMatchObject({ error: { code: 'GOVERNANCE_UNAVAILABLE' } });
+    }
   });
 
   it('returns 400 for non-JSON body (with X-Agent-Id header)', async () => {
