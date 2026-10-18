@@ -154,9 +154,10 @@ test('Node rejects adversarial inputs before reservation or provider dispatch', 
       evidence(name, result, state, f.calls.length - before);
       if (observeOnly) return;
       assert.equal(result.status, 501);
-      assert.equal(result.body.error.code, 'HITL_NOT_AVAILABLE');
+      assert.deepEqual(result.body, { error: { code: 'HITL_NOT_AVAILABLE', message: 'HITL requires Cloudflare Workflows deployment.' } });
       assert.equal(f.calls.length, before);
       assert.equal(state.holds.length, 0);
+      assert.equal(state.audit.length, 0);
       assert.equal(state.ledger.reserved_usd, 0);
     });
     await t.test('Node HITL control routes fail explicitly without database/provider work', async () => {
@@ -244,6 +245,107 @@ test('Concurrent HTTP requests cannot over-reserve one shared budget; holds and 
       assert.equal(row.hash, createHash('sha256').update(encoded).digest('hex'));
       previousHash = row.hash;
     }
+  } finally { await f.cleanup(); }
+});
+
+async function putBudget(f, agent, authorization, limitUsd = 25) {
+  const response = await fetch(`${f.base}/api/v1/operator/budgets/${agent}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...(authorization ? { Authorization: authorization } : {}) },
+    body: JSON.stringify({ limitUsd }),
+    signal: AbortSignal.timeout(5000),
+  });
+  const text = await response.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = text; }
+  return { status: response.status, body };
+}
+
+test('Fresh database rejects unauthenticated provisioning, then an operator grant passes chat', { timeout: 20_000 }, async () => {
+  const admin = 'synthetic-operator-token';
+  const f = await fixture(true, admin, authConfigFor(syntheticAgentToken, ['fresh-agent']));
+  try {
+    const agent = 'fresh-agent';
+    const before = f.calls.length;
+    const blocked = await f.chat(agent, requestBody);
+    assert.equal(blocked.status, 403);
+    assert.equal(blocked.body.error.code, 'BUDGET_NOT_PROVISIONED');
+    assert.equal((await f.state(agent)).ledger, undefined);
+    assert.equal((await f.state(agent)).holds.length, 0);
+    assert.equal(f.calls.length, before);
+
+    for (const authorization of [undefined, 'Bearer wrong-operator-token', `Bearer ${syntheticAgentToken}`]) {
+      const denied = await putBudget(f, agent, authorization);
+      assert.equal(denied.status, 401);
+      assert.equal(denied.body.error.code, 'UNAUTHORIZED');
+      assert.equal((await f.state(agent)).ledger, undefined);
+    }
+    const chatTokenOnly = await fetch(`${f.base}/api/v1/operator/budgets/${agent}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Agentgov-Token': syntheticAgentToken },
+      body: JSON.stringify({ limitUsd: 25 }),
+      signal: AbortSignal.timeout(5000),
+    });
+    assert.equal(chatTokenOnly.status, 401);
+    assert.equal((await f.state(agent)).ledger, undefined);
+    assert.equal(f.calls.length, before);
+
+    const created = await putBudget(f, agent, `Bearer ${admin}`);
+    assert.equal(created.status, 201);
+    assert.equal(created.body.created, true);
+    assert.equal(created.body.agentId, agent);
+    assert.equal(created.body.limitUsd, 25);
+    assert.equal(created.body.spentUsd, 0);
+    assert.equal(created.body.reservedUsd, 0);
+    let state = await f.state(agent);
+    assert.equal(state.ledger.limit_usd, 25);
+    assert.equal(state.ledger.spent_usd, 0);
+    assert.equal(state.ledger.reserved_usd, 0);
+    assert.equal(state.audit.filter(row => row.event_type === 'budget_provisioned').length, 1);
+
+    const allowed = await f.chat(agent, requestBody);
+    assert.equal(allowed.status, 200);
+    assert.equal(f.calls.length, before + 1);
+    state = await f.state(agent);
+    assert.equal(state.holds.length, 1);
+    assert.equal(state.holds[0].status, 'settled');
+    assert.equal(state.ledger.reserved_usd, 0);
+    assert.ok(state.ledger.spent_usd > 0);
+    const spent = state.ledger.spent_usd;
+
+    const again = await putBudget(f, agent, `Bearer ${admin}`);
+    assert.equal(again.status, 200);
+    assert.equal(again.body.created, false);
+    state = await f.state(agent);
+    assert.equal(state.ledger.spent_usd, spent);
+    assert.equal(state.ledger.reserved_usd, 0);
+    assert.equal(state.audit.filter(row => row.event_type === 'budget_provisioned').length, 1);
+    assert.equal(state.audit.filter(row => row.event_type === 'budget_limit_changed').length, 0);
+
+    const raised = await putBudget(f, agent, `Bearer ${admin}`, 40);
+    assert.equal(raised.status, 200);
+    assert.equal(raised.body.created, false);
+    state = await f.state(agent);
+    assert.equal(state.ledger.limit_usd, 40);
+    assert.equal(state.ledger.spent_usd, spent);
+    assert.equal(state.audit.filter(row => row.event_type === 'budget_limit_changed').length, 1);
+    assert.ok(!JSON.stringify(state.audit).includes(admin));
+    assert.ok(!JSON.stringify(state.audit).includes(syntheticAgentToken));
+    console.log(JSON.stringify({ case: 'operator-provision-then-chat', blocked: blocked.status, created: created.status,
+      chat: allowed.status, repeated: again.status, raised: raised.status, spent }));
+  } finally { await f.cleanup(); }
+});
+
+test('Unset operator token cannot provision a fresh database', { timeout: 20_000 }, async () => {
+  const f = await fixture(true, undefined, authConfigFor(syntheticAgentToken, ['fresh-agent']));
+  try {
+    const denied = await putBudget(f, 'fresh-agent', 'Bearer arbitrary-caller-token');
+    assert.equal(denied.status, 503);
+    assert.equal(denied.body.error.code, 'ADMIN_AUTH_UNAVAILABLE');
+    assert.equal((await f.state('fresh-agent')).ledger, undefined);
+    assert.equal((await f.client.execute('SELECT COUNT(*) AS n FROM budget_ledger')).rows[0].n, 0);
+    assert.equal(f.calls.length, 0);
+    console.log(JSON.stringify({ case: 'operator-token-unset-provision', status: denied.status, budgetRows: 0 }));
   } finally { await f.cleanup(); }
 });
 

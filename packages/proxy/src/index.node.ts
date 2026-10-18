@@ -6,6 +6,7 @@
  * - Uses embedded libSQL (file: URL) instead of Turso cloud HTTP
  * - Passes process.env into app.fetch as bindings so existing proxy code works unchanged
  * - Rejects Node HITL requests with 501 before reserving budget
+ * - Serves operator budget provisioning on the shared app with the native client, including file: URLs
  * - Mounts read-only dashboard API routes for the SPA (Plan 03)
  */
 

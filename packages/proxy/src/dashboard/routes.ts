@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { budgetLedger, auditLog, hitlQueue } from '../db/schema';
 import type { DbClient } from '../db/client';
 import { updateBudgetLimit } from '../budget/ledger';
+import { authenticateOperator } from '../operator-auth';
 import type { AgentId } from '../types';
 
 /**
@@ -68,17 +69,14 @@ export function createDashboardRoutes(db: DbClient) {
    *   400 INVALID_LIMIT — limitUsd is negative, NaN, or Infinity
    *   404 AGENT_NOT_FOUND — no budget row exists for the given agentId
    *
+   * This route does not create a row. New budgets use PUT /api/v1/operator/budgets/:agentId.
+   *
    * CRITICAL: Only updates limit_usd. Never touches spent_usd or reserved_usd.
    * Every successful change appends a budget_limit_changed audit event (BUDGET-02).
    */
   router.patch('/api/v1/dashboard/budgets/:agentId', async (c) => {
-    const secret = c.env?.AGENTGOV_BUDGET_ADMIN_TOKEN as string | undefined;
-    if (!secret) return c.json({ error: { code: 'ADMIN_AUTH_UNAVAILABLE' } }, 503);
-    const digest = async (s: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
-    const [actual, expected] = await Promise.all([digest(c.req.header('Authorization') ?? ''), digest(`Bearer ${secret}`)]);
-    let difference = 0;
-    for (let i = 0; i < expected.length; i++) difference |= actual[i] ^ expected[i];
-    if (difference !== 0) return c.json({ error: { code: 'UNAUTHORIZED' } }, 401);
+    const auth = await authenticateOperator(c.env?.AGENTGOV_BUDGET_ADMIN_TOKEN, c.req.header('Authorization'));
+    if (!auth.ok) return c.json({ error: { code: auth.code } }, auth.status);
     const agentId = c.req.param('agentId');
     let body: { limitUsd?: unknown } | null;
     try { body = await c.req.json(); } catch { return c.json({ error: { code: 'INVALID_LIMIT' } }, 400); }

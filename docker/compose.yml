@@ -9,6 +9,7 @@ services:
       - agentgov-data:/data
     environment:
       AGENTGOV_AGENT_AUTH: "${AGENTGOV_AGENT_AUTH:-}"
+      AGENTGOV_BUDGET_ADMIN_TOKEN: "${AGENTGOV_BUDGET_ADMIN_TOKEN:-}"
       DATABASE_URL: "file:/data/agentgov.db"
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"

@@ -1,12 +1,15 @@
 import { eq } from 'drizzle-orm';
 import { budgetLedger, holds } from '../db/schema';
 import type { DbClient } from '../db/client';
+import { isAgentId } from '../agent-auth';
 import type { AgentId, HoldId } from '../types';
 import { auditedWrite } from '../audit/writer';
 
+export type BudgetRow = typeof budgetLedger.$inferSelect;
+
 /**
- * Ensure an agent has a budget_ledger row.
- * Uses INSERT OR IGNORE semantics (onConflictDoNothing) — does nothing if row exists.
+ * Test/helper insert. Not an operator path and not called by chat.
+ * Operator provisioning is provisionAgentBudget, which audits the grant.
  */
 export async function ensureAgent(
   db: DbClient,
@@ -107,6 +110,58 @@ export async function settleHold(
       ],
     };
   });
+}
+
+/**
+ * Create or reuse an agent budget. Idempotent.
+ * A new row starts at zero spend and zero reservation and writes budget_provisioned.
+ * An existing row keeps spentUsd and reservedUsd. A changed limit reuses updateBudgetLimit.
+ * The same limit writes nothing. Chat still cannot call this.
+ */
+export async function provisionAgentBudget(
+  db: DbClient,
+  agentId: AgentId,
+  limitUsd: number,
+): Promise<{ row: BudgetRow; created: boolean }> {
+  if (!isAgentId(agentId)) throw new Error('Invalid agent id');
+  if (!Number.isFinite(limitUsd) || limitUsd < 0) throw new Error('Invalid budget limit');
+  for (let attempt = 0; attempt < 32; attempt++) {
+    const [existing] = await db.select().from(budgetLedger).where(eq(budgetLedger.agentId, agentId)).limit(1);
+    if (existing) {
+      if (existing.limitUsd === limitUsd) return { row: existing, created: false };
+      const updated = await updateBudgetLimit(db, agentId, limitUsd);
+      if (updated) return { row: updated, created: false };
+      continue;
+    }
+    const now = Date.now();
+    const inserted = await auditedWrite(db, async () => {
+      const [current] = await db.select().from(budgetLedger).where(eq(budgetLedger.agentId, agentId)).limit(1);
+      if (current) return null;
+      return {
+        event: {
+          eventType: 'budget_provisioned' as const,
+          agentId,
+          model: '',
+          costDelta: 0,
+          runningBalance: limitUsd,
+          meta: { limitUsd },
+        },
+        condition: {
+          sql: 'NOT EXISTS(SELECT 1 FROM budget_ledger WHERE agent_id=?)',
+          args: [agentId],
+        },
+        statements: (hash: string) => [{
+          sql: `INSERT INTO budget_ledger (agent_id,limit_usd,spent_usd,reserved_usd,updated_at)
+                SELECT ?,?,0,0,? WHERE EXISTS(SELECT 1 FROM audit_log WHERE hash=?)`,
+          args: [agentId, limitUsd, now, hash],
+        }],
+      };
+    });
+    if (!inserted) continue;
+    const [row] = await db.select().from(budgetLedger).where(eq(budgetLedger.agentId, agentId)).limit(1);
+    if (row) return { row, created: true };
+  }
+  throw new Error('Budget provisioning contention');
 }
 
 /**

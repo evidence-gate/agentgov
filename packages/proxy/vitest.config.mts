@@ -10,6 +10,7 @@ export default defineConfig({
       'src/budget/calculator.test.ts',
       'src/audit/writer.test.ts',
       'src/budget/gate.test.ts',
+      'src/budget/provision.test.ts',
       'src/budget/alerts.test.ts',
       'src/hitl/hitl.test.ts',
       'src/hitl/routes.test.ts',

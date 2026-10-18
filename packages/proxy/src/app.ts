@@ -1,9 +1,11 @@
-import { authenticateAgent } from './agent-auth';
+import { authenticateAgent, isAgentId } from './agent-auth';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { validateChatRequest } from './request-validation';
 import { createDbClient, type DbClient } from './db/client';
 import { budgetGate, budgetSettle } from './budget/gate';
+import { provisionAgentBudget } from './budget/ledger';
+import { authenticateOperator } from './operator-auth';
 import { forwardToLlm } from './passthrough/forward';
 import { checkAndFireAlerts } from './budget/alerts';
 import { classifyAction, type RiskTier } from './hitl/classifier';
@@ -14,17 +16,59 @@ import { appendAuditEvent } from './audit/writer';
 import type { ChatCompletionRequest, BudgetExceededErrorBody } from './types';
 
 export type AppEnvironment = {
-  Bindings: Env & { AGENTGOV_AGENT_AUTH?: string; AGENTGOV_PROVIDER_TIMEOUT_MS?: string; AGENTGOV_MAX_RETRIES?: string; AGENTGOV_RETRY_BASE_MS?: string };
+  Bindings: Env & {
+    AGENTGOV_AGENT_AUTH?: string;
+    AGENTGOV_BUDGET_ADMIN_TOKEN?: string;
+    AGENTGOV_PROVIDER_TIMEOUT_MS?: string;
+    AGENTGOV_MAX_RETRIES?: string;
+    AGENTGOV_RETRY_BASE_MS?: string;
+  };
   Variables: { db?: DbClient; hitlUnavailable?: boolean };
 };
 
 const app = new Hono<AppEnvironment>();
 
 app.use('/v1/chat/completions', bodyLimit({ maxSize: 1_048_576 }));
+app.use('/api/v1/operator/budgets/*', bodyLimit({ maxSize: 4096 }));
 
 // Health check endpoint
 app.get('/health', (c) => {
   return c.json({ status: 'ok' });
+});
+
+// Operator-only create/upsert. Chat tokens and missing credentials cannot grant a budget.
+// Node serves this with the native libSQL client (including file: URLs). Workers uses the web client.
+app.put('/api/v1/operator/budgets/:agentId', async (c) => {
+  const auth = await authenticateOperator(c.env?.AGENTGOV_BUDGET_ADMIN_TOKEN, c.req.header('Authorization'));
+  if (!auth.ok) return c.json({ error: { code: auth.code } }, auth.status);
+
+  const agentId = c.req.param('agentId');
+  if (!isAgentId(agentId)) return c.json({ error: { code: 'INVALID_AGENT' } }, 400);
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: { code: 'INVALID_LIMIT', message: 'Body must be {"limitUsd":<non-negative finite number>}' } }, 400);
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return c.json({ error: { code: 'INVALID_LIMIT', message: 'Body must be {"limitUsd":<non-negative finite number>}' } }, 400);
+  }
+  const record = body as Record<string, unknown>;
+  const limitUsd = record['limitUsd'];
+  if (Object.keys(record).length !== 1 || !Object.hasOwn(record, 'limitUsd') ||
+    typeof limitUsd !== 'number' || !Number.isFinite(limitUsd) || limitUsd < 0) {
+    return c.json({ error: { code: 'INVALID_LIMIT', message: 'Body must be {"limitUsd":<non-negative finite number>}' } }, 400);
+  }
+
+  const dbUrl = c.env?.TURSO_DATABASE_URL;
+  const dbToken = c.env?.TURSO_AUTH_TOKEN;
+  if ((!dbUrl || !dbToken) && !c.get('db')) {
+    return c.json({ error: { code: 'GOVERNANCE_UNAVAILABLE', message: 'Budget database is not configured.' } }, 503);
+  }
+  const db = c.get('db') ?? createDbClient(dbUrl!, dbToken!);
+  const { row, created } = await provisionAgentBudget(db, agentId, limitUsd);
+  return c.json({ ...row, created }, created ? 201 : 200);
 });
 
 // Mount HITL sub-routes (approve, deny, status, slack callback)
