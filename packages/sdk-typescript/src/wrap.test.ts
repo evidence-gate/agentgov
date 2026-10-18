@@ -146,12 +146,13 @@ describe('createAgentgovFetch', () => {
     const agentFetch = createAgentgovFetch({ proxyUrl: 'http://proxy:8787', agentId: 'agent-x' });
     await agentFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer sk-test' },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer sk-test', 'X-Agentgov-Token': 'synthetic_sdk_token_000000000000001' },
     });
 
     const calledHeaders: Headers = mockFetch.mock.calls[0][1].headers;
     expect(calledHeaders.get('Content-Type')).toBe('application/json');
     expect(calledHeaders.get('Authorization')).toBe('Bearer sk-test');
+    expect(calledHeaders.get('X-Agentgov-Token')).toBe('synthetic_sdk_token_000000000000001');
     expect(calledHeaders.get('X-Agent-Id')).toBe('agent-x');
   });
 

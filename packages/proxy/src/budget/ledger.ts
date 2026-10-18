@@ -1,22 +1,8 @@
-/**
- * Budget ledger — DB read/write for budget_ledger and holds tables.
- *
- * Implements the Hold/Settle pattern for concurrent budget enforcement.
- * Every LLM request that passes the gate creates a Hold (pessimistic reservation).
- * After the response arrives, the hold is settled to the actual cost.
- *
- * Concurrency note: Steps in createHold are NOT wrapped in a single DB transaction
- * because the Turso HTTP client does not support interactive transactions.
- * At high concurrency, two simultaneous reads could both see sufficient budget.
- * This is a known consistency risk documented here; Phase 2 mitigates it by
- * running each agent's gate in a Cloudflare Durable Object (serialized per agent).
- * See PITFALLS.md #8.
- */
-
 import { eq } from 'drizzle-orm';
 import { budgetLedger, holds } from '../db/schema';
 import type { DbClient } from '../db/client';
 import type { AgentId, HoldId } from '../types';
+import { auditedWrite } from '../audit/writer';
 
 /**
  * Ensure an agent has a budget_ledger row.
@@ -56,117 +42,71 @@ export async function getBudget(
   };
 }
 
-/**
- * Create a pessimistic budget hold before forwarding a request.
- *
- * Returns { approved: true, holdId } if sufficient budget exists.
- * Returns { approved: false, remaining } if budget would be exceeded.
- *
- * CRITICAL: This function reads from the primary replica for enforcement correctness.
- * // primary read for enforcement correctness — see PITFALLS.md #8
- *
- * Atomicity: NOT a single DB transaction (Turso HTTP does not support interactive
- * transactions). Phase 2 Durable Objects mitigate race conditions per-agent.
- */
+/** Reserve and audit atomically; concurrent requests cannot spend the same balance. */
 export async function createHold(
-  db: DbClient,
-  agentId: AgentId,
-  model: string,
-  estimatedCost: number
+  db: DbClient, agentId: AgentId, model: string, estimatedCost: number, subject?: string,
 ): Promise<{ approved: true; holdId: HoldId } | { approved: false; remaining: number }> {
-  // primary read for enforcement correctness — see PITFALLS.md #8
-  const budget = await getBudget(db, agentId);
-
-  if (!budget) {
-    // Agent has no ledger row — treat as zero budget to fail closed
-    return { approved: false, remaining: 0 };
-  }
-
-  const { limitUsd, spentUsd, reservedUsd } = budget;
-  const projectedTotal = spentUsd + reservedUsd + estimatedCost;
-
-  if (projectedTotal > limitUsd) {
-    return {
-      approved: false,
-      remaining: limitUsd - spentUsd - reservedUsd,
-    };
-  }
-
-  // Sufficient budget — create the hold
+  if (!Number.isFinite(estimatedCost) || estimatedCost < 0) throw new Error('Invalid hold cost');
   const holdId = crypto.randomUUID();
-  const now = Date.now();
-  const expiresAt = now + 3_600_000; // 1 hour
-
-  // INSERT hold row
-  await db.insert(holds).values({
-    id: holdId,
-    agentId,
-    model,
-    estimatedCost,
-    status: 'active',
-    createdAt: now,
-    expiresAt,
+  let remaining = 0;
+  const committed = await auditedWrite(db, async () => {
+    const budget = await getBudget(db, agentId);
+    remaining = budget ? budget.limitUsd - budget.spentUsd - budget.reservedUsd : 0;
+    if (!budget || estimatedCost > remaining) return null;
+    const now = Date.now();
+    return {
+      event: { eventType: 'budget_hold', agentId, model, costDelta: estimatedCost,
+        runningBalance: remaining - estimatedCost, meta: { holdId, estimatedCost, ...(subject ? { subject } : {}) } },
+      condition: {
+        sql: 'EXISTS(SELECT 1 FROM budget_ledger WHERE agent_id=? AND limit_usd=? AND spent_usd=? AND reserved_usd=?)',
+        args: [agentId, budget.limitUsd, budget.spentUsd, budget.reservedUsd],
+      },
+      statements: (hash: string) => [
+        { sql: `INSERT INTO holds (id,agent_id,model,estimated_cost,status,created_at,expires_at)
+                SELECT ?,?,?,?,'active',?,? WHERE EXISTS(SELECT 1 FROM audit_log WHERE hash=?)`,
+          args: [holdId, agentId, model, estimatedCost, now, now + 3_600_000, hash] },
+        { sql: `UPDATE budget_ledger SET reserved_usd=reserved_usd+?,updated_at=?
+                WHERE agent_id=? AND EXISTS(SELECT 1 FROM audit_log WHERE hash=?)`,
+          args: [estimatedCost, now, agentId, hash] },
+      ],
+    };
   });
-
-  // UPDATE budget_ledger: increment reservedUsd
-  await db
-    .update(budgetLedger)
-    .set({ reservedUsd: reservedUsd + estimatedCost, updatedAt: now })
-    .where(eq(budgetLedger.agentId, agentId));
-
-  return { approved: true, holdId };
+  return committed ? { approved: true, holdId } : { approved: false, remaining };
 }
 
-/**
- * Settle a hold after the LLM response arrives.
- *
- * Marks the hold as settled, decrements reservedUsd, increments spentUsd.
- * Note: We do a separate SELECT to get hold data, then two UPDATEs.
- * This is sequential, not transactional — same concurrency caveat as createHold.
- */
+/** Settle and audit exactly once. Null cost conservatively consumes the reservation. */
 export async function settleHold(
-  db: DbClient,
-  holdId: HoldId,
-  actualCost: number
+  db: DbClient, holdId: HoldId, actualCost: number | null,
+  context?: { agentId: AgentId; model: string; actualUsage: { promptTokens: number; completionTokens: number } | null },
 ): Promise<void> {
-  // Step 1: SELECT the hold to get agentId and estimatedCost
-  const holdRows = await db
-    .select()
-    .from(holds)
-    .where(eq(holds.id, holdId))
-    .limit(1);
-
-  if (holdRows.length === 0) {
-    console.error(`settleHold: hold ${holdId} not found`);
-    return;
-  }
-
-  const hold = holdRows[0];
-  const { agentId, estimatedCost } = hold;
-  const now = Date.now();
-
-  // Step 2: UPDATE holds SET status='settled'
-  await db
-    .update(holds)
-    .set({ status: 'settled' })
-    .where(eq(holds.id, holdId));
-
-  // Step 3: UPDATE budget_ledger: release reservation, record actual spend
-  // Get current budget to compute new values
-  const budget = await getBudget(db, agentId);
-  if (!budget) {
-    console.error(`settleHold: no budget row for agent ${agentId}`);
-    return;
-  }
-
-  await db
-    .update(budgetLedger)
-    .set({
-      reservedUsd: Math.max(0, budget.reservedUsd - estimatedCost),
-      spentUsd: budget.spentUsd + actualCost,
-      updatedAt: now,
-    })
-    .where(eq(budgetLedger.agentId, agentId));
+  if (actualCost !== null && (!Number.isFinite(actualCost) || actualCost < 0)) throw new Error('Invalid settlement cost');
+  await auditedWrite(db, async () => {
+    const [hold] = await db.select().from(holds).where(eq(holds.id, holdId)).limit(1);
+    if (!hold) throw new Error('Settlement hold not found');
+    if (context && (context.agentId !== hold.agentId || context.model !== hold.model)) throw new Error('Settlement identity mismatch');
+    if (hold.status === 'settled') return null;
+    if (hold.status !== 'active') throw new Error('Settlement hold is not active');
+    const budget = await getBudget(db, hold.agentId);
+    if (!budget) throw new Error('Settlement budget not found');
+    const cost = actualCost ?? hold.estimatedCost;
+    return {
+      event: { eventType: 'budget_settle', agentId: hold.agentId, model: hold.model, costDelta: cost,
+        runningBalance: budget.limitUsd - budget.spentUsd - budget.reservedUsd + hold.estimatedCost - cost,
+        meta: { holdId, actualCost: cost, ...(context ? { actualUsage: context.actualUsage } : {}),
+          ...(actualCost === null ? { estimated: true, reason: 'usage_unknown' } : {}) } },
+      condition: {
+        sql: `EXISTS(SELECT 1 FROM holds WHERE id=? AND status='active') AND
+              EXISTS(SELECT 1 FROM budget_ledger WHERE agent_id=? AND limit_usd=? AND spent_usd=? AND reserved_usd=?)`,
+        args: [holdId, hold.agentId, budget.limitUsd, budget.spentUsd, budget.reservedUsd],
+      },
+      statements: (hash: string) => [
+        { sql: `UPDATE holds SET status='settled' WHERE id=? AND EXISTS(SELECT 1 FROM audit_log WHERE hash=?)`, args: [holdId, hash] },
+        { sql: `UPDATE budget_ledger SET reserved_usd=MAX(0,reserved_usd-?),spent_usd=spent_usd+?,updated_at=?
+                WHERE agent_id=? AND EXISTS(SELECT 1 FROM audit_log WHERE hash=?)`,
+          args: [hold.estimatedCost, cost, Date.now(), hold.agentId, hash] },
+      ],
+    };
+  });
 }
 
 /**
@@ -183,11 +123,27 @@ export async function updateBudgetLimit(
   agentId: AgentId,
   limitUsd: number,
 ): Promise<typeof budgetLedger.$inferSelect | null> {
-  const now = Date.now();
-  const rows = await db
-    .update(budgetLedger)
-    .set({ limitUsd, updatedAt: now })
-    .where(eq(budgetLedger.agentId, agentId))
-    .returning();
-  return rows[0] ?? null;
+  if (!Number.isFinite(limitUsd) || limitUsd < 0) throw new Error('Invalid budget limit');
+  let updated: typeof budgetLedger.$inferSelect | null = null;
+  await auditedWrite(db, async () => {
+    const [current] = await db.select().from(budgetLedger).where(eq(budgetLedger.agentId, agentId)).limit(1);
+    if (!current) { updated = null; return null; }
+    const now = Date.now();
+    updated = { ...current, limitUsd, updatedAt: now };
+    return {
+      event: { eventType: 'budget_limit_changed', agentId, model: '', costDelta: 0,
+        runningBalance: limitUsd - current.spentUsd - current.reservedUsd,
+        meta: { previousLimitUsd: current.limitUsd, newLimitUsd: limitUsd } },
+      condition: {
+        sql: 'EXISTS(SELECT 1 FROM budget_ledger WHERE agent_id=? AND limit_usd=? AND spent_usd=? AND reserved_usd=?)',
+        args: [agentId, current.limitUsd, current.spentUsd, current.reservedUsd],
+      },
+      statements: (hash: string) => [{
+        sql: `UPDATE budget_ledger SET limit_usd=?,updated_at=? WHERE agent_id=?
+              AND EXISTS(SELECT 1 FROM audit_log WHERE hash=?)`,
+        args: [limitUsd, now, agentId, hash],
+      }],
+    };
+  });
+  return updated;
 }

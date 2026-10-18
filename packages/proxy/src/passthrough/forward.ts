@@ -1,537 +1,169 @@
-/**
- * LLM passthrough — forwards approved requests to the real LLM provider.
- *
- * Features:
- * - Routes by model name prefix (gpt-* / o1-* / o3-* → OpenAI, claude-* → Anthropic, gemini-* → Google)
- * - Streams responses directly without buffering
- * - For streaming: uses stream_options.include_usage so the final SSE chunk contains token counts
- * - Calls budgetSettle after the stream/response completes with actual token usage
- * - Returns provider errors (4xx/5xx) wrapped in structured AgentError responses via retry engine
- * - Returns 503 if the required LLM provider API key is not configured
- * - Automatically retries transient errors (429, 5xx) with exponential backoff and jitter
- * - Immediately halts on permanent errors (401, 4xx) without wasting budget
- */
-
+/** Provider forwarding with bounded lifetime and fail-closed usage accounting. */
 import { budgetSettle } from '../budget/gate';
 import { forwardWithRetry, parseRetryConfig } from '../error/retry';
 import type { DbClient } from '../db/client';
 import type { HoldId, ChatCompletionRequest, AgentId } from '../types';
 
-/**
- * Environment bindings expected by the passthrough handler.
- * These must be set in wrangler.jsonc (non-secret) or .dev.vars / Wrangler secrets (secret values).
- */
 export interface ForwardEnv {
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
   GEMINI_API_KEY?: string;
   AGENTGOV_MAX_RETRIES?: string;
   AGENTGOV_RETRY_BASE_MS?: string;
+  AGENTGOV_PROVIDER_TIMEOUT_MS?: string;
+}
+type Usage = { promptTokens: number; completionTokens: number };
+function count(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+function usage(value: unknown, anthropic: boolean): Usage | null {
+  if (!value || typeof value !== 'object') return null;
+  const u = value as Record<string, unknown>;
+  const p = u[anthropic ? 'input_tokens' : 'prompt_tokens'];
+  const c = u[anthropic ? 'output_tokens' : 'completion_tokens'];
+  return count(p) && count(c) ? { promptTokens: p, completionTokens: c } : null;
+}
+function failure(status = 502): Response {
+  // Never echo upstream bodies, request data, or exception messages (may contain keys).
+  return Response.json({ error: 'provider request failed or usage unavailable' }, { status });
 }
 
-type LlmProvider = 'openai' | 'anthropic' | 'google';
-
-/**
- * Determine the LLM provider from the model name.
- */
-function resolveProvider(model: string): LlmProvider | null {
-  if (model.startsWith('gpt-') || model.startsWith('o1-') || model.startsWith('o3-')) {
-    return 'openai';
-  }
-  if (model.startsWith('claude-')) {
-    return 'anthropic';
-  }
-  if (model.startsWith('gemini-')) {
-    return 'google';
-  }
-  return null;
-}
-
-/**
- * Forward an approved request to the real LLM provider and stream the response back.
- *
- * @param requestBody - Parsed ChatCompletionRequest from the incoming request
- * @param holdId - Active budget hold ID to settle after the response arrives
- * @param agentId - Agent ID (for budgetSettle audit event)
- * @param db - DB client
- * @param env - Environment bindings (API keys)
- */
+/** The optional signal covers client disconnect; the deadline includes headers and body. */
 export async function forwardToLlm(
-  requestBody: ChatCompletionRequest,
-  holdId: HoldId,
-  agentId: AgentId,
-  db: DbClient,
-  env: ForwardEnv,
+  requestBody: ChatCompletionRequest, holdId: HoldId, agentId: AgentId,
+  db: DbClient, env: ForwardEnv, signal?: AbortSignal,
 ): Promise<Response> {
   const model = requestBody.model;
-  const provider = resolveProvider(model);
-
-  if (!provider) {
-    return new Response(
-      JSON.stringify({ error: `cannot determine LLM provider from model name: ${model}` }),
-      { status: 422, headers: { 'Content-Type': 'application/json' } },
-    );
+  const anthropic = model.startsWith('claude-');
+  const google = model.startsWith('gemini-');
+  const openai = /^(gpt-|o1-|o3-)/.test(model);
+  const apiKey = anthropic ? env.ANTHROPIC_API_KEY : google ? env.GEMINI_API_KEY : env.OPENAI_API_KEY;
+  const settle = (u: Usage | null) => budgetSettle(db, holdId, u, model, agentId);
+  if ((!anthropic && !google && !openai) || !apiKey || signal?.aborted) {
+    await settle({ promptTokens: 0, completionTokens: 0 });
+    return failure(!anthropic && !google && !openai ? 422 : !apiKey ? 503 : 499);
   }
-
-  const retryEnv = {
-    AGENTGOV_MAX_RETRIES: env.AGENTGOV_MAX_RETRIES,
-    AGENTGOV_RETRY_BASE_MS: env.AGENTGOV_RETRY_BASE_MS,
-  };
-
-  // Validate API key availability before making the request
-  if (provider === 'openai' && !env.OPENAI_API_KEY) {
-    return new Response(
-      JSON.stringify({
-        error:
-          'LLM provider API key not configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in wrangler secrets.',
-      }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } },
-    );
-  }
-  if (provider === 'anthropic' && !env.ANTHROPIC_API_KEY) {
-    return new Response(
-      JSON.stringify({
-        error:
-          'LLM provider API key not configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in wrangler secrets.',
-      }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } },
-    );
-  }
-  if (provider === 'google' && !env.GEMINI_API_KEY) {
-    return new Response(
-      JSON.stringify({
-        error:
-          'LLM provider API key not configured. Set GEMINI_API_KEY in wrangler secrets.',
-      }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } },
-    );
-  }
-
-  if (provider === 'openai') {
-    return forwardToOpenAI(requestBody, holdId, agentId, db, env.OPENAI_API_KEY!, retryEnv);
-  }
-
-  if (provider === 'google') {
-    return forwardToGemini(requestBody, holdId, agentId, db, env.GEMINI_API_KEY!, retryEnv);
-  }
-
-  // Anthropic
-  return forwardToAnthropic(requestBody, holdId, agentId, db, env.ANTHROPIC_API_KEY!, retryEnv);
-}
-
-// ---------------------------------------------------------------------------
-// OpenAI forwarding
-// ---------------------------------------------------------------------------
-
-async function forwardToOpenAI(
-  requestBody: ChatCompletionRequest,
-  holdId: HoldId,
-  agentId: AgentId,
-  db: DbClient,
-  apiKey: string,
-  retryEnv: Record<string, string | undefined> = {},
-): Promise<Response> {
-  const isStreaming = requestBody.stream === true;
-
-  // For streaming: add stream_options.include_usage so we get token counts in the final chunk
-  const forwardBody = isStreaming
-    ? { ...requestBody, stream_options: { include_usage: true } }
-    : requestBody;
-
-  const retryConfig = parseRetryConfig(retryEnv);
-
-  // Use forwardWithRetry to wrap the fetch call with automatic retry on transient errors.
-  // On permanent errors or retry exhaustion, forwardWithRetry returns a 502 AgentError response
-  // and settles the hold at 0 cost — we return that directly.
-  // On success, response.ok is true and we continue with settle/streaming logic.
-  const llmResponse = await forwardWithRetry(
-    () =>
-      fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(forwardBody),
-      }),
-    retryConfig,
-    db,
-    holdId,
-    agentId,
-    requestBody.model,
-  );
-
-  // If retry engine returned an error response (502), pass it through directly.
-  // The hold has already been settled at 0 cost by forwardWithRetry.
-  if (!llmResponse.ok) {
-    return llmResponse;
-  }
-
-  if (!isStreaming) {
-    // Non-streaming: buffer the response, extract usage, settle, return
-    const responseJson = await llmResponse.json() as {
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-    };
-
-    const promptTokens = responseJson.usage?.prompt_tokens ?? 0;
-    const completionTokens = responseJson.usage?.completion_tokens ?? 0;
-
-    // Settle budget asynchronously (non-blocking)
-    budgetSettle(db, holdId, { promptTokens, completionTokens }, requestBody.model, agentId).catch(
-      (err) => console.error('forwardToLlm: budgetSettle failed:', err),
-    );
-
-    return new Response(JSON.stringify(responseJson), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  // Streaming: pipe through a TransformStream, intercept the final chunk for usage data
-  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
-  const writer = writable.getWriter();
-
-  // Process the stream in the background — extract usage from the final chunk
-  const model = requestBody.model;
-  processStreamAndSettle(llmResponse.body!, writer, db, holdId, agentId, model).catch((err) =>
-    console.error('forwardToLlm: stream processing error:', err),
-  );
-
-  return new Response(readable, {
-    status: 200,
-    headers: {
-      'Content-Type': llmResponse.headers.get('Content-Type') ?? 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  const configured = Number(env.AGENTGOV_PROVIDER_TIMEOUT_MS);
+  const timeoutMs = Number.isFinite(configured) && configured > 0
+    ? Math.min(configured, 120000) : 60000;
+  const timer = setTimeout(abort, timeoutMs);
+  const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); };
+  // Race as well as passing signal: custom streams can otherwise ignore fetch cancellation.
+  const bounded = <T>(work: Promise<T>): Promise<T> => new Promise((resolve, reject) => {
+    const onAbort = () => reject(new Error('provider deadline/disconnect'));
+    if (controller.signal.aborted) { reject(new Error('provider deadline/disconnect')); return; }
+    controller.signal.addEventListener('abort', onAbort, { once: true });
+    work.then(resolve, reject).finally(() => controller.signal.removeEventListener('abort', onAbort));
   });
-}
-
-/**
- * Pipe an SSE stream through a TransformStream writer.
- * Detects the final data chunk containing usage information and calls budgetSettle.
- *
- * OpenAI SSE format with stream_options.include_usage:
- * The last data chunk (before [DONE]) contains a usage field in the delta.
- */
-async function processStreamAndSettle(
-  body: ReadableStream<Uint8Array>,
-  writer: WritableStreamDefaultWriter<Uint8Array>,
-  db: DbClient,
-  holdId: HoldId,
-  agentId: AgentId,
-  model: string,
-): Promise<void> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let promptTokens = 0;
-  let completionTokens = 0;
-
+  const max_tokens = requestBody.max_tokens ?? 4096;
+  const body = anthropic ? {
+    model, max_tokens,
+    system: requestBody.messages.filter(m => m.role === 'system').map(m => m.content ?? '').join('\n'),
+    messages: requestBody.messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.content ?? '' })),
+    stream: requestBody.stream === true,
+  } : { ...requestBody, max_tokens, ...(requestBody.stream ? { stream_options: { include_usage: true } } : {}) };
+  const url = anthropic ? 'https://api.anthropic.com/v1/messages'
+    : google ? 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+      : 'https://api.openai.com/v1/chat/completions';
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      // Forward chunk to response stream
-      await writer.write(value);
-
-      // Parse SSE chunks to extract usage
-      const text = decoder.decode(value, { stream: true });
-      const lines = text.split('\n');
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') continue;
-
+    const response = await forwardWithRetry(() => bounded(fetch(url, {
+      method: 'POST', signal: controller.signal,
+      headers: anthropic ? { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }
+        : { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(body),
+    })), parseRetryConfig(env as Record<string, string | undefined>), db, holdId, agentId, model,
+    ms => bounded(new Promise(resolve => {
+      const id = setTimeout(resolve, ms);
+      controller.signal.addEventListener('abort', () => { clearTimeout(id); resolve(); }, { once: true });
+    })));
+    if (!response.ok) { cleanup(); return response; } // Retry engine settled rejection.
+    if (!requestBody.stream) {
+      const data = await bounded(response.json()) as { usage?: unknown };
+      const actual = usage(data?.usage, anthropic);
+      await settle(actual);
+      cleanup();
+      return actual ? Response.json(data) : failure();
+    }
+    if (!response.body) throw new Error('missing provider body');
+    const reader = response.body.getReader();
+    void reader.closed.catch(() => {});
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let event = '';
+    let actual: Usage | null = null;
+    let input: number | undefined;
+    let terminal = false;
+    let finished: Promise<void> | undefined;
+    const finish = (known: boolean) => {
+      finished ??= settle(known ? actual : null).finally(cleanup);
+      return finished;
+    };
+    const parseLine = (line: string) => {
+      if (line.startsWith('event:')) { event = line.slice(6).trim(); return; }
+      if (!line.startsWith('data:')) return;
+      const data = line.slice(5).trim();
+      if (data === '[DONE]') { terminal = true; return; }
+      try {
+        const value = JSON.parse(data);
+        if (!anthropic) {
+          if (value.usage != null) actual = usage(value.usage, false);
+        } else if (event === 'message_start') {
+          const p = value.message?.usage?.input_tokens;
+          input = count(p) ? p : undefined;
+        } else if (event === 'message_delta') {
+          const c = value.usage?.output_tokens;
+          actual = input !== undefined && count(c) ? { promptTokens: input, completionTokens: c } : null;
+        } else if (event === 'message_stop') terminal = true;
+      } catch { /* Unknown or malformed usage remains conservatively charged. */ }
+    };
+    const stream = new ReadableStream<Uint8Array>({
+      async pull(out) {
         try {
-          const parsed = JSON.parse(data) as {
-            usage?: { prompt_tokens?: number; completion_tokens?: number };
-          };
-          if (parsed.usage) {
-            promptTokens = parsed.usage.prompt_tokens ?? 0;
-            completionTokens = parsed.usage.completion_tokens ?? 0;
+          const { done, value } = await bounded(reader.read());
+          if (done) {
+            buffer += decoder.decode();
+            if (buffer) parseLine(buffer);
+            await finish(terminal && actual !== null);
+            out.close();
+            return;
           }
+          buffer += decoder.decode(value, { stream: true });
+          // Bound incomplete SSE line memory; oversized events fail closed.
+          if (buffer.length > 1024 * 1024) throw new Error('oversized SSE event');
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) parseLine(line.trimEnd());
+          out.enqueue(value);
         } catch {
-          // Not valid JSON — skip
-        }
-      }
-    }
-  } finally {
-    await writer.close();
-  }
-
-  // Settle budget after stream completes
-  budgetSettle(db, holdId, { promptTokens, completionTokens }, model, agentId).catch((err) =>
-    console.error('processStreamAndSettle: budgetSettle failed:', err),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Gemini forwarding
-// ---------------------------------------------------------------------------
-
-/**
- * Forward a request to Google Gemini via the OpenAI-compatible endpoint.
- *
- * Gemini's OpenAI-compat API is structurally identical to OpenAI's:
- * - Same request/response schema (chat completions)
- * - Same streaming SSE format with stream_options.include_usage
- * - Bearer token authentication (GEMINI_API_KEY)
- * - processStreamAndSettle() reused without modification
- */
-async function forwardToGemini(
-  requestBody: ChatCompletionRequest,
-  holdId: HoldId,
-  agentId: AgentId,
-  db: DbClient,
-  apiKey: string,
-  retryEnv: Record<string, string | undefined> = {},
-): Promise<Response> {
-  const isStreaming = requestBody.stream === true;
-
-  // For streaming: add stream_options.include_usage so we get token counts in the final chunk
-  const forwardBody = isStreaming
-    ? { ...requestBody, stream_options: { include_usage: true } }
-    : requestBody;
-
-  const retryConfig = parseRetryConfig(retryEnv);
-
-  const llmResponse = await forwardWithRetry(
-    () =>
-      fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(forwardBody),
-      }),
-    retryConfig,
-    db,
-    holdId,
-    agentId,
-    requestBody.model,
-  );
-
-  // If retry engine returned an error response (502), pass it through directly.
-  // The hold has already been settled at 0 cost by forwardWithRetry.
-  if (!llmResponse.ok) {
-    return llmResponse;
-  }
-
-  if (!isStreaming) {
-    // Non-streaming: buffer the response, extract usage, settle, return
-    const responseJson = await llmResponse.json() as {
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-    };
-
-    const promptTokens = responseJson.usage?.prompt_tokens ?? 0;
-    const completionTokens = responseJson.usage?.completion_tokens ?? 0;
-
-    // Settle budget asynchronously (non-blocking)
-    budgetSettle(db, holdId, { promptTokens, completionTokens }, requestBody.model, agentId).catch(
-      (err) => console.error('forwardToGemini: budgetSettle failed:', err),
-    );
-
-    return new Response(JSON.stringify(responseJson), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  // Streaming: pipe through a TransformStream, intercept the final chunk for usage data.
-  // Gemini OpenAI-compat returns the same SSE format as OpenAI — processStreamAndSettle works unchanged.
-  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
-  const writer = writable.getWriter();
-
-  const model = requestBody.model;
-  processStreamAndSettle(llmResponse.body!, writer, db, holdId, agentId, model).catch((err) =>
-    console.error('forwardToGemini: stream processing error:', err),
-  );
-
-  return new Response(readable, {
-    status: 200,
-    headers: {
-      'Content-Type': llmResponse.headers.get('Content-Type') ?? 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Anthropic forwarding
-// ---------------------------------------------------------------------------
-
-/**
- * Convert OpenAI chat message format to Anthropic Messages API format.
- *
- * OpenAI: { role: 'system'|'user'|'assistant', content: string }[]
- * Anthropic: { system?: string, messages: { role: 'user'|'assistant', content: string }[] }
- */
-function convertToAnthropicFormat(requestBody: ChatCompletionRequest): {
-  model: string;
-  max_tokens: number;
-  system?: string;
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
-  stream?: boolean;
-} {
-  const messages = requestBody.messages;
-  let system: string | undefined;
-  const nonSystemMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
-
-  for (const msg of messages) {
-    if (msg.role === 'system') {
-      system = msg.content ?? undefined;
-    } else {
-      nonSystemMessages.push({ role: msg.role as 'user' | 'assistant', content: msg.content ?? '' });
-    }
-  }
-
-  return {
-    model: requestBody.model,
-    max_tokens: requestBody.max_tokens ?? 4096,
-    ...(system ? { system } : {}),
-    messages: nonSystemMessages,
-    ...(requestBody.stream ? { stream: true } : {}),
-  };
-}
-
-async function forwardToAnthropic(
-  requestBody: ChatCompletionRequest,
-  holdId: HoldId,
-  agentId: AgentId,
-  db: DbClient,
-  apiKey: string,
-  retryEnv: Record<string, string | undefined> = {},
-): Promise<Response> {
-  const anthropicBody = convertToAnthropicFormat(requestBody);
-  const retryConfig = parseRetryConfig(retryEnv);
-
-  const llmResponse = await forwardWithRetry(
-    () =>
-      fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(anthropicBody),
-      }),
-    retryConfig,
-    db,
-    holdId,
-    agentId,
-    requestBody.model,
-  );
-
-  // If retry engine returned an error response (502), pass it through directly.
-  // The hold has already been settled at 0 cost by forwardWithRetry.
-  if (!llmResponse.ok) {
-    return llmResponse;
-  }
-
-  if (!requestBody.stream) {
-    // Non-streaming: extract usage from Anthropic response format
-    const responseJson = await llmResponse.json() as {
-      usage?: { input_tokens?: number; output_tokens?: number };
-    };
-
-    const promptTokens = responseJson.usage?.input_tokens ?? 0;
-    const completionTokens = responseJson.usage?.output_tokens ?? 0;
-
-    budgetSettle(db, holdId, { promptTokens, completionTokens }, requestBody.model, agentId).catch(
-      (err) => console.error('forwardToLlm (Anthropic): budgetSettle failed:', err),
-    );
-
-    return new Response(JSON.stringify(responseJson), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  // Streaming: parse Anthropic SSE events for token extraction
-  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
-  const writer = writable.getWriter();
-
-  const model = requestBody.model;
-  processAnthropicStreamAndSettle(llmResponse.body!, writer, db, holdId, agentId, model).catch((err) =>
-    console.error('forwardToLlm (Anthropic streaming): error:', err),
-  );
-
-  return new Response(readable, {
-    status: 200,
-    headers: {
-      'Content-Type': llmResponse.headers.get('Content-Type') ?? 'text/event-stream',
-      'Cache-Control': 'no-cache',
-    },
-  });
-}
-
-/**
- * Pipe an Anthropic SSE stream through a TransformStream writer, parsing event-specific
- * data lines to extract actual token usage for budget settlement.
- *
- * Anthropic SSE format:
- *   event: message_start  → message.usage.input_tokens  (prompt tokens)
- *   event: message_delta  → usage.output_tokens         (completion tokens, cumulative — OVERWRITE not sum)
- *
- * The message_start.message.usage.output_tokens is always 1 (placeholder) and is ignored.
- */
-async function processAnthropicStreamAndSettle(
-  body: ReadableStream<Uint8Array>,
-  writer: WritableStreamDefaultWriter<Uint8Array>,
-  db: DbClient,
-  holdId: HoldId,
-  agentId: AgentId,
-  model: string,
-): Promise<void> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let buffer = '';
-  let currentEvent = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      await writer.write(value); // pipe to client FIRST
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? ''; // last incomplete line stays in buffer
-
-      for (const line of lines) {
-        if (line.startsWith('event: ')) {
-          currentEvent = line.slice(7).trim();
-        } else if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
+          controller.abort();
+          void reader.cancel().catch(() => {});
+          try { await finish(false); } catch { /* Failed settlement leaves the hold reserved. */ }
           try {
-            const evt = JSON.parse(data) as Record<string, unknown>;
-            if (currentEvent === 'message_start') {
-              const msg = evt['message'] as Record<string, unknown> | undefined;
-              const usage = msg?.['usage'] as Record<string, unknown> | undefined;
-              inputTokens = (usage?.['input_tokens'] as number) ?? 0;
-            }
-            if (currentEvent === 'message_delta') {
-              const usage = evt['usage'] as Record<string, unknown> | undefined;
-              // OVERWRITE, not sum — output_tokens is cumulative across message_delta events
-              outputTokens = (usage?.['output_tokens'] as number) ?? outputTokens;
-            }
-          } catch { /* skip malformed JSON */ }
+            out.enqueue(new TextEncoder().encode('event: error\ndata: {"error":"provider stream interrupted"}\n\n'));
+            out.close();
+          } catch { /* Downstream already cancelled. */ }
         }
-      }
-    }
-  } finally {
-    await writer.close();
+      },
+      async cancel() {
+        controller.abort();
+        void reader.cancel().catch(() => {});
+        await finish(false);
+      },
+      start() {
+        // Settle even when the downstream never consumes the stream.
+        controller.signal.addEventListener('abort', () => {
+          void reader.cancel().catch(() => {});
+          void finish(false).catch(() => {});
+        }, { once: true });
+      },
+    });
+    return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
+  } catch {
+    controller.abort();
+    try { await settle(null); } finally { cleanup(); }
+    return failure();
   }
-
-  budgetSettle(db, holdId, { promptTokens: inputTokens, completionTokens: outputTokens }, model, agentId)
-    .catch((err) => console.error('processAnthropicStreamAndSettle: budgetSettle failed:', err));
 }

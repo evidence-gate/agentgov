@@ -141,8 +141,8 @@ describe('forwardWithRetry', () => {
     expect(requestFn).toHaveBeenCalledTimes(1);
   });
 
-  it('retries on 500 twice then returns 200', async () => {
-    const requestFn = makeResponses([500, 500, 200]);
+  it('retries confirmed 429 rejections then returns 200', async () => {
+    const requestFn = makeResponses([429, 429, 200]);
     const response = await forwardWithRetry(requestFn, baseConfig, makeDbMock(), holdId, agentId, model, sleepFn);
     expect(response.ok).toBe(true);
     expect(requestFn).toHaveBeenCalledTimes(3);
@@ -227,7 +227,7 @@ describe('forwardWithRetry', () => {
     await forwardWithRetry(requestFn2, baseConfig, makeDbMock(), holdId, agentId, model, capturedSleepFn);
 
     // Should have slept for 2000ms (2s * 1000)
-    expect(capturedSleepFn).toHaveBeenCalledWith(2000);
+    expect(capturedSleepFn).toHaveBeenCalledWith(100);
   });
 
   it('logs error_classified audit event on non-2xx response', async () => {
@@ -241,7 +241,7 @@ describe('forwardWithRetry', () => {
   });
 
   it('logs retry_attempt audit event when retrying', async () => {
-    const requestFn = makeResponses([500, 200]);
+    const requestFn = makeResponses([429, 200]);
     await forwardWithRetry(requestFn, baseConfig, makeDbMock(), holdId, agentId, model, sleepFn);
     const calls = mockAppendAuditEvent.mock.calls as [unknown, { eventType: string }][];
     const retryAttemptCalls = calls.filter(
@@ -283,10 +283,32 @@ describe('forwardWithRetry', () => {
     expect(requestFn).toHaveBeenCalledTimes(1);
   });
 
-  it('retries on 503 (transient)', async () => {
+  it('does not retry ambiguous 503; conservatively settles', async () => {
     const requestFn = makeResponses([503, 200]);
     const response = await forwardWithRetry(requestFn, baseConfig, makeDbMock(), holdId, agentId, model, sleepFn);
-    expect(requestFn).toHaveBeenCalledTimes(2);
-    expect(response.ok).toBe(true);
+    expect(requestFn).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(502);
+    expect(mockBudgetSettle).toHaveBeenCalledWith(expect.anything(), holdId, null, model, agentId);
+  });
+});
+
+describe('adversarial retry policy', () => {
+  beforeEach(() => { mockBudgetSettle.mockClear(); });
+  it.each([301, 302, 307, 308, 402, 408, 409, 418, 425, 451, 500, 502, 503])('does not replay ambiguous status %i', async status => {
+    const request = makeResponses([status, 200]);
+    const result = await forwardWithRetry(request, baseConfig, makeDbMock(), holdId, agentId, model);
+    expect(result.status).toBe(502);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(mockBudgetSettle).toHaveBeenCalledExactlyOnceWith(expect.anything(), holdId, null, model, agentId);
+  });
+  it('clamps invalid retry configuration', () => {
+    expect(parseRetryConfig({ AGENTGOV_MAX_RETRIES: '-3', AGENTGOV_RETRY_BASE_MS: '-1' })).toMatchObject({ maxRetries: 0, baseDelayMs: 0 });
+    expect(parseRetryConfig({ AGENTGOV_MAX_RETRIES: '99999', AGENTGOV_RETRY_BASE_MS: '9999999' })).toMatchObject({ maxRetries: 5, baseDelayMs: 30000 });
+  });
+  it('interrupted 429 backoff releases without another provider request', async () => {
+    const request = makeResponses([429, 200]);
+    await forwardWithRetry(request, baseConfig, makeDbMock(), holdId, agentId, model, async () => { throw new Error('synthetic disconnect'); });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(mockBudgetSettle).toHaveBeenCalledExactlyOnceWith(expect.anything(), holdId, { promptTokens: 0, completionTokens: 0 }, model, agentId);
   });
 });

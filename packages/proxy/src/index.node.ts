@@ -5,42 +5,18 @@
  * - Uses @hono/node-server instead of Cloudflare's fetch handler
  * - Uses embedded libSQL (file: URL) instead of Turso cloud HTTP
  * - Passes process.env into app.fetch as bindings so existing proxy code works unchanged
- * - Stubs HITL_WORKFLOW: any request that triggers HITL approval returns 501
+ * - Rejects Node HITL requests with 501 before reserving budget
  * - Mounts read-only dashboard API routes for the SPA (Plan 03)
  */
 
+import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { setDbClientFactory } from './db/client';
 import { createDockerDbClient, runMigrations } from './db/client.node';
 import { createDashboardRoutes } from './dashboard/routes';
 
 // Import the same Hono app object used in Workers — no changes to existing routes
-import app from './app';
-
-/**
- * Stub HITL_WORKFLOW binding.
- * In self-host (Docker) mode, Cloudflare Workflows are not available.
- * Any attempt to create a workflow instance is intercepted and returns 501.
- *
- * The stub throws a special sentinel error that the HITL code path catches.
- * Note: The actual TypeError from calling undefined.create() is what we avoid here —
- * we replace it with a controlled 501 response by wrapping the app fetch.
- */
-const HITL_WORKFLOW_STUB = {
-  create: async (_params: unknown) => {
-    throw new HitlNotAvailableError();
-  },
-  get: async (_id: string) => {
-    throw new HitlNotAvailableError();
-  },
-};
-
-class HitlNotAvailableError extends Error {
-  readonly code = 'HITL_NOT_AVAILABLE';
-  constructor() {
-    super('HITL requires Cloudflare Workflows deployment');
-  }
-}
+import sharedApp, { type AppEnvironment } from './app';
 
 async function main() {
   const port = parseInt(process.env['PORT'] ?? '8787', 10);
@@ -58,7 +34,19 @@ async function main() {
   await runMigrations(db);
   console.log('agentgov: migrations applied');
 
-  // Mount read-only dashboard API routes (for Plan 03 SPA)
+  // Register platform availability before mounting chat. Database access keeps
+  // main's process-local factory; Node HITL rejects before any reservation.
+  const app = new Hono<AppEnvironment>();
+  app.use('*', async (c, next) => {
+    c.set('hitlUnavailable', true);
+    if (c.req.path.startsWith('/v1/hitl/') || c.req.path === '/v1/slack/callback') {
+      return c.json({ error: { code: 'HITL_NOT_AVAILABLE', message: 'HITL requires Cloudflare Workflows deployment.' } }, 501);
+    }
+    await next();
+  });
+  app.route('/', sharedApp);
+
+  // Mount dashboard API routes
   app.route('/', createDashboardRoutes(db));
 
   console.log(`agentgov: starting on port ${port}`);
@@ -72,6 +60,11 @@ async function main() {
   const nodeBindings = (): Parameters<typeof app.fetch>[1] => ({
     TURSO_DATABASE_URL: databaseUrl,
     TURSO_AUTH_TOKEN: authToken,
+    AGENTGOV_AGENT_AUTH: process.env['AGENTGOV_AGENT_AUTH'],
+    AGENTGOV_BUDGET_ADMIN_TOKEN: process.env['AGENTGOV_BUDGET_ADMIN_TOKEN'],
+    AGENTGOV_PROVIDER_TIMEOUT_MS: process.env['AGENTGOV_PROVIDER_TIMEOUT_MS'],
+    AGENTGOV_MAX_RETRIES: process.env['AGENTGOV_MAX_RETRIES'],
+    AGENTGOV_RETRY_BASE_MS: process.env['AGENTGOV_RETRY_BASE_MS'],
     OPENAI_API_KEY: process.env['OPENAI_API_KEY'] ?? '',
     ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] ?? '',
     GEMINI_API_KEY: process.env['GEMINI_API_KEY'] ?? '',
@@ -82,36 +75,10 @@ async function main() {
     SLACK_BOT_TOKEN: process.env['SLACK_BOT_TOKEN'] ?? '',
     SLACK_CHANNEL_ID: process.env['SLACK_CHANNEL_ID'] ?? '',
     SLACK_SIGNING_SECRET: process.env['SLACK_SIGNING_SECRET'] ?? '',
-    // Stub HITL_WORKFLOW — throws HitlNotAvailableError if triggered.
-    // The fetch wrapper below catches this and returns 501.
-    HITL_WORKFLOW: HITL_WORKFLOW_STUB,
   } as Parameters<typeof app.fetch>[1]);
 
-  // Wrap app.fetch to catch HitlNotAvailableError and return 501
-  const fetchWithHitlGuard = async (req: Request) => {
-    try {
-      return await app.fetch(req, nodeBindings());
-    } catch (err) {
-      if (err instanceof HitlNotAvailableError) {
-        return new Response(
-          JSON.stringify({
-            error: {
-              code: 'HITL_NOT_AVAILABLE',
-              message: 'HITL requires Cloudflare Workflows deployment. Self-hosted mode does not support HITL workflows.',
-            },
-          }),
-          {
-            status: 501,
-            headers: { 'Content-Type': 'application/json' },
-          },
-        );
-      }
-      throw err;
-    }
-  };
-
   serve({
-    fetch: fetchWithHitlGuard,
+    fetch: (req: Request) => app.fetch(req, nodeBindings()),
     port,
   });
 

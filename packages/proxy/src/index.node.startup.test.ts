@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
@@ -15,6 +16,8 @@ import { startHranaBridge, type HranaBridge } from '../scripts/hrana-bridge';
 const PROXY_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const REDIRECT_PRELOAD = fileURLToPath(new URL('../scripts/redirect-provider-fetch.mjs', import.meta.url));
 const FAKE_API_KEY = 'test-local-openai-key';
+const AUTH_TOKEN = 'synthetic_startup_token_0000000001';
+const AUTH_CONFIG = JSON.stringify([{ subject: 'startup-test', tokenSha256: createHash('sha256').update(AUTH_TOKEN).digest('hex'), agentIds: ['node-startup-config', 'file-url-startup'] }]);
 const PROVIDER_CONTENT = 'config-reached-provider';
 
 async function unusedPort(): Promise<number> {
@@ -89,6 +92,7 @@ async function launchNodeProxy(databaseUrl: string, providerOrigin: string) {
       PORT: String(port),
       DATABASE_URL: databaseUrl,
       OPENAI_API_KEY: FAKE_API_KEY,
+      AGENTGOV_AGENT_AUTH: AUTH_CONFIG,
       AGENTGOV_TEST_PROVIDER_ORIGIN: providerOrigin,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -121,6 +125,7 @@ async function postChat(port: number, agentId: string) {
     headers: {
       'content-type': 'application/json',
       'x-agent-id': agentId,
+      'x-agentgov-token': AUTH_TOKEN,
     },
     body: JSON.stringify({
       model: 'gpt-4o',
@@ -145,6 +150,13 @@ async function ledgerAgentIds(fileUrl: string, agentId: string): Promise<number>
   }
 }
 
+async function provisionAgent(fileUrl: string, agentId: string) {
+  const stored = createClient({ url: fileUrl });
+  try {
+    await stored.execute({ sql: 'INSERT INTO budget_ledger(agent_id,limit_usd,spent_usd,reserved_usd,updated_at) VALUES(?,10,0,0,?)', args: [agentId, Date.now()] });
+  } finally { stored.close(); }
+}
+
 it('Node startup delivers Turso config and calls the provider instead of the dev stub', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'agentgov-node-config-'));
   const fileUrl = `file:${join(dir, 'test.db')}`;
@@ -156,6 +168,7 @@ it('Node startup delivers Turso config and calls the provider instead of the dev
     provider = await startFakeProvider();
     const proxy = await launchNodeProxy(bridge.url, provider.origin);
     child = proxy.child;
+    await provisionAgent(fileUrl, 'node-startup-config');
     bridge.authorizations.length = 0;
 
     const { status, raw } = await postChat(proxy.port, 'node-startup-config');
@@ -181,7 +194,7 @@ it('Node startup delivers Turso config and calls the provider instead of the dev
       bridge.authorizations.includes('Bearer local'),
       `database requests after /health did not carry TURSO_AUTH_TOKEN.\n${JSON.stringify(bridge.authorizations)}\n${proxy.output}`,
     );
-    assert.equal(await ledgerAgentIds(fileUrl, 'node-startup-config'), 1, 'budget gate did not write the agent row');
+    assert.equal(await ledgerAgentIds(fileUrl, 'node-startup-config'), 1, 'preprovisioned budget row was not retained');
   } finally {
     if (child) await stopChild(child);
     if (provider) await provider.close();
@@ -200,6 +213,7 @@ it('Node startup enforces budget and calls the provider for a file: SQLite datab
     provider = await startFakeProvider();
     const proxy = await launchNodeProxy(fileUrl, provider.origin);
     child = proxy.child;
+    await provisionAgent(fileUrl, agentId);
 
     const { status, raw } = await postChat(proxy.port, agentId);
     assert.equal(
