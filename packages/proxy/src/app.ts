@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { createDbClient } from './db/client';
+import { createDbClient, type DbClient } from './db/client';
 import { budgetGate, budgetSettle } from './budget/gate';
 import { forwardToLlm } from './passthrough/forward';
 import { checkAndFireAlerts } from './budget/alerts';
@@ -10,7 +10,12 @@ import { buildAgentErrorResponse } from './error/reporter';
 import { appendAuditEvent } from './audit/writer';
 import type { ChatCompletionRequest, BudgetExceededErrorBody } from './types';
 
-const app = new Hono<{ Bindings: Env }>();
+export type AppEnvironment = {
+  Bindings: Env;
+  Variables: { db?: DbClient };
+};
+
+const app = new Hono<AppEnvironment>();
 
 // Health check endpoint
 app.get('/health', (c) => {
@@ -52,7 +57,8 @@ app.post('/v1/chat/completions', async (c) => {
     return c.json(makeStubResponse(body.model), 200);
   }
 
-  const db = createDbClient(dbUrl, dbToken);
+  // Node injects its migrated native SQLite client; Workers uses the web client.
+  const db = c.get('db') ?? createDbClient(dbUrl, dbToken);
 
   // Step 4: Run budget gate (Hold/Settle pattern)
   const gateResult = await budgetGate({ db, agentId, request: body });

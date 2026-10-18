@@ -61,6 +61,9 @@ jobs:
       - name: Test proxy startup and migrations (Node.js)
         run: pnpm --filter @agentgov/proxy test:startup
 
+      - name: Test proxy chat pipeline (Node.js, local provider)
+        run: pnpm --filter @agentgov/proxy test:chat
+
       - name: Test SDK (TypeScript)
         run: pnpm --filter @agentgov/sdk test
 
