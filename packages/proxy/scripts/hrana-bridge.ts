@@ -102,7 +102,8 @@ export type HranaBridge = {
 
 /**
  * Loopback Hrana HTTP server backed by a local SQLite file.
- * The Node entrypoint's request path uses `@libsql/client/web`, which only speaks HTTP.
+ * Speaks enough of the Hrana HTTP protocol for the native libSQL client to
+ * reach a local SQLite file when a test sets DATABASE_URL to an http URL.
  */
 export async function startHranaBridge(fileUrl: string): Promise<HranaBridge> {
   const db = createClient({ url: fileUrl }) as unknown as SqlClient;

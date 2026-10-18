@@ -13,10 +13,11 @@ import * as schema from './schema';
  * This client is for Node.js/Docker deployments only. Never use in Cloudflare Workers.
  *
  * @param url - SQLite file URL (e.g., 'file:agentgov.db' or 'file:/data/agentgov.db')
+ * @param authToken - Sent on HTTP libSQL URLs. Embedded file: URLs accept it and do not require it.
  */
-export function createDockerDbClient(url?: string) {
+export function createDockerDbClient(url?: string, authToken?: string) {
   const dbUrl = url ?? process.env['DATABASE_URL'] ?? 'file:agentgov.db';
-  const client = createClient({ url: dbUrl });
+  const client = createClient(authToken === undefined ? { url: dbUrl } : { url: dbUrl, authToken });
   return drizzle(client, { schema });
 }
 

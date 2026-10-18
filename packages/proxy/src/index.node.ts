@@ -10,6 +10,7 @@
  */
 
 import { serve } from '@hono/node-server';
+import { setDbClientFactory } from './db/client';
 import { createDockerDbClient, runMigrations } from './db/client.node';
 import { createDashboardRoutes } from './dashboard/routes';
 
@@ -43,9 +44,15 @@ class HitlNotAvailableError extends Error {
 
 async function main() {
   const port = parseInt(process.env['PORT'] ?? '8787', 10);
+  const databaseUrl = process.env['DATABASE_URL'] ?? 'file:agentgov.db';
+  const authToken = 'local';
 
-  // Create embedded libSQL client (file: URL, no Turso cloud needed)
-  const db = createDockerDbClient();
+  // One native libSQL connection for migrations, the dashboard, and chat.
+  // createDbClient() defaults to @libsql/client/web, which rejects file: URLs.
+  // Install the native client in this process only. src/index.ts (Workers)
+  // never imports this module, so the Workers bundle stays on the web client.
+  const db = createDockerDbClient(databaseUrl, authToken);
+  setDbClientFactory(() => db);
 
   // Run migrations idempotently on every startup
   await runMigrations(db);
@@ -63,8 +70,8 @@ async function main() {
   // is not the Workers binding object. Pass the Node config as app.fetch's env
   // argument — the same channel Cloudflare uses for c.env.
   const nodeBindings = (): Parameters<typeof app.fetch>[1] => ({
-    TURSO_DATABASE_URL: process.env['DATABASE_URL'] ?? 'file:agentgov.db',
-    TURSO_AUTH_TOKEN: 'local',
+    TURSO_DATABASE_URL: databaseUrl,
+    TURSO_AUTH_TOKEN: authToken,
     OPENAI_API_KEY: process.env['OPENAI_API_KEY'] ?? '',
     ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] ?? '',
     GEMINI_API_KEY: process.env['GEMINI_API_KEY'] ?? '',
