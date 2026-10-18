@@ -81,3 +81,37 @@ No tests use production credentials. All validation was performed locally, with
 - [Published tsup 9 requirements](https://registry.npmjs.org/tsup/9.0.0)
 - [Undici advisory](https://github.com/advisories/GHSA-xjj6-f33q-929c)
 - [esbuild advisory](https://github.com/advisories/GHSA-67mh-4wv8-2f99)
+
+## Follow-up: real Node startup validation
+
+A review identified a pre-existing startup failure missed by mocked unit tests:
+`index.node.ts` imported `index.ts`, whose `HitlWorkflow` re-export loaded
+`cloudflare:workers` in ordinary Node. Running the actual `start:node` command
+under Node 22.23.3 reproduced `MODULE_NOT_FOUND` before migrations or HTTP startup.
+
+The shared Hono app now lives in `src/app.ts`. `src/index.ts` remains the unchanged
+Cloudflare entry-point path and re-exports both the app and `HitlWorkflow`.
+The Node entry point imports the shared app directly. No request handler logic
+was changed as part of this split.
+
+Verification after the fix:
+
+- Actual `pnpm --filter @agentgov/proxy start:node` with a disposable SQLite file:
+  migrations applied, HTTP server started, `/health` returned **200** with
+  `{"status":"ok"}`. The test server was stopped after validation.
+- Added `test:startup`: an unmocked Node child process uses the real entry point,
+  a fresh temporary DB, and a local HTTP port. It checks `/health`, verifies
+  `audit_log`, `budget_ledger`, `holds`, and the migration journal, then restarts
+  against the same DB and confirms no migration duplication. The test cleans up
+  its child processes and temporary directory. **1 integration test passes**.
+- Re-ran Node (148 tests), Workers (24 tests), all lint and all builds: pass.
+- This verifies startup/migration/health on macOS, not all business endpoints.
+  Docker remains unverified because its daemon is unavailable. No VM was started.
+
+Independent review found no blocking issue in the follow-up diff and independently
+re-ran the startup integration test under Node 22 (1/1 pass). It confirmed that
+the shared app body is identical to the prior implementation. It also noted
+pre-existing concerns outside this startup fix: Node environment middleware is
+registered after existing routes, and the shared DB adapter uses the web client.
+Therefore startup/health success is not evidence that every Node budget, LLM,
+or HITL business route works end to end; those paths require separate validation.

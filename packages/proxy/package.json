@@ -16,7 +16,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "start:node": "tsx src/index.node.ts",
-    "build": "wrangler deploy --dry-run --env=\"\" --outdir dist"
+    "build": "wrangler deploy --dry-run --env=\"\" --outdir dist",
+    "test:startup": "node --test scripts/node-startup.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "~1.4.4",
