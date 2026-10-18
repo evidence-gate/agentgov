@@ -113,10 +113,34 @@ test('Node chat injects bindings, enforces budget, calls the provider, and settl
     const ledger = (await client.execute("SELECT * FROM budget_ledger WHERE agent_id='allowed'")).rows[0];
     assert.ok(Math.abs(ledger.spent_usd - 0.000045) < 1e-10);
     assert.equal(ledger.reserved_usd, 0);
-    const holds = (await client.execute('SELECT agent_id,status FROM holds')).rows;
+    const holds = (await client.execute('SELECT id,agent_id,status FROM holds')).rows;
     assert.equal(holds.length, 1);
     assert.equal(holds[0].agent_id, 'allowed');
     assert.equal(holds[0].status, 'settled');
+    const audit = (await client.execute('SELECT * FROM audit_log')).rows;
+    assert.equal(audit.length, 4);
+    assert.ok(!JSON.stringify(audit).includes('synthetic-local-key'));
+    const held = audit.find(row => row.event_type === 'budget_hold');
+    assert.equal(held.agent_id, 'allowed');
+    assert.equal(held.model, 'gpt-4o-mini');
+    assert.ok(held.cost_delta > 0);
+    const settled = audit.find(row => row.event_type === 'budget_settle');
+    assert.equal(settled.agent_id, 'allowed');
+    assert.equal(settled.model, 'gpt-4o-mini');
+    assert.ok(Math.abs(settled.cost_delta - 0.000045) < 1e-10);
+    assert.ok(Math.abs(settled.running_balance - (10 - 0.000045)) < 1e-10);
+    const heldId = JSON.parse(held.payload).holdId;
+    assert.equal(typeof heldId, 'string');
+    assert.ok(heldId.length > 0);
+    assert.equal(heldId, holds[0].id);
+    assert.equal(JSON.parse(settled.payload).holdId, heldId);
+    assert.deepEqual(JSON.parse(settled.payload).actualUsage, { promptTokens: 100, completionTokens: 50 });
+    const blockedEvents = audit.filter(row => row.event_type === 'budget_blocked');
+    assert.deepEqual(blockedEvents.map(row => [row.agent_id, row.model, JSON.parse(row.payload).reason]).sort(), [
+      ['allowed', 'unknown-test-model', 'unknown_model'],
+      ['exhausted', 'gpt-4o-mini', 'budget_exceeded'],
+    ]);
+
   } finally {
     if (child.exitCode === null) child.kill('SIGTERM');
     await exited;

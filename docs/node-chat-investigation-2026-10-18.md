@@ -88,3 +88,49 @@ pre-existing unsupported-workflow/error-handling and hold-lifecycle concerns,
 and HITL sub-routes still construct their own web DB client. These are outside the
 proved non-HITL chat path. Docker/Linux execution remains unverified because no
 approved running Docker engine is available.
+
+## Independent review and deployment-impact check
+
+Independent review of candidate `d87ebf8ffbabc8406993e16291b110bd18968ee7`
+against `54dda831025f936ea8b53d7b093f12b05e48ac1a` found no newly introduced
+merge blocker. The reviewer independently ran the real Node chat test under
+Node 22.23.3 (1/1 pass) and Workers tests (24/24 pass). Node native DB injection,
+Workers web fallback, and absence of native SQLite imports in the Workers graph
+were confirmed. No real secret was identified in the seven changed files;
+credential-pattern scanning likewise found no match or secret-named file.
+
+The reviewer noted that audit assertions originally checked only event types.
+The follow-up strengthens these assertions to check four records, agent/model
+attribution, positive hold cost, settled cost and remaining balance, hold-ID
+correlation, actual usage, both blocked reasons, and absence of the synthetic
+provider key in audit records. The strengthened local test passes. Production
+implementation is unchanged by this test improvement.
+
+Limits: Workers tests use stubs/mocks rather than a live Turso integration. Audit
+hash-chain integrity under concurrent writes is not certified by this test.
+Existing nontransactional budget reservation/settlement, HITL errors/hold lifecycle,
+missing-provider-key holds, and other previously documented paths remain outside
+this bounded fix. The dependency alert count is not functional validation.
+
+Existing deployment impact was checked through available records only:
+
+- GitHub deployment records: 0; environments: 0. Actions remains disabled.
+  Available runs are CI and Dependabot, not recorded production deployments.
+- `.planning/phases/07-cloudflare-workers-production-deploy/07-VERIFICATION.md`
+  records `human_needed` for live deployment and smoke tests; its companion
+  summary says human deployment steps are still awaited (2026-03-15 record).
+- `.planning/phases/04-dashboard-python-sdk-self-host/04-02-SUMMARY.md` says
+  Docker was unavailable and the files were inspected instead of a live build.
+- These records do not prove that no one subsequently deployed manually. The
+  currently running deployment, deployed SHA, configuration, and actual user
+  impact remain **unconfirmed**. No production endpoint was probed.
+
+The candidate is suitable for a merge decision scoped to correcting the confirmed
+Node non-HITL chat path, with the above limits accepted. It is not evidence of
+Docker/Linux readiness or all production business flows. No push, merge,
+deployment, paid API request, or VM operation was performed for this review.
+
+The reviewer also checked the added audit assertions and found no blocker. Its
+minor suggestion to reject missing hold IDs was adopted: the audit hold ID must
+be a nonempty string, match the actual `holds.id`, and match the settlement ID.
+The final targeted integration test passed again after this change.
