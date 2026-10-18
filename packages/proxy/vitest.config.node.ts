@@ -5,6 +5,7 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/db/schema.test.ts',
+      'src/agent-auth.test.ts',
       'src/passthrough/forward.test.ts',
       'src/request-validation.test.ts',
       'src/budget/calculator.test.ts',

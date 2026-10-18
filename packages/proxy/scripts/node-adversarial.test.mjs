@@ -14,6 +14,15 @@ import { createClient } from '@libsql/client';
 // Optional baseline snapshot path makes before/after evidence independent of edits.
 const appDir = process.env.TEST_NODE_APP_DIR ?? fileURLToPath(new URL('../', import.meta.url));
 const observeOnly = process.env.TEST_ADVERSARIAL_OBSERVE === '1';
+const syntheticAgentToken = 'synthetic-agent-token-0123456789abcdef';
+const rotatedAgentToken = 'rotated-synthetic-token-0123456789abcdef';
+const tokenHash = token => createHash('sha256').update(token).digest('hex');
+const authConfigFor = (token, agentIds) => JSON.stringify([{ subject: 'synthetic-http-test', tokenSha256: tokenHash(token), agentIds }]);
+const defaultAuthConfig = authConfigFor(syntheticAgentToken, [
+  'invalid-json', 'null', 'array', 'missing-messages', 'null-message', 'negative-max', 'fraction-max',
+  'zero-max', 'null-max', 'string-max', 'multiple-completions', 'completion-token-alias', 'malformed-tool',
+  'hitl', 'missing-key', 'concurrent', ...Array.from({ length: 5 }, (_, i) => `unprovisioned-rotation-${i}`),
+]);
 const requestBody = { model: 'gpt-4o-mini', max_tokens: 100, messages: [{ role: 'user', content: 'synthetic input' }] };
 async function listen(server) {
   server.listen(0, '127.0.0.1');
@@ -22,7 +31,7 @@ async function listen(server) {
 }
 const close = server => new Promise((resolve, reject) => server.close(err => err ? reject(err) : resolve()));
 
-async function fixture(withKey = true, adminToken) {
+async function fixture(withKey = true, adminToken, authConfig = defaultAuthConfig) {
   const dir = await mkdtemp(join(tmpdir(), 'agentgov-adversarial-'));
   const url = `file:${join(dir, 'test.db')}`;
   const client = createClient({ url });
@@ -33,7 +42,7 @@ async function fixture(withKey = true, adminToken) {
     for await (const chunk of req) text += chunk;
     const body = JSON.parse(text);
     const balances = (await client.execute('SELECT agent_id,limit_usd,spent_usd,reserved_usd FROM budget_ledger')).rows;
-    calls.push({ body, balances });
+    calls.push({ body, balances, headers: { ...req.headers } });
     if (body.messages?.[0]?.content === 'concurrent') await delay(300);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -52,6 +61,7 @@ async function fixture(withKey = true, adminToken) {
     env: { PATH: process.env.PATH, DATABASE_URL: url, PORT: String(port),
       ...(withKey ? { OPENAI_API_KEY: 'synthetic-adversarial-key' } : {}),
       ...(adminToken ? { AGENTGOV_BUDGET_ADMIN_TOKEN: adminToken } : {}),
+      ...(authConfig === null ? {} : { AGENTGOV_AGENT_AUTH: authConfig }),
       TEST_PROVIDER_URL: `http://127.0.0.1:${providerPort}` },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -80,9 +90,9 @@ async function fixture(withKey = true, adminToken) {
   async function seed(agent, limit = 10) {
     await client.execute({ sql: 'INSERT INTO budget_ledger(agent_id,limit_usd,spent_usd,reserved_usd,updated_at) VALUES(?,?,0,0,?)', args: [agent, limit, Date.now()] });
   }
-  async function chat(agent, body, raw = false) {
+  async function chat(agent, body, raw = false, token = syntheticAgentToken) {
     const response = await fetch(`${base}/v1/chat/completions`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Id': agent },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Id': agent, ...(token === null ? {} : { 'X-Agentgov-Token': token }) },
       body: raw ? body : JSON.stringify(body), signal: AbortSignal.timeout(10_000),
     });
     const text = await response.text();
@@ -324,5 +334,78 @@ test('Only the budget administrator can mutate a limit, with exactly one matchin
     console.log(JSON.stringify({ case: 'admin-token-required', statuses: [401, 401, result.status],
       limit: state.ledger.limit_usd, spent: state.ledger.spent_usd, reserved: state.ledger.reserved_usd,
       auditEvents: state.audit.length, event: event.event_type }));
+  } finally { await f.cleanup(); }
+});
+
+test('Chat authentication rejects absent or malformed server configuration before ledger mutation', { timeout: 30_000 }, async () => {
+  for (const config of [null, '{malformed', '[]', JSON.stringify([{ subject: 'bad', tokenSha256: 'not-a-hash', agentIds: ['auth-allowed'] }])]) {
+    const f = await fixture(true, undefined, config);
+    try {
+      await f.seed('auth-allowed');
+      const before = await f.state('auth-allowed');
+      const result = await f.chat('auth-allowed', requestBody);
+      const after = await f.state('auth-allowed');
+      assert.equal(result.status, 503);
+      assert.deepEqual(after, before);
+      assert.equal(f.calls.length, 0);
+      console.log(JSON.stringify({ case: 'chat-auth-config', config: config === null ? 'unset' : 'invalid', status: result.status, mutations: 0, providerCalls: 0 }));
+    } finally { await f.cleanup(); }
+  }
+});
+
+test('Chat token is bound to allowed agent IDs and never forwarded or audited', { timeout: 20_000 }, async () => {
+  const f = await fixture(true, undefined, authConfigFor(syntheticAgentToken, ['auth-allowed']));
+  try {
+    await f.seed('auth-allowed');
+    await f.seed('auth-other');
+    for (const token of [null, 'incorrect-agent-token-0123456789abcdef', 'short', 'x'.repeat(257)]) {
+      const before = await f.state('auth-allowed');
+      const result = await f.chat('auth-allowed', requestBody, false, token);
+      assert.equal(result.status, 401);
+      assert.deepEqual(await f.state('auth-allowed'), before);
+      assert.equal(f.calls.length, 0);
+    }
+    const otherBefore = await f.state('auth-other');
+    const crossAgent = await f.chat('auth-other', requestBody);
+    assert.equal(crossAgent.status, 403);
+    assert.deepEqual(await f.state('auth-other'), otherBefore);
+    assert.equal(f.calls.length, 0);
+    const allowed = await f.chat('auth-allowed', requestBody);
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.body.id, 'local-adversarial-response');
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.calls[0].headers['x-agentgov-token'], undefined);
+    assert.ok(!JSON.stringify(f.calls).includes(syntheticAgentToken));
+    const state = await f.state('auth-allowed');
+    assert.equal(state.holds.length, 1);
+    assert.equal(state.holds[0].status, 'settled');
+    assert.equal(state.ledger.reserved_usd, 0);
+    assert.ok(state.ledger.spent_usd > 0);
+    assert.equal(state.audit.filter(a => a.event_type === 'budget_hold').length, 1);
+    assert.equal(JSON.parse(state.audit.find(a => a.event_type === 'budget_hold').payload).subject, 'synthetic-http-test');
+    assert.equal(state.audit.filter(a => a.event_type === 'budget_settle').length, 1);
+    assert.ok(!JSON.stringify(state.audit).includes(syntheticAgentToken));
+    console.log(JSON.stringify({ case: 'chat-auth-binding', invalidTokens: [401, 401, 401, 401], crossAgent: crossAgent.status,
+      allowed: allowed.status, providerCalls: 1, tokenForwarded: false, tokenAudited: false }));
+  } finally { await f.cleanup(); }
+});
+
+test('Replacing configured token rejects the old token and accepts the new token', { timeout: 20_000 }, async () => {
+  // A newly started Node process models a deployment/restart with rotated config.
+  const f = await fixture(true, undefined, authConfigFor(rotatedAgentToken, ['auth-allowed']));
+  try {
+    await f.seed('auth-allowed');
+    const oldToken = await f.chat('auth-allowed', requestBody);
+    assert.equal(oldToken.status, 401);
+    const beforeNewToken = await f.state('auth-allowed');
+    assert.equal(beforeNewToken.holds.length, 0);
+    assert.equal(beforeNewToken.audit.length, 0);
+    assert.equal(f.calls.length, 0);
+    const newToken = await f.chat('auth-allowed', requestBody, false, rotatedAgentToken);
+    assert.equal(newToken.status, 200);
+    assert.equal(f.calls.length, 1);
+    assert.ok(!JSON.stringify(f.calls).includes(rotatedAgentToken));
+    assert.ok(!JSON.stringify((await f.state('auth-allowed')).audit).includes(rotatedAgentToken));
+    console.log(JSON.stringify({ case: 'chat-auth-token-rotation', oldToken: oldToken.status, newToken: newToken.status, providerCalls: 1 }));
   } finally { await f.cleanup(); }
 });

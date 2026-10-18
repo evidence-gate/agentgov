@@ -1,3 +1,4 @@
+import { authenticateAgent } from './agent-auth';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { validateChatRequest } from './request-validation';
@@ -13,7 +14,7 @@ import { appendAuditEvent } from './audit/writer';
 import type { ChatCompletionRequest, BudgetExceededErrorBody } from './types';
 
 export type AppEnvironment = {
-  Bindings: Env & { AGENTGOV_PROVIDER_TIMEOUT_MS?: string; AGENTGOV_MAX_RETRIES?: string; AGENTGOV_RETRY_BASE_MS?: string };
+  Bindings: Env & { AGENTGOV_AGENT_AUTH?: string; AGENTGOV_PROVIDER_TIMEOUT_MS?: string; AGENTGOV_MAX_RETRIES?: string; AGENTGOV_RETRY_BASE_MS?: string };
   Variables: { db?: DbClient; hitlUnavailable?: boolean };
 };
 
@@ -32,11 +33,16 @@ app.route('/', hitlRoutes);
 
 // OpenAI-compatible chat completions endpoint with budget enforcement
 app.post('/v1/chat/completions', async (c) => {
+  const auth = await authenticateAgent(c.env?.AGENTGOV_AGENT_AUTH, c.req.header('X-Agentgov-Token'));
+  if (!auth.ok) return c.json({ error: { code: auth.code } }, auth.status);
+  // Only server-owned grants can authorize the request-controlled agent ID.
   // Step 1: Require X-Agent-Id header
   const agentId = c.req.header('X-Agent-Id');
   if (!agentId) {
     return c.json({ error: 'X-Agent-Id header required' }, 400);
   }
+
+  if (!auth.identity.agentIds.includes(agentId)) return c.json({ error: { code: 'AGENT_FORBIDDEN' } }, 403);
 
   // Step 2: Parse request body
   let body: ChatCompletionRequest;
@@ -68,7 +74,7 @@ app.post('/v1/chat/completions', async (c) => {
   const db = c.get('db') ?? createDbClient(dbUrl!, dbToken!);
 
   // Step 4: Run budget gate (Hold/Settle pattern)
-  const gateResult = await budgetGate({ db, agentId, request: body });
+  const gateResult = await budgetGate({ db, agentId, request: body, subject: auth.identity.subject });
 
   if (gateResult.action === 'block') {
     if (gateResult.reason === 'unknown_agent') return c.json({ error: { code: 'BUDGET_NOT_PROVISIONED' } }, 403);

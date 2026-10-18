@@ -44,7 +44,7 @@ export async function getBudget(
 
 /** Reserve and audit atomically; concurrent requests cannot spend the same balance. */
 export async function createHold(
-  db: DbClient, agentId: AgentId, model: string, estimatedCost: number,
+  db: DbClient, agentId: AgentId, model: string, estimatedCost: number, subject?: string,
 ): Promise<{ approved: true; holdId: HoldId } | { approved: false; remaining: number }> {
   if (!Number.isFinite(estimatedCost) || estimatedCost < 0) throw new Error('Invalid hold cost');
   const holdId = crypto.randomUUID();
@@ -56,7 +56,7 @@ export async function createHold(
     const now = Date.now();
     return {
       event: { eventType: 'budget_hold', agentId, model, costDelta: estimatedCost,
-        runningBalance: remaining - estimatedCost, meta: { holdId, estimatedCost } },
+        runningBalance: remaining - estimatedCost, meta: { holdId, estimatedCost, ...(subject ? { subject } : {}) } },
       condition: {
         sql: 'EXISTS(SELECT 1 FROM budget_ledger WHERE agent_id=? AND limit_usd=? AND spent_usd=? AND reserved_usd=?)',
         args: [agentId, budget.limitUsd, budget.spentUsd, budget.reservedUsd],

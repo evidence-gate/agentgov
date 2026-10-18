@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -9,6 +10,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { createClient } from '@libsql/client';
+
+const agentToken = 'synthetic-chat-token-0123456789abcdef';
+const agentAuth = JSON.stringify([{ subject: 'synthetic-chat-test', tokenSha256: createHash('sha256').update(agentToken).digest('hex'), agentIds: ['allowed', 'exhausted'] }]);
 
 async function listen(server) {
   server.listen(0, '127.0.0.1');
@@ -27,7 +31,7 @@ test('Node chat injects bindings, enforces budget, calls the provider, and settl
     for await (const chunk of req) body += chunk;
     const budgetAtDispatch = (await client.execute("SELECT reserved_usd FROM budget_ledger WHERE agent_id='allowed'")).rows[0];
     const activeHolds = (await client.execute("SELECT id FROM holds WHERE agent_id='allowed' AND status='active'")).rows.length;
-    calls.push({ path: req.url, authorization: req.headers.authorization, body: JSON.parse(body), budgetAtDispatch, activeHolds });
+    calls.push({ headers: { ...req.headers }, path: req.url, authorization: req.headers.authorization, body: JSON.parse(body), budgetAtDispatch, activeHolds });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       id: 'local-provider-result', object: 'chat.completion', model: 'gpt-4o-mini',
@@ -45,7 +49,7 @@ test('Node chat injects bindings, enforces budget, calls the provider, and settl
     cwd: fileURLToPath(new URL('../', import.meta.url)),
     env: {
       PATH: process.env.PATH, DATABASE_URL: url, PORT: String(port),
-      OPENAI_API_KEY: 'synthetic-local-key', TEST_PROVIDER_URL: `http://127.0.0.1:${providerPort}`,
+      OPENAI_API_KEY: 'synthetic-local-key', AGENTGOV_AGENT_AUTH: agentAuth, TEST_PROVIDER_URL: `http://127.0.0.1:${providerPort}`,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -73,7 +77,7 @@ test('Node chat injects bindings, enforces budget, calls the provider, and settl
     }
     async function chat(agent, model = 'gpt-4o-mini') {
       const response = await fetch(`${base}/v1/chat/completions`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Id': agent },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Id': agent, 'X-Agentgov-Token': agentToken },
         body: JSON.stringify({ model, max_tokens: 100, messages: [{ role: 'user', content: 'synthetic test' }] }),
         signal: AbortSignal.timeout(5000),
       });
@@ -97,6 +101,8 @@ test('Node chat injects bindings, enforces budget, calls the provider, and settl
     assert.equal(unknown.body.error.code, 'UNKNOWN_MODEL');
     assert.equal(calls.length, 1);
     assert.equal(calls[0].authorization, 'Bearer synthetic-local-key');
+    assert.equal(calls[0].headers['x-agentgov-token'], undefined);
+    assert.ok(!JSON.stringify(calls).includes(agentToken));
     assert.equal(calls[0].body.model, 'gpt-4o-mini');
     assert.ok(calls[0].budgetAtDispatch.reserved_usd > 0);
     assert.equal(calls[0].activeHolds, 1);
@@ -120,8 +126,10 @@ test('Node chat injects bindings, enforces budget, calls the provider, and settl
     const audit = (await client.execute('SELECT * FROM audit_log')).rows;
     assert.equal(audit.length, 4);
     assert.ok(!JSON.stringify(audit).includes('synthetic-local-key'));
+    assert.ok(!JSON.stringify(audit).includes(agentToken));
     const held = audit.find(row => row.event_type === 'budget_hold');
     assert.equal(held.agent_id, 'allowed');
+    assert.equal(JSON.parse(held.payload).subject, 'synthetic-chat-test');
     assert.equal(held.model, 'gpt-4o-mini');
     assert.ok(held.cost_delta > 0);
     const settled = audit.find(row => row.event_type === 'budget_settle');

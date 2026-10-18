@@ -173,9 +173,11 @@ class TestTransportUrlRewrite:
 class TestTransportHeaderInjection:
     def test_transport_injects_agent_id(self):
         transport, inner = make_transport(200, {}, agent_id="my-agent-007")
-        send(transport)
+        with httpx.Client(transport=transport) as client:
+            client.post("https://api.openai.com/v1/chat/completions", content=b"{}", headers={"X-Agentgov-Token": "synthetic_sdk_token_000000000000001"})
         assert inner.last_request is not None
         assert inner.last_request.headers.get("x-agent-id") == "my-agent-007"
+        assert inner.last_request.headers.get("x-agentgov-token") == "synthetic_sdk_token_000000000000001"
 
 
 # ---------------------------------------------------------------------------

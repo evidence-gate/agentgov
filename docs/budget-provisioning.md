@@ -6,4 +6,4 @@ Requests for an unregistered ID fail closed with an audited `unknown_agent` deci
 
 Budget limit updates apply the new limit and its `budget_limit_changed` event in one database write transaction. Failure to persist the audit leaves the prior limit unchanged. The update operation only changes existing agents and does not grant budgets to unknown IDs.
 
-The deployment operator must separately confirm caller authentication and which registered agent IDs each caller is authorized to use. A budget row alone is not an authentication credential.
+The deployment operator must configure AGENTGOV_AGENT_AUTH and provision caller tokens as described in agent-authentication.md. Chat now enforces each authenticated subject’s explicit agent allowlist before the budget gate. A budget row alone is not an authentication credential.

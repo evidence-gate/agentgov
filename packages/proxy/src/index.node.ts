@@ -68,6 +68,7 @@ async function main() {
   const env: Record<string, unknown> = {};
   env['TURSO_DATABASE_URL'] = process.env['DATABASE_URL'] ?? 'file:agentgov.db';
   env['TURSO_AUTH_TOKEN'] = 'local';
+  env['AGENTGOV_AGENT_AUTH'] = process.env['AGENTGOV_AGENT_AUTH'];
   env['AGENTGOV_PROVIDER_TIMEOUT_MS'] = process.env['AGENTGOV_PROVIDER_TIMEOUT_MS'];
   env['AGENTGOV_BUDGET_ADMIN_TOKEN'] = process.env['AGENTGOV_BUDGET_ADMIN_TOKEN'];
   env['AGENTGOV_MAX_RETRIES'] = process.env['AGENTGOV_MAX_RETRIES'];

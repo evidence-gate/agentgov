@@ -24,6 +24,7 @@ export interface GateContext {
   db: DbClient;
   agentId: AgentId;
   request: ChatCompletionRequest;
+  subject?: string;
 }
 
 /**
@@ -67,7 +68,7 @@ export async function budgetGate(ctx: GateContext): Promise<GateResult> {
   }
 
   // Step 3: Attempt to create hold
-  const holdResult = await createHold(db, agentId, model, estimatedCost);
+  const holdResult = await createHold(db, agentId, model, estimatedCost, ctx.subject);
 
   if (holdResult.approved) {
     // The reservation and budget_hold audit committed together.

@@ -89,9 +89,10 @@ async def test_async_transport_injects_agent_id():
     """x-agent-id header is injected into the rewritten request."""
     transport, inner = make_async_transport(200, {}, agent_id="my-async-agent")
     async with httpx.AsyncClient(transport=transport) as client:
-        await client.post("https://api.openai.com/v1/chat/completions", content=b"{}")
+        await client.post("https://api.openai.com/v1/chat/completions", content=b"{}", headers={"X-Agentgov-Token": "synthetic_sdk_token_000000000000001"})
     assert inner.last_request is not None
     assert inner.last_request.headers.get("x-agent-id") == "my-async-agent"
+    assert inner.last_request.headers.get("x-agentgov-token") == "synthetic_sdk_token_000000000000001"
 
 
 # ---------------------------------------------------------------------------

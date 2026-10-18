@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import app from './index';
+const token = 'synthetic_auth_token_for_tests_0001';
+const config = JSON.stringify([{ subject: 'test', tokenSha256: 'bf781a1ce0f205860892608c70eb8e3b5e54de78e6b5a8b67411115a26f99ee3', agentIds: ['test-agent', 'test-agent-01'] }]);
+function request(path: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers); headers.set('X-Agentgov-Token', token);
+  return app.request(path, { ...init, headers }, { AGENTGOV_AGENT_AUTH: config } as unknown as Env);
+}
 
 describe('GET /health', () => {
   it('returns 200 with { status: "ok" }', async () => {
-    const res = await app.request('/health');
+    const res = await request('/health');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ status: 'ok' });
@@ -12,7 +18,7 @@ describe('GET /health', () => {
 
 describe('POST /v1/chat/completions', () => {
   it('returns 400 when X-Agent-Id header is missing', async () => {
-    const res = await app.request('/v1/chat/completions', {
+    const res = await request('/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -30,7 +36,7 @@ describe('POST /v1/chat/completions', () => {
       [{ role: 'user', content: 'Hello' }],
       [{ role: 'assistant', content: null, tool_calls: [{ id: 't', type: 'function', function: { name: 'send_email', arguments: '{}' } }] }],
     ]) {
-      const res = await app.request('/v1/chat/completions', {
+      const res = await request('/v1/chat/completions', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Id': 'test-agent' },
         body: JSON.stringify({ model: 'gpt-4o', messages }),
       });
@@ -40,7 +46,7 @@ describe('POST /v1/chat/completions', () => {
   });
 
   it('returns 400 for non-JSON body (with X-Agent-Id header)', async () => {
-    const res = await app.request('/v1/chat/completions', {
+    const res = await request('/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,7 +65,7 @@ describe('HITL routes accessibility (Workers pool)', () => {
     // Without HITL_WORKFLOW binding, this will fail — but the ROUTE is mounted
     // Hono default env has HITL_WORKFLOW: Workflow (from wrangler types)
     // In Workers pool with wrangler config, the binding is an actual Workflow stub
-    const res = await app.request('/v1/hitl/test-ticket/approve', {
+    const res = await request('/v1/hitl/test-ticket/approve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ actor: 'test@example.com' }),
@@ -71,7 +77,7 @@ describe('HITL routes accessibility (Workers pool)', () => {
   });
 
   it('GET /v1/hitl/:id/status is mounted (returns non-404)', async () => {
-    const res = await app.request('/v1/hitl/unknown-ticket/status');
+    const res = await request('/v1/hitl/unknown-ticket/status');
     // Route is mounted — will fail with 500 (DB error) or similar, but NOT Hono 404
     expect(res.status).not.toBe(404);
   });
