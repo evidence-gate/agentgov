@@ -13,6 +13,16 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Synthetic credential scoped only to the agent IDs exercised by these fixtures.
+const syntheticToken = 'synthetic_hitl_integration_token_0000000000';
+const syntheticAuth = JSON.stringify([{
+  subject: 'hitl-integration-fixture',
+  tokenSha256: '35c98c912ac113ffaaaa7d0e4c9a63c6f1625e1dcc447e3487b8b86780f1afc6',
+  agentIds: ['test-agent-hitl', 'test-agent-safe', 'test-agent-notool', 'test-order',
+    'test-agent-stuck', 'test-agent-unique', 'test-agent-notool-loop'],
+}]);
+
+
 // Mock cloudflare:workers module — not available in Node.js (only in Cloudflare Workers runtime)
 // This allows importing index.ts (which re-exports HitlWorkflow) in Node.js test env.
 vi.mock('cloudflare:workers', () => ({
@@ -53,6 +63,7 @@ describe('HITL pipeline integration (via index.ts app with mocked DB)', () => {
     const mockEnv = {
       TURSO_DATABASE_URL: 'http://mock-db',
       TURSO_AUTH_TOKEN: 'mock-token',
+      AGENTGOV_AGENT_AUTH: syntheticAuth,
       HITL_WORKFLOW: { get: mockWorkflowGet, create: mockCreate },
       AGENTGOV_HITL_TTL_SECONDS: '3600',
     };
@@ -63,6 +74,7 @@ describe('HITL pipeline integration (via index.ts app with mocked DB)', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Agentgov-Token': syntheticToken,
           'X-Agent-Id': 'test-agent-hitl',
         },
         body: JSON.stringify({
@@ -127,6 +139,7 @@ describe('HITL pipeline integration (via index.ts app with mocked DB)', () => {
     const mockEnv = {
       TURSO_DATABASE_URL: 'http://mock-db',
       TURSO_AUTH_TOKEN: 'mock-token',
+      AGENTGOV_AGENT_AUTH: syntheticAuth,
       HITL_WORKFLOW: {
         get: vi.fn(),
         create: vi.fn(),
@@ -140,6 +153,7 @@ describe('HITL pipeline integration (via index.ts app with mocked DB)', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Agentgov-Token': syntheticToken,
           'X-Agent-Id': 'test-agent-safe',
         },
         body: JSON.stringify({
@@ -199,6 +213,7 @@ describe('HITL pipeline integration (via index.ts app with mocked DB)', () => {
     const mockEnv = {
       TURSO_DATABASE_URL: 'http://mock-db',
       TURSO_AUTH_TOKEN: 'mock-token',
+      AGENTGOV_AGENT_AUTH: syntheticAuth,
       HITL_WORKFLOW: { get: vi.fn(), create: vi.fn() },
     };
 
@@ -208,6 +223,7 @@ describe('HITL pipeline integration (via index.ts app with mocked DB)', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Agentgov-Token': syntheticToken,
           'X-Agent-Id': 'test-agent-notool',
         },
         body: JSON.stringify({
@@ -246,6 +262,7 @@ describe('HITL pipeline integration (via index.ts app with mocked DB)', () => {
     const mockEnv = {
       TURSO_DATABASE_URL: 'http://mock-db',
       TURSO_AUTH_TOKEN: 'mock-token',
+      AGENTGOV_AGENT_AUTH: syntheticAuth,
       HITL_WORKFLOW: { get: vi.fn(), create: mockCreate },
       AGENTGOV_HITL_TTL_SECONDS: '3600',
     };
@@ -256,6 +273,7 @@ describe('HITL pipeline integration (via index.ts app with mocked DB)', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Agentgov-Token': syntheticToken,
           'X-Agent-Id': 'test-order',
         },
         body: JSON.stringify({
@@ -308,6 +326,7 @@ describe('Loop detection integration (via index.ts with mocked DB)', () => {
     const mockEnv = {
       TURSO_DATABASE_URL: 'http://mock-db',
       TURSO_AUTH_TOKEN: 'mock-token',
+      AGENTGOV_AGENT_AUTH: syntheticAuth,
       HITL_WORKFLOW: { get: vi.fn(), create: vi.fn() },
     };
 
@@ -318,6 +337,7 @@ describe('Loop detection integration (via index.ts with mocked DB)', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Agentgov-Token': syntheticToken,
           'X-Agent-Id': 'test-agent-stuck',
         },
         body: JSON.stringify({
@@ -396,6 +416,7 @@ describe('Loop detection integration (via index.ts with mocked DB)', () => {
     const mockEnv = {
       TURSO_DATABASE_URL: 'http://mock-db',
       TURSO_AUTH_TOKEN: 'mock-token',
+      AGENTGOV_AGENT_AUTH: syntheticAuth,
       HITL_WORKFLOW: { get: vi.fn(), create: vi.fn() },
     };
 
@@ -405,6 +426,7 @@ describe('Loop detection integration (via index.ts with mocked DB)', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Agentgov-Token': syntheticToken,
           'X-Agent-Id': 'test-agent-unique',
         },
         body: JSON.stringify({
@@ -476,6 +498,7 @@ describe('Loop detection integration (via index.ts with mocked DB)', () => {
     const mockEnv = {
       TURSO_DATABASE_URL: 'http://mock-db',
       TURSO_AUTH_TOKEN: 'mock-token',
+      AGENTGOV_AGENT_AUTH: syntheticAuth,
       HITL_WORKFLOW: { get: vi.fn(), create: vi.fn() },
     };
 
@@ -485,6 +508,7 @@ describe('Loop detection integration (via index.ts with mocked DB)', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Agentgov-Token': syntheticToken,
           'X-Agent-Id': 'test-agent-notool-loop',
         },
         body: JSON.stringify({

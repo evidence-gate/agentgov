@@ -425,7 +425,7 @@ describe('Anthropic SSE streaming', () => {
     );
   });
 
-  it('no message_delta: degrades safely to completionTokens=0', async () => {
+  it('no message_delta: conservatively accounts unknown usage', async () => {
     const stream = createAnthropicSSEStream([
       {
         event: 'message_start',
@@ -459,7 +459,7 @@ describe('Anthropic SSE streaming', () => {
     expect(mockBudgetSettle).toHaveBeenCalledWith(
       expect.anything(),
       anthropicHoldId,
-      { promptTokens: 25, completionTokens: 0 },
+      null,
       'claude-3-5-sonnet-20241022',
       anthropicAgentId,
     );
@@ -599,7 +599,7 @@ describe('Gemini missing API key', () => {
     expect(res.status).toBe(503);
   });
 
-  it('error body mentions GEMINI_API_KEY', async () => {
+  it('error body is sanitized', async () => {
     const res = await forwardToLlm(
       { model: 'gemini-2.0-flash', messages: [{ role: 'user', content: 'Hello' }] },
       holdId,
@@ -608,7 +608,7 @@ describe('Gemini missing API key', () => {
       {},
     );
     const body = await res.json() as { error: string };
-    expect(body.error).toContain('GEMINI_API_KEY');
+    expect(body.error).toBe('provider request failed or usage unavailable');
   });
 
   it('does NOT call fetch when GEMINI_API_KEY is missing', async () => {
@@ -620,5 +620,90 @@ describe('Gemini missing API key', () => {
       {},
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('adversarial provider lifecycle', () => {
+  const request = { model: 'gpt-4o', messages: [{ role: 'user' as const, content: 'synthetic' }] };
+  const env = { OPENAI_API_KEY: 'synthetic-secret', AGENTGOV_PROVIDER_TIMEOUT_MS: '100' };
+  const run = (stream = false, signal?: AbortSignal) => forwardToLlm({ ...request, stream }, holdId, agentId, makeDbMock(), env, signal);
+  const unknown = () => expect(mockBudgetSettle).toHaveBeenCalledExactlyOnceWith(expect.anything(), holdId, null, request.model, agentId);
+  beforeEach(() => { mockBudgetSettle.mockReset().mockResolvedValue(undefined); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+  it('releases a missing-key hold before returning', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    await forwardToLlm(request, holdId, agentId, makeDbMock(), {});
+    expect(mockBudgetSettle).toHaveBeenCalledExactlyOnceWith(expect.anything(), holdId, { promptTokens: 0, completionTokens: 0 }, request.model, agentId);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('does not retry or leak transport exception/key; conservatively settles', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error(env.OPENAI_API_KEY)));
+    const response = await run();
+    expect(response.status).toBe(502);
+    expect(await response.text()).not.toContain(env.OPENAI_API_KEY);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    unknown();
+  });
+  it.each(['not json', '{}', '{"usage":{"prompt_tokens":-1,"completion_tokens":2}}', '{"usage":{"prompt_tokens":1,"completion_tokens":"2"}}'])('does not settle malformed usage for free: %s', async data => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(data)));
+    expect((await run()).status).toBe(502);
+    unknown();
+  });
+  it('sets actual output cap to the same 4096 default reserved by gate', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ usage: { prompt_tokens: 1, completion_tokens: 2 } })));
+    await run();
+    expect(JSON.parse((vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string).max_tokens).toBe(4096);
+  });
+  it('reassembles usage split in the middle of JSON', async () => {
+    const text = 'data: {"choices":[],"usage":{"prompt_tokens":17,"completion_tokens":31}}\n\ndata: [DONE]\n\n';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(makeStream([...text]))));
+    const response = await run(true);
+    expect(await response.text()).toBe(text);
+    expect(mockBudgetSettle).toHaveBeenCalledExactlyOnceWith(expect.anything(), holdId, { promptTokens: 17, completionTokens: 31 }, request.model, agentId);
+  });
+  it('requires terminal marker before trusting partial usage', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(makeStream(['data: {"usage":{"prompt_tokens":1,"completion_tokens":2}}\n\n']))));
+    await (await run(true)).text();
+    unknown();
+  });
+  it('bounds a hanging fetch and does not retry', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    expect((await run()).status).toBe(502);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    unknown();
+  });
+  it('bounds a hanging non-streaming response body', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new ReadableStream({ start() {} }))));
+    expect((await run()).status).toBe(502);
+    unknown();
+  });
+  it('settles when downstream cancels while upstream hangs', async () => {
+    const cancel = vi.fn();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new ReadableStream({ cancel }))));
+    const response = await run(true);
+    await response.body!.cancel();
+    expect(cancel).toHaveBeenCalled();
+    unknown();
+  });
+  it('settles and terminates an upstream stream read error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new ReadableStream({ start(c) { c.error(new Error('synthetic')); } }))));
+    const response = await run(true);
+    expect(await response.text()).toContain('provider stream interrupted');
+    unknown();
+  });
+  it('settles on client signal cancellation without replaying inference', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new ReadableStream({ start() {} }))));
+    const controller = new AbortController();
+    const pending = run(false, controller.signal);
+    controller.abort();
+    expect((await pending).status).toBe(502);
+    unknown();
+  });
+  it('deadline settles even a stream never consumed downstream', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(makeStream(['data: {}\n\n']))));
+    const response = await run(true);
+    await new Promise(resolve => setTimeout(resolve, 160));
+    unknown();
+    expect(await response.text()).toContain('provider stream interrupted');
   });
 });

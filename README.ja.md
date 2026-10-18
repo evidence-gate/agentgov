@@ -169,6 +169,9 @@ client = agentgov.wrap(Anthropic(), proxy_url="http://localhost:8787", agent_id=
 
 ## デプロイ
 
+**chat利用前にagent認証を設定してください。** `X-Agentgov-Token`とサーバー管理の`AGENTGOV_AGENT_AUTH`対応表が必須です。未設定時は拒否します。[設定とSDK利用方法](docs/agent-authentication.md)を参照してください。dashboard参照・HITL statusのアクセス制御とリモート利用時のHTTPSは別途必要です。Composeはlocalhost限定です。Workersの配備手順だけでは実資格情報やアクセス制御は構成されません。[公開条件](docs/integration-release-conditions.md)も確認してください。
+
+
 ### Docker Compose（セルフホスト）
 
 ```bash

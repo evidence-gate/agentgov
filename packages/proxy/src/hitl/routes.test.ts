@@ -165,13 +165,14 @@ describe('hitlRoutes', () => {
       HITL_WORKFLOW: { get: mockWorkflowGet, create: mockCreate },
       TURSO_DATABASE_URL: 'http://localhost',
       TURSO_AUTH_TOKEN: 'token',
+      AGENTGOV_HITL_APPROVAL_TOKEN: 'synthetic-operator-secret',
     };
 
     const res = await testApp.request(
       '/v1/hitl/ticket-123/approve',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer synthetic-operator-secret' },
         body: JSON.stringify({ actor: 'alice@example.com', reason: 'LGTM' }),
       },
       mockEnv,
@@ -200,13 +201,14 @@ describe('hitlRoutes', () => {
       HITL_WORKFLOW: { get: mockWorkflowGet, create: mockCreate },
       TURSO_DATABASE_URL: 'http://localhost',
       TURSO_AUTH_TOKEN: 'token',
+      AGENTGOV_HITL_APPROVAL_TOKEN: 'synthetic-operator-secret',
     };
 
     const res = await testApp.request(
       '/v1/hitl/ticket-456/deny',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer synthetic-operator-secret' },
         body: JSON.stringify({ actor: 'bob@example.com' }),
       },
       mockEnv,
@@ -248,6 +250,7 @@ describe('hitlRoutes', () => {
       HITL_WORKFLOW: { get: mockWorkflowGet, create: mockCreate },
       TURSO_DATABASE_URL: 'http://localhost',
       TURSO_AUTH_TOKEN: 'token',
+      AGENTGOV_HITL_APPROVAL_TOKEN: 'synthetic-operator-secret',
     };
 
     const res = await testApp.request('/v1/hitl/ticket-789/status', {}, mockEnv);
@@ -271,6 +274,7 @@ describe('hitlRoutes', () => {
       HITL_WORKFLOW: { get: mockWorkflowGet, create: mockCreate },
       TURSO_DATABASE_URL: 'http://localhost',
       TURSO_AUTH_TOKEN: 'token',
+      AGENTGOV_HITL_APPROVAL_TOKEN: 'synthetic-operator-secret',
     };
 
     const res = await testApp.request('/v1/hitl/nonexistent/status', {}, mockEnv);
@@ -295,6 +299,7 @@ describe('hitlRoutes', () => {
       SLACK_SIGNING_SECRET: 'secret',
       TURSO_DATABASE_URL: 'http://localhost',
       TURSO_AUTH_TOKEN: 'token',
+      AGENTGOV_HITL_APPROVAL_TOKEN: 'synthetic-operator-secret',
     };
 
     const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -336,6 +341,7 @@ describe('hitlRoutes', () => {
       SLACK_SIGNING_SECRET: 'secret',
       TURSO_DATABASE_URL: 'http://localhost',
       TURSO_AUTH_TOKEN: 'token',
+      AGENTGOV_HITL_APPROVAL_TOKEN: 'synthetic-operator-secret',
     };
 
     const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -382,6 +388,7 @@ describe('hitlRoutes', () => {
       SLACK_SIGNING_SECRET: 'secret',
       TURSO_DATABASE_URL: 'http://localhost',
       TURSO_AUTH_TOKEN: 'token',
+      AGENTGOV_HITL_APPROVAL_TOKEN: 'synthetic-operator-secret',
     };
 
     const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -402,5 +409,24 @@ describe('hitlRoutes', () => {
     );
 
     expect(res.status).toBe(200);
+  });
+});
+
+
+describe('direct decision authentication fails closed', () => {
+  it('rejects missing configuration and absent/wrong credentials without dispatch', async () => {
+    const { hitlRoutes } = await import('./routes');
+    const sendEvent = vi.fn();
+    const env = { HITL_WORKFLOW: { get: vi.fn().mockResolvedValue({ sendEvent }) } };
+    for (const action of ['approve', 'deny']) {
+      const request = { method: 'POST', body: JSON.stringify({ actor: 'forged-admin' }) };
+      expect((await hitlRoutes.request(`/v1/hitl/id/${action}`, request, env)).status).toBe(503);
+      for (const authorization of ['', 'Bearer wrong']) {
+        expect((await hitlRoutes.request(`/v1/hitl/id/${action}`, { ...request, headers: { Authorization: authorization } },
+          { ...env, AGENTGOV_HITL_APPROVAL_TOKEN: 'synthetic-operator-secret' })).status).toBe(401);
+      }
+    }
+    expect(env.HITL_WORKFLOW.get).not.toHaveBeenCalled();
+    expect(sendEvent).not.toHaveBeenCalled();
   });
 });

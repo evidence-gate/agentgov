@@ -209,7 +209,7 @@ describe('notifyChannels', () => {
     expect(body.callbackUrl).toBe('https://proxy.example.com/v1/hitl/ticket-abc');
   });
 
-  it('does not throw if webhook POST fails', async () => {
+  it('throws if webhook POST fails', async () => {
     const mockFetch = vi.fn().mockRejectedValue(new Error('network error'));
     global.fetch = mockFetch;
 
@@ -223,7 +223,7 @@ describe('notifyChannels', () => {
         expiresAt: 1700000000000,
         callbackUrl: 'https://proxy.example.com/v1/hitl/ticket-abc',
       })
-    ).resolves.not.toThrow();
+    ).rejects.toThrow();
   });
 
   it('posts Slack Block Kit message when token and channel configured', async () => {
@@ -262,7 +262,7 @@ describe('notifyChannels', () => {
     expect(denyBtn.value).toBe('ticket-slack');
   });
 
-  it('does not throw if Slack POST fails', async () => {
+  it('throws if Slack POST fails', async () => {
     const mockFetch = vi.fn().mockRejectedValue(new Error('slack error'));
     global.fetch = mockFetch;
 
@@ -277,7 +277,7 @@ describe('notifyChannels', () => {
         slackBotToken: 'xoxb-token',
         slackChannelId: 'C123456',
       })
-    ).resolves.not.toThrow();
+    ).rejects.toThrow();
   });
 
   it('skips webhook when webhookUrl is not provided', async () => {

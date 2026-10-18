@@ -169,6 +169,8 @@ client = agentgov.wrap(Anthropic(), proxy_url="http://localhost:8787", agent_id=
 
 ## Deploy
 
+**Configure agent authentication before sending chat requests.** The proxy now requires `X-Agentgov-Token` and a server-owned `AGENTGOV_AGENT_AUTH` credential-to-agent mapping; missing configuration fails closed. See [agent authentication](docs/agent-authentication.md). This does not authenticate dashboard reads or HITL status: restrict those routes separately and use HTTPS for remote access. Docker Compose binds the host port to `127.0.0.1`; the Workers instructions below do not configure production credentials or access controls. See [release conditions](docs/integration-release-conditions.md).
+
 ### Docker Compose (Self-Host)
 
 ```bash

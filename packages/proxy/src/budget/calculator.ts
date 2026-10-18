@@ -26,14 +26,13 @@ function getPricing() {
 }
 
 /**
- * Estimate the number of input tokens for a request using a character-based heuristic.
- *
- * Heuristic: sum all message content character counts ÷ 4 (GPT tokenization approximation).
- * Rounds up to the nearest integer.
+ * Reserve a conservative text-input upper bound, including tool schemas and
+ * arguments. The former characters/4 heuristic omitted non-content fields and
+ * underestimated non-ASCII text. UTF-8 bytes plus framing overhead intentionally
+ * over-reserve; actual provider usage releases the difference after completion.
  */
 export function estimateInputTokens(request: ChatCompletionRequest): number {
-  const totalChars = request.messages.reduce((sum, msg) => sum + (msg.content?.length ?? 0), 0);
-  return Math.ceil(totalChars / 4);
+  return new TextEncoder().encode(JSON.stringify(request)).length + request.messages.length * 32 + 256;
 }
 
 /**

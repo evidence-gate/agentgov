@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import app from './index';
+const token = 'synthetic_auth_token_for_tests_0001';
+const config = JSON.stringify([{ subject: 'test', tokenSha256: 'bf781a1ce0f205860892608c70eb8e3b5e54de78e6b5a8b67411115a26f99ee3', agentIds: ['test-agent', 'test-agent-01'] }]);
+function request(path: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers); headers.set('X-Agentgov-Token', token);
+  return app.request(path, { ...init, headers }, { AGENTGOV_AGENT_AUTH: config } as unknown as Env);
+}
 
 describe('GET /health', () => {
   it('returns 200 with { status: "ok" }', async () => {
-    const res = await app.request('/health');
+    const res = await request('/health');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ status: 'ok' });
@@ -12,7 +18,7 @@ describe('GET /health', () => {
 
 describe('POST /v1/chat/completions', () => {
   it('returns 400 when X-Agent-Id header is missing', async () => {
-    const res = await app.request('/v1/chat/completions', {
+    const res = await request('/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -25,63 +31,22 @@ describe('POST /v1/chat/completions', () => {
     expect(body['error']).toBe('X-Agent-Id header required');
   });
 
-  it('returns 200 with stub response for valid request (no DB bindings = dev passthrough)', async () => {
-    // Without TURSO bindings (no env in test), budget enforcement is skipped (dev mode passthrough)
-    const res = await app.request('/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Agent-Id': 'test-agent-01',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: 'Hello' }],
-      }),
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
-    expect(typeof body['id']).toBe('string');
-    expect((body['id'] as string).startsWith('stub-')).toBe(true);
-    expect(body['object']).toBe('chat.completion');
-    const choices = body['choices'] as Array<{ message: { role: string; content: string } }>;
-    expect(Array.isArray(choices)).toBe(true);
-    expect(choices[0].message.role).toBe('assistant');
-    expect(choices[0].message.content).toBe('stub');
-  });
-
-  it('returns 200 stub when request has reversible tool_calls (no TURSO = dev passthrough)', async () => {
-    // Reversible tool_calls with dev passthrough (no TURSO) — no HITL triggered
-    const res = await app.request('/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Agent-Id': 'test-agent-safe',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'assistant',
-            content: null,
-            tool_calls: [
-              {
-                id: 'call_safe',
-                type: 'function',
-                function: { name: 'read_file', arguments: '{}' },
-              },
-            ],
-          },
-        ],
-      }),
-    });
-    // Dev passthrough — no TURSO = stub response (no HITL gate without DB)
-    expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
-    expect((body['id'] as string).startsWith('stub-')).toBe(true);
+  it('fails closed when DB bindings are missing, including risky tool requests', async () => {
+    for (const messages of [
+      [{ role: 'user', content: 'Hello' }],
+      [{ role: 'assistant', content: null, tool_calls: [{ id: 't', type: 'function', function: { name: 'send_email', arguments: '{}' } }] }],
+    ]) {
+      const res = await request('/v1/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Id': 'test-agent' },
+        body: JSON.stringify({ model: 'gpt-4o', messages }),
+      });
+      expect(res.status).toBe(503);
+      expect(await res.json()).toMatchObject({ error: { code: 'GOVERNANCE_UNAVAILABLE' } });
+    }
   });
 
   it('returns 400 for non-JSON body (with X-Agent-Id header)', async () => {
-    const res = await app.request('/v1/chat/completions', {
+    const res = await request('/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,7 +65,7 @@ describe('HITL routes accessibility (Workers pool)', () => {
     // Without HITL_WORKFLOW binding, this will fail — but the ROUTE is mounted
     // Hono default env has HITL_WORKFLOW: Workflow (from wrangler types)
     // In Workers pool with wrangler config, the binding is an actual Workflow stub
-    const res = await app.request('/v1/hitl/test-ticket/approve', {
+    const res = await request('/v1/hitl/test-ticket/approve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ actor: 'test@example.com' }),
@@ -112,7 +77,7 @@ describe('HITL routes accessibility (Workers pool)', () => {
   });
 
   it('GET /v1/hitl/:id/status is mounted (returns non-404)', async () => {
-    const res = await app.request('/v1/hitl/unknown-ticket/status');
+    const res = await request('/v1/hitl/unknown-ticket/status');
     // Route is mounted — will fail with 500 (DB error) or similar, but NOT Hono 404
     expect(res.status).not.toBe(404);
   });
