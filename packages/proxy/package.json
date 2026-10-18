@@ -15,20 +15,23 @@
     "types": "wrangler types",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "start:node": "tsx src/index.node.ts"
+    "start:node": "tsx src/index.node.ts",
+    "build": "wrangler deploy --dry-run --env=\"\" --outdir dist",
+    "test:startup": "node --test scripts/node-startup.test.mjs"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.21",
-    "drizzle-kit": "^0.31.9",
-    "tsx": "^4.21.0",
-    "typescript": "^5",
-    "vitest": "~3.2.6",
-    "wrangler": "^4"
+    "@cloudflare/vitest-plugin": "~1.4.4",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "~4.1.12",
+    "wrangler": "^4.151.1",
+    "@types/node": "^22.20.5"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.11",
+    "@hono/node-server": "^1.19.17",
     "@libsql/client": "^0.14.0",
-    "drizzle-orm": "^0.45.1",
-    "hono": "^4.12.7"
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.13"
   }
 }

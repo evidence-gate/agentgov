@@ -14,7 +14,7 @@ import { createDockerDbClient, runMigrations } from './db/client.node';
 import { createDashboardRoutes } from './dashboard/routes';
 
 // Import the same Hono app object used in Workers — no changes to existing routes
-import app from './index';
+import app from './app';
 
 /**
  * Stub HITL_WORKFLOW binding.

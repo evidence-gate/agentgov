@@ -22,9 +22,10 @@
     "openai": ">=4.0.0"
   },
   "devDependencies": {
-    "openai": "^4.0.0",
-    "tsup": "latest",
-    "typescript": "^5",
-    "vitest": "~3.2.6"
+    "openai": "^4.104.0",
+    "tsup": "^9.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "~4.1.12",
+    "@types/node": "^22.0.0"
   }
 }

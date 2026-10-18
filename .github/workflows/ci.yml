@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: '.node-version'
 
       - name: Enable corepack (pnpm)
         run: corepack enable
@@ -36,6 +36,9 @@ jobs:
       - name: Lint dashboard
         run: pnpm --filter @agentgov/dashboard lint
 
+      - name: Build proxy, SDK, and dashboard
+        run: pnpm -r build
+
   test-node:
     name: Test (Node.js)
     runs-on: ubuntu-latest
@@ -44,7 +47,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: '.node-version'
 
       - name: Enable corepack (pnpm)
         run: corepack enable
@@ -54,6 +57,9 @@ jobs:
 
       - name: Test proxy (Node.js)
         run: pnpm --filter @agentgov/proxy test:node
+
+      - name: Test proxy startup and migrations (Node.js)
+        run: pnpm --filter @agentgov/proxy test:startup
 
       - name: Test SDK (TypeScript)
         run: pnpm --filter @agentgov/sdk test
@@ -66,7 +72,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: '.node-version'
 
       - name: Enable corepack (pnpm)
         run: corepack enable

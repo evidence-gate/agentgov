@@ -1,5 +1,8 @@
 [English](README.md) | **日本語**
 
+開発環境は Node.js 22.23.3（`.node-version`）と pnpm 10.0.0 を使用します。`corepack enable` の後に `pnpm install --frozen-lockfile` を実行してください。CI と Docker も同じ Node バージョンを使用します。
+
+
 # agentgov
 
 AIエージェントのためのガバナンスレイヤー — 予算強制、人間による承認、無限ループの検出を実現します。
