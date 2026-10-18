@@ -169,6 +169,8 @@ client = agentgov.wrap(Anthropic(), proxy_url="http://localhost:8787", agent_id=
 
 ## Deploy
 
+**Do not expose this proxy directly to untrusted clients.** `X-Agent-Id` is an accounting label, not authentication: a caller can use any registered agent's budget. A trusted ingress must authenticate callers, enforce their allowed agent IDs and replace caller-supplied identity headers; the proxy origin must not be directly reachable. Dashboard reads and HITL status also need access control. Docker Compose binds the host port to `127.0.0.1` by default; other containers/local users still need a trusted boundary. Workers deployment below does not configure that boundary. See [integration and recovery conditions](docs/integration-release-conditions.md) before deployment.
+
 ### Docker Compose (Self-Host)
 
 ```bash

@@ -20,7 +20,8 @@
     "test:startup": "node --test scripts/node-startup.test.mjs",
     "test:chat": "node --test scripts/node-chat.test.mjs",
     "test:adversarial": "node --test scripts/node-adversarial.test.mjs",
-    "test:hitl": "node --import tsx --test scripts/hitl-lifecycle.test.mjs"
+    "test:hitl": "node --import tsx --test scripts/hitl-lifecycle.test.mjs",
+    "test:recovery": "node --import tsx --test scripts/reservation-recovery.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "~1.4.4",

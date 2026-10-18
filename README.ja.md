@@ -169,6 +169,9 @@ client = agentgov.wrap(Anthropic(), proxy_url="http://localhost:8787", agent_id=
 
 ## デプロイ
 
+**信頼できないクライアントへ直接公開しないでください。** `X-Agent-Id`は認証ではなく、任意の登録済みagentの予算を使用できます。入口で利用者を認証し、使用可能なagent IDを強制し、送信者のIDヘッダーを置き換える必要があります。入口を迂回する直接接続も遮断してください。Composeのホストポートはlocalhost限定です。Workersの配備手順だけでは認証は構成されません。[統合・公開条件と予約復旧](docs/integration-release-conditions.md)を確認してください。
+
+
 ### Docker Compose（セルフホスト）
 
 ```bash
