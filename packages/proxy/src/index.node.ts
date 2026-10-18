@@ -4,7 +4,7 @@
  * Starts the same Hono app used in Cloudflare Workers, but adapts it for Node.js:
  * - Uses @hono/node-server instead of Cloudflare's fetch handler
  * - Uses embedded libSQL (file: URL) instead of Turso cloud HTTP
- * - Maps process.env values into c.env so existing proxy code works unchanged
+ * - Passes process.env into app.fetch as bindings so existing proxy code works unchanged
  * - Stubs HITL_WORKFLOW: any request that triggers HITL approval returns 501
  * - Mounts read-only dashboard API routes for the SPA (Plan 03)
  */
@@ -51,38 +51,39 @@ async function main() {
   await runMigrations(db);
   console.log('agentgov: migrations applied');
 
-  // Middleware to map process.env into c.env so existing Workers-style code works.
-  // Runs before all other routes.
-  app.use('*', async (c, next) => {
-    // Cast to allow setting arbitrary env values — Env type is a Workers global type
-    const env = c.env as unknown as Record<string, unknown>;
-    env['TURSO_DATABASE_URL'] = process.env['DATABASE_URL'] ?? 'file:agentgov.db';
-    env['TURSO_AUTH_TOKEN'] = 'local';
-    env['OPENAI_API_KEY'] = process.env['OPENAI_API_KEY'] ?? '';
-    env['ANTHROPIC_API_KEY'] = process.env['ANTHROPIC_API_KEY'] ?? '';
-    env['GEMINI_API_KEY'] = process.env['GEMINI_API_KEY'] ?? '';
-    env['AGENTGOV_ALERT_WEBHOOK_URL'] = process.env['AGENTGOV_ALERT_WEBHOOK_URL'] ?? '';
-    env['AGENTGOV_ALERT_THRESHOLDS'] = process.env['AGENTGOV_ALERT_THRESHOLDS'] ?? '0.80,1.00';
-    env['AGENTGOV_HITL_TTL_SECONDS'] = process.env['AGENTGOV_HITL_TTL_SECONDS'] ?? '259200';
-    env['AGENTGOV_HITL_WEBHOOK_URL'] = process.env['AGENTGOV_HITL_WEBHOOK_URL'] ?? '';
-    env['SLACK_BOT_TOKEN'] = process.env['SLACK_BOT_TOKEN'] ?? '';
-    env['SLACK_CHANNEL_ID'] = process.env['SLACK_CHANNEL_ID'] ?? '';
-    env['SLACK_SIGNING_SECRET'] = process.env['SLACK_SIGNING_SECRET'] ?? '';
-    // Stub HITL_WORKFLOW — throws HitlNotAvailableError if triggered.
-    // The fetch wrapper below catches this and returns 501.
-    env['HITL_WORKFLOW'] = HITL_WORKFLOW_STUB;
-    await next();
-  });
-
   // Mount read-only dashboard API routes (for Plan 03 SPA)
   app.route('/', createDashboardRoutes(db));
 
   console.log(`agentgov: starting on port ${port}`);
 
+  // Hono runs handlers in registration order. The shared app registers
+  // /v1/chat/completions at import time, so middleware added here would run
+  // only after that handler returns and would never populate c.env.
+  // @hono/node-server also calls fetch(request, { incoming, outgoing }), which
+  // is not the Workers binding object. Pass the Node config as app.fetch's env
+  // argument — the same channel Cloudflare uses for c.env.
+  const nodeBindings = (): Parameters<typeof app.fetch>[1] => ({
+    TURSO_DATABASE_URL: process.env['DATABASE_URL'] ?? 'file:agentgov.db',
+    TURSO_AUTH_TOKEN: 'local',
+    OPENAI_API_KEY: process.env['OPENAI_API_KEY'] ?? '',
+    ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] ?? '',
+    GEMINI_API_KEY: process.env['GEMINI_API_KEY'] ?? '',
+    AGENTGOV_ALERT_WEBHOOK_URL: process.env['AGENTGOV_ALERT_WEBHOOK_URL'] ?? '',
+    AGENTGOV_ALERT_THRESHOLDS: process.env['AGENTGOV_ALERT_THRESHOLDS'] ?? '0.80,1.00',
+    AGENTGOV_HITL_TTL_SECONDS: process.env['AGENTGOV_HITL_TTL_SECONDS'] ?? '259200',
+    AGENTGOV_HITL_WEBHOOK_URL: process.env['AGENTGOV_HITL_WEBHOOK_URL'] ?? '',
+    SLACK_BOT_TOKEN: process.env['SLACK_BOT_TOKEN'] ?? '',
+    SLACK_CHANNEL_ID: process.env['SLACK_CHANNEL_ID'] ?? '',
+    SLACK_SIGNING_SECRET: process.env['SLACK_SIGNING_SECRET'] ?? '',
+    // Stub HITL_WORKFLOW — throws HitlNotAvailableError if triggered.
+    // The fetch wrapper below catches this and returns 501.
+    HITL_WORKFLOW: HITL_WORKFLOW_STUB,
+  } as Parameters<typeof app.fetch>[1]);
+
   // Wrap app.fetch to catch HitlNotAvailableError and return 501
-  const fetchWithHitlGuard = async (req: Request, ...args: unknown[]) => {
+  const fetchWithHitlGuard = async (req: Request) => {
     try {
-      return await (app.fetch as (req: Request, ...args: unknown[]) => Promise<Response>)(req, ...args);
+      return await app.fetch(req, nodeBindings());
     } catch (err) {
       if (err instanceof HitlNotAvailableError) {
         return new Response(

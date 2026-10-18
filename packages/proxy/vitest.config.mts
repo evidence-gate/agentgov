@@ -18,6 +18,7 @@ export default defineConfig({
       'src/error/reporter.test.ts',
       'src/error/retry.test.ts',
       'src/error/loop-detector.test.ts',
+      'src/index.node.startup.test.ts',
     ],
   },
 });
