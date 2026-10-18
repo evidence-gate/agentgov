@@ -16,6 +16,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "start:node": "tsx src/index.node.ts",
+    "budget:provision": "tsx src/cli/provision-budget.ts",
     "build": "wrangler deploy --dry-run --env=\"\" --outdir dist",
     "test:startup": "node --test scripts/node-startup.test.mjs",
     "test:chat": "node --test scripts/node-chat.test.mjs",

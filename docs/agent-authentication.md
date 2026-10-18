@@ -25,6 +25,8 @@ Nodeはprocess環境、Composeは同名環境変数、Workersは同名bindingか
 - 許可されないagent:403 AGENT_FORBIDDEN。
 - 認証済みだが予算未登録:403 BUDGET_NOT_PROVISIONED。
 
+予算行は chat では作らない。運用者は `AGENTGOV_BUDGET_ADMIN_TOKEN` の Bearer を付けた `PUT /api/v1/operator/budgets/:agentId`、または DB 資格情報を持つ `pnpm --filter @agentgov/proxy budget:provision` で登録する。手順と Docker / Node / Workers のコマンドは budget-provisioning.md。未設定は 503、token 不一致は 401 で、いずれも行を作らない。chat token や `X-Agentgov-Token` では予算を付与できない。予算行だけでは chat を認可しない。
+
 拒否はDB・予約・provider呼出の前。認証失敗をDB監査へ保存していないため、必要な認証失敗監視は秘密を除去した入口ログで行う。要求主体が送るAuthorizationやX-Authenticated-Subjectは権限を与えない。管理用BearerやSlack署名は別経路のまま。
 
 既存SDKは任意ヘッダーを維持するため、SDKのAPI変更なしで利用できる。例（AGENTGOV_TOKENは別途承認済み手順で配布される値）:

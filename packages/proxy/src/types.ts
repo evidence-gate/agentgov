@@ -47,7 +47,8 @@ export type AuditEventType =
   | 'retry_exhausted'
   | 'permanent_error'
   | 'stuck_detected'
-  | 'budget_limit_changed';
+  | 'budget_limit_changed'
+  | 'budget_provisioned';
 
 export interface AuditEvent {
   eventType: AuditEventType;
