@@ -1,5 +1,8 @@
 **English** | [日本語](README.ja.md)
 
+Development requires Node.js 22.23.3 (see `.node-version`) and pnpm 10.0.0. Run `corepack enable` before `pnpm install --frozen-lockfile`. CI and Docker use the same Node baseline.
+
+
 # agentgov
 
 Governance layer for AI agents -- enforce budgets, require human approval, catch stuck loops.
